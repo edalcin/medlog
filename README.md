@@ -20,7 +20,7 @@ Projetado especialmente para uso familiar, o sistema permite registrar consultas
 ### ✅ Status da Implementação (Outubro 2025)
 
 **🚀 MVP Funcional Completo:**
-- ✅ **Autenticação Google OAuth** - Login seguro via Gmail
+- ✅ **Autenticação com Email e Senha** - Login simples com credenciais
 - ✅ **Registro de Consultas** - Interface completa para registrar consultas
 - ✅ **Gestão de Profissionais** - CRUD básico de profissionais de saúde
 - ✅ **Upload de Arquivos** - Suporte a PDF, PNG, JPG (até 10MB)
@@ -65,7 +65,6 @@ A falta de um local centralizado onde todo o histórico médico possa ser consul
 ### Pré-requisitos
 - Node.js 20+
 - MariaDB 11+ ou Docker
-- Conta Google Cloud (para OAuth)
 
 ### Setup Rápido
 
@@ -90,9 +89,9 @@ npm run dev
 **Acesse:** `http://localhost:3000`
 
 ### Primeiro Login
-1. Configure Google OAuth no Google Cloud Console
-2. Defina `ADMIN_EMAIL=seu-email@gmail.com` no `.env.local`
-3. Faça login com seu Gmail - você será o admin
+1. Crie usuário admin manualmente no banco ou via seed (futuro script)
+2. Defina `ADMIN_EMAIL=seu-email@dominio.com` no `.env.local`
+3. Acesse /auth/signin e entre com email e senha cadastrados
 4. Comece a cadastrar profissionais e consultas!
 
 ---
