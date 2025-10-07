@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Profissionais - MedLog{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Profissionais de Saúde</h2>
+    <a href="{{ url_for('new_professional') }}" class="btn btn-success">Novo Profissional</a>
+</div>
+
+{% if professionals %}
+<table>
+    <thead>
+        <tr>
+            <th>Nome</th>
+            <th>Especialidade</th>
+            <th>CRM</th>
+            <th>Telefone</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for prof in professionals %}
+        <tr>
+            <td>{{ prof.name }}</td>
+            <td>{{ prof.specialty }}</td>
+            <td>{{ prof.crm or '-' }}</td>
+            <td>{{ prof.phone or '-' }}</td>
+            <td class="actions">
+                <a href="{{ url_for('edit_professional', id=prof.id) }}" class="btn btn-small">Editar</a>
+                <form method="POST" action="{{ url_for('delete_professional', id=prof.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este profissional?');">
+                    <button type="submit" class="btn btn-small btn-danger">Excluir</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Nenhum profissional cadastrado. <a href="{{ url_for('new_professional') }}">Cadastrar o primeiro profissional</a>.</p>
+{% endif %}
+{% endblock %}

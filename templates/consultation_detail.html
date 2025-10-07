@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Detalhes da Consulta - MedLog{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Detalhes da Consulta</h2>
+    <div class="actions">
+        <a href="{{ url_for('edit_consultation', id=consultation.id) }}" class="btn">Editar</a>
+        <a href="{{ url_for('index') }}" class="btn">Voltar</a>
+    </div>
+</div>
+
+<div style="margin-bottom: 30px;">
+    <p><strong>Data:</strong> {{ consultation.date.strftime('%d/%m/%Y') }}</p>
+    <p><strong>Profissional:</strong> {{ consultation.professional.name }}</p>
+    <p><strong>Especialidade:</strong> {{ consultation.specialty }}</p>
+    <p><strong>CRM:</strong> {{ consultation.professional.crm or 'Não informado' }}</p>
+    <p><strong>Telefone:</strong> {{ consultation.professional.phone or 'Não informado' }}</p>
+</div>
+
+<div style="margin-bottom: 30px;">
+    <h3>Observações:</h3>
+    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin-top: 10px;">
+        {% if consultation.notes %}
+            {{ consultation.notes|replace('\n', '<br>')|safe }}
+        {% else %}
+            <em>Nenhuma observação registrada.</em>
+        {% endif %}
+    </div>
+</div>
+
+<div>
+    <h3>Arquivos Anexados:</h3>
+    {% if consultation.files %}
+    <table>
+        <thead>
+            <tr>
+                <th>Nome do Arquivo</th>
+                <th>Data de Upload</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for file in consultation.files %}
+            <tr>
+                <td>{{ file.original_filename }}</td>
+                <td>{{ file.uploaded_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td class="actions">
+                    <a href="{{ url_for('uploaded_file', filename=file.filename) }}" target="_blank" class="btn btn-small">Abrir</a>
+                    <form method="POST" action="{{ url_for('delete_file', file_id=file.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir este arquivo?');">
+                        <button type="submit" class="btn btn-small btn-danger">Excluir</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="margin-top: 10px;"><em>Nenhum arquivo anexado.</em></p>
+    {% endif %}
+</div>
+{% endblock %}

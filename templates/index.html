@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Consultas - MedLog{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Consultas Médicas</h2>
+    <a href="{{ url_for('new_consultation') }}" class="btn btn-success">Nova Consulta</a>
+</div>
+
+{% if consultations %}
+<table>
+    <thead>
+        <tr>
+            <th>Data</th>
+            <th>Profissional</th>
+            <th>Especialidade</th>
+            <th>Arquivos</th>
+            <th>Ações</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for consultation in consultations %}
+        <tr>
+            <td>{{ consultation.date.strftime('%d/%m/%Y') }}</td>
+            <td>{{ consultation.professional.name }}</td>
+            <td>{{ consultation.specialty }}</td>
+            <td>{{ consultation.files|length }} arquivo(s)</td>
+            <td class="actions">
+                <a href="{{ url_for('view_consultation', id=consultation.id) }}" class="btn btn-small">Ver</a>
+                <a href="{{ url_for('edit_consultation', id=consultation.id) }}" class="btn btn-small">Editar</a>
+                <form method="POST" action="{{ url_for('delete_consultation', id=consultation.id) }}" style="display: inline;" onsubmit="return confirm('Tem certeza que deseja excluir esta consulta?');">
+                    <button type="submit" class="btn btn-small btn-danger">Excluir</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Nenhuma consulta registrada. <a href="{{ url_for('new_consultation') }}">Registrar a primeira consulta</a>.</p>
+{% endif %}
+{% endblock %}

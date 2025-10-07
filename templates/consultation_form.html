@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}{% if consultation %}Editar{% else %}Nova{% endif %} Consulta - MedLog{% endblock %}
+
+{% block content %}
+<h2>{% if consultation %}Editar{% else %}Nova{% endif %} Consulta</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <div class="form-group">
+        <label for="date">Data da Consulta:</label>
+        <input type="date" id="date" name="date" value="{% if consultation %}{{ consultation.date.strftime('%Y-%m-%d') }}{% endif %}" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="professional_id">Profissional:</label>
+        <select id="professional_id" name="professional_id" required onchange="updateSpecialty()">
+            <option value="">Selecione um profissional</option>
+            {% for prof in professionals %}
+            <option value="{{ prof.id }}" data-specialty="{{ prof.specialty }}" {% if consultation and consultation.professional_id == prof.id %}selected{% endif %}>
+                {{ prof.name }} - {{ prof.specialty }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label for="specialty">Especialidade:</label>
+        <input type="text" id="specialty" name="specialty" value="{% if consultation %}{{ consultation.specialty }}{% endif %}" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="notes">Observações (texto livre):</label>
+        <textarea id="notes" name="notes">{% if consultation %}{{ consultation.notes }}{% endif %}</textarea>
+    </div>
+    
+    <div class="form-group">
+        <label for="files">Arquivos (receitas, exames, laudos - PDF, PNG, JPG):</label>
+        <input type="file" id="files" name="files" multiple accept=".pdf,.png,.jpg,.jpeg,.gif">
+        <small style="color: #666; display: block; margin-top: 5px;">Você pode selecionar múltiplos arquivos. Tamanho máximo: 16MB por arquivo.</small>
+    </div>
+    
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Salvar</button>
+        <a href="{{ url_for('index') }}" class="btn">Cancelar</a>
+    </div>
+</form>
+
+<script>
+function updateSpecialty() {
+    var select = document.getElementById('professional_id');
+    var specialtyInput = document.getElementById('specialty');
+    var selectedOption = select.options[select.selectedIndex];
+    if (selectedOption.value) {
+        specialtyInput.value = selectedOption.getAttribute('data-specialty');
+    }
+}
+</script>
+{% endblock %}

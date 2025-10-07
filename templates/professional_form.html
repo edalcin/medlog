@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}{% if professional %}Editar{% else %}Novo{% endif %} Profissional - MedLog{% endblock %}
+
+{% block content %}
+<h2>{% if professional %}Editar{% else %}Novo{% endif %} Profissional de Saúde</h2>
+
+<form method="POST">
+    <div class="form-group">
+        <label for="name">Nome:</label>
+        <input type="text" id="name" name="name" value="{% if professional %}{{ professional.name }}{% endif %}" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="specialty">Especialidade:</label>
+        <input type="text" id="specialty" name="specialty" value="{% if professional %}{{ professional.specialty }}{% endif %}" required>
+    </div>
+    
+    <div class="form-group">
+        <label for="crm">CRM:</label>
+        <input type="text" id="crm" name="crm" value="{% if professional %}{{ professional.crm }}{% endif %}">
+    </div>
+    
+    <div class="form-group">
+        <label for="phone">Telefone:</label>
+        <input type="tel" id="phone" name="phone" value="{% if professional %}{{ professional.phone }}{% endif %}">
+    </div>
+    
+    <div class="form-group">
+        <label for="address">Endereço:</label>
+        <textarea id="address" name="address" style="min-height: 100px;">{% if professional %}{{ professional.address }}{% endif %}</textarea>
+    </div>
+    
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Salvar</button>
+        <a href="{{ url_for('professionals') }}" class="btn">Cancelar</a>
+    </div>
+</form>
+{% endblock %}
