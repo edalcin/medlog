@@ -1032,4 +1032,4 @@ Para questões e suporte:
 
 **Desenvolvido com ❤️ para uso familiar**
 
-*Última atualização: 2025-01-07*
+**Última atualização: 7 de outubro de 2025**
