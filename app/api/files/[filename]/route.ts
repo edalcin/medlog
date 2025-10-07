@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth/config'
-import { handleApiError } from '@/lib/responses'
-import { NotFoundError, ForbiddenError } from '@/lib/errors'
-import { getFullFilePath } from '@/lib/upload'
+import { authOptions } from '../../../../lib/auth/config'
+import { handleApiError } from '../../../../lib/responses'
+import { NotFoundError, ForbiddenError } from '../../../../lib/errors'
+import { getFullFilePath } from '../../../../lib/upload'
 import { readFile } from 'fs/promises'
 
 const prisma = new PrismaClient()

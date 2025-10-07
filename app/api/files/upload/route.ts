@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth/config'
-import { successResponse, handleApiError, errorResponse } from '@/lib/responses'
-import { ValidationError, NotFoundError } from '@/lib/errors'
-import { saveUploadedFile } from '@/lib/upload'
+import { authOptions } from '../../../../lib/auth/config'
+import { successResponse, handleApiError, errorResponse } from '../../../../lib/responses'
+import { ValidationError, NotFoundError } from '../../../../lib/errors'
+import { saveUploadedFile } from '../../../../lib/upload'
 
 const prisma = new PrismaClient()
 

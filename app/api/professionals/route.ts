@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { successResponse, handleApiError } from '@/lib/responses'
-import { NotFoundError } from '@/lib/errors'
+import { successResponse, handleApiError } from '../../../lib/responses'
+import { NotFoundError } from '../../../lib/errors'
 
 const prisma = new PrismaClient()
 
