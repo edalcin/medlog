@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String @id @default(uuid())
+  email     String @unique
+  name      String
+  googleId  String @unique
+  role      UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  consultations Consultation[]
+
+  @@map("users")
+}
+
+model Professional {
+  id        String @id @default(uuid())
+  name      String
+  specialty String
+  crm       String?
+  phone     String?
+  address   String?
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  consultations Consultation[]
+  files         File[]
+
+  @@map("professionals")
+}
+
+model Consultation {
+  id             String @id @default(uuid())
+  date           DateTime
+  notes          String?
+  userId         String
+  professionalId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id])
+  files        File[]
+
+  @@map("consultations")
+}
+
+model File {
+  id             String @id @default(uuid())
+  filename       String
+  path           String
+  mimeType       String
+  size           Int
+  consultationId String
+  professionalId String
+  uploadedAt     DateTime @default(now())
+
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@map("files")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}

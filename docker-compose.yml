@@ -1,0 +1,80 @@
+version: '3.8'
+
+services:
+  medlog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: medlog
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Database
+      - DB_HOST=${DB_HOST:-mariadb}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-medlog}
+      - DB_USER=${DB_USER:-medlog_user}
+      - DB_PASSWORD=${DB_PASSWORD}
+
+      # Application
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=3000
+      - APP_URL=${APP_URL:-http://localhost:3000}
+
+      # Files
+      - FILES_PATH=/app/data/uploads
+
+      # Google OAuth
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL}
+
+      # Security
+      - SESSION_SECRET=${SESSION_SECRET}
+      - JWT_SECRET=${JWT_SECRET}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+
+      # Admin
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+    volumes:
+      - uploads:/app/data/uploads
+    networks:
+      - medlog-network
+    depends_on:
+      - mariadb
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  mariadb:
+    image: mariadb:11
+    container_name: medlog-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-rootpassword}
+      - MYSQL_DATABASE=${DB_NAME:-medlog}
+      - MYSQL_USER=${DB_USER:-medlog_user}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - medlog-network
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+volumes:
+  uploads:
+  db_data:
+
+networks:
+  medlog-network:
+    driver: bridge

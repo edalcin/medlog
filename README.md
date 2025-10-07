@@ -6,6 +6,7 @@
 [![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/next.js-14+-black.svg)](https://nextjs.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/status-MVP%20Ready-green.svg)](https://github.com/edalcin/medlog)
 
 ---
 
@@ -15,6 +16,39 @@ O MedLog é um sistema web self-hosted para centralizar todo o histórico médic
 
 Projetado especialmente para uso familiar, o sistema permite registrar consultas médicas em texto livre (com suporte a Markdown), fazer upload de PDFs e imagens de exames e resultados, além de gerenciar profissionais de saúde com suas especialidades.
 
+### ✅ Status da Implementação (Outubro 2025)
+
+**🚀 MVP Funcional Completo:**
+- ✅ **Autenticação Google OAuth** - Login seguro via Gmail
+- ✅ **Registro de Consultas** - Interface completa para registrar consultas
+- ✅ **Gestão de Profissionais** - CRUD básico de profissionais de saúde
+- ✅ **Upload de Arquivos** - Suporte a PDF, PNG, JPG (até 10MB)
+- ✅ **Visualização de Arquivos** - Download direto dos arquivos
+- ✅ **API REST** - Endpoints completos para todas as operações
+- ✅ **Interface Responsiva** - Design moderno com Tailwind CSS
+- ✅ **Banco de Dados** - Schema completo com Prisma ORM
+- ✅ **Docker Ready** - Containerização completa para produção
+
+**📋 Funcionalidades Implementadas:**
+- Autenticação e autorização
+- CRUD de consultas médicas
+- CRUD de profissionais de saúde
+- Upload e download de arquivos
+- Interface web responsiva
+- API REST completa
+- Middleware de autenticação
+- Tratamento de erros consistente
+- Validação de dados
+- TypeScript completo
+
+**🔄 Próximas Etapas (Fase 2):**
+- Relatórios e dashboards
+- Busca avançada e filtros
+- Gestão de usuários familiares (admin)
+- Visualizações multi-perspectiva de arquivos
+- Timeline de histórico médico
+- Exportação de relatórios
+
 ### Problema que Resolve
 
 A falta de um local centralizado onde todo o histórico médico possa ser consultado de forma organizada, causando:
@@ -22,6 +56,43 @@ A falta de um local centralizado onde todo o histórico médico possa ser consul
 - Perda de receitas e laudos médicos
 - Falta de histórico completo ao consultar novos médicos
 - Informações espalhadas em papéis, emails e diferentes aplicativos
+
+---
+
+## 🚀 Início Rápido (Desenvolvimento)
+
+### Pré-requisitos
+- Node.js 20+
+- MariaDB 11+ ou Docker
+- Conta Google Cloud (para OAuth)
+
+### Setup Rápido
+
+```bash
+# Clone e instale
+git clone https://github.com/edalcin/medlog.git
+cd medlog
+npm install
+
+# Configure ambiente
+cp .env.example .env.local
+# Edite .env.local com suas configurações
+
+# Setup banco de dados
+npx prisma generate
+npx prisma db push
+
+# Inicie desenvolvimento
+npm run dev
+```
+
+**Acesse:** `http://localhost:3000`
+
+### Primeiro Login
+1. Configure Google OAuth no Google Cloud Console
+2. Defina `ADMIN_EMAIL=seu-email@gmail.com` no `.env.local`
+3. Faça login com seu Gmail - você será o admin
+4. Comece a cadastrar profissionais e consultas!
 
 ---
 
