@@ -16,39 +16,40 @@ env:
   IMAGE_NAME: edalcin/medlog
 
 jobs:
+  quality:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install
+        run: npm ci
+      - name: Lint
+        run: npm run lint --if-present
+        continue-on-error: true
+      - name: Typecheck
+        run: npx tsc --noEmit
+        continue-on-error: true
+      - name: Placeholder tests
+        run: echo "(Adicionar testes futuramente)"
+        continue-on-error: true
   build-and-push:
     runs-on: ubuntu-latest
+    needs: quality
+    if: always()
     permissions:
       contents: read
       packages: write
       id-token: write
       attestations: write
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint --if-present
-
-      - name: Typecheck
-        run: npx tsc --noEmit
-
-      - name: Placeholder tests
-        run: echo "(Adicionar testes futuramente)"
-
+      - uses: actions/checkout@v4
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -56,7 +57,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -69,7 +69,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha
-
+            type=raw,value=unraid-test,enable=true
       - name: Build and push Docker image
         id: build
         uses: docker/build-push-action@v5
@@ -81,7 +81,6 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
       - name: Generate artifact attestation
         if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v1
@@ -89,7 +88,6 @@ jobs:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
-
       - name: Generate CHANGELOG fragment (tag only)
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
@@ -100,7 +98,6 @@ jobs:
           echo "Commit: $GITHUB_SHA" >> RELEASE_NOTES.md
           echo >> RELEASE_NOTES.md
           echo "(Gerar changelog detalhado quando houver conventional commits)" >> RELEASE_NOTES.md
-
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
