@@ -3,6 +3,7 @@
 > Sistema completo para gerenciamento de histórico médico pessoal e familiar
 
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
+[![GHCR Image](https://img.shields.io/badge/ghcr.io-edalcin%2Fmedlog-1f425f?logo=github)](https://github.com/users/edalcin/packages/container/package/medlog)
 [![GitHub Container Registry](https://img.shields.io/badge/container%20registry-ghcr.io-blue.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
 [![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/next.js-14+-black.svg)](https://nextjs.org/)
