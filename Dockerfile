@@ -57,6 +57,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 RUN mkdir -p /app/data/uploads && chown -R nextjs:nodejs /app/data/uploads
 
 COPY --from=builder /app/prisma ./prisma
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh
 
 USER nextjs
 
@@ -66,4 +68,5 @@ ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
 # Entrypoint script para rodar migrations antes de subir o server
-ENTRYPOINT ["/bin/sh","-c","npx prisma migrate deploy && node server.js"]
+ENV MEDLOG_VERSION=0.1.0
+ENTRYPOINT ["/bin/sh","./docker-entrypoint.sh"]
