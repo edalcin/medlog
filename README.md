@@ -246,9 +246,10 @@ docker inspect ghcr.io/edalcin/medlog:latest
 - Ative/desative usuários
 
 ### 🔐 Autenticação Segura
-- Login via **Google OAuth 2.0**
-- Sem necessidade de criar senhas
-- Sessões seguras e gerenciadas
+
+- Login via **Email e Senha** (NextAuth Credentials)
+- Senhas armazenadas com bcrypt (hash seguro)
+- Sessões JWT leves e assinadas
 
 ---
 
@@ -307,25 +308,37 @@ docker inspect ghcr.io/edalcin/medlog:latest
 - **MariaDB 11+** instalado e rodando
 - **Conta Google Cloud** com OAuth 2.0 configurado
 
-### Configuração do Google OAuth
+### Migrações e Seed
 
-1. Acesse o [Google Cloud Console](https://console.cloud.google.com)
-2. Crie um novo projeto ou selecione um existente
-3. Ative a **Google+ API**:
-   - Menu → APIs & Services → Library
-   - Busque "Google+ API" e ative
-4. Crie credenciais OAuth 2.0:
-   - APIs & Services → Credentials
-   - Create Credentials → OAuth 2.0 Client ID
-   - Application type: Web application
-5. Configure as URLs autorizadas:
-   - **Authorized JavaScript origins:**
-     - `http://SEU_IP:3000`
-     - `https://SEU_DOMINIO` (se usar Cloudflare)
-   - **Authorized redirect URIs:**
-     - `http://SEU_IP:3000/api/auth/callback/google`
-     - `https://SEU_DOMINIO/api/auth/callback/google`
-6. Copie o **Client ID** e **Client Secret**
+Para aplicar o schema do banco em produção/desenvolvimento:
+
+```bash
+npm run prisma:migrate:deploy
+```
+
+Gerar nova migration após alterar o schema (`prisma/schema.prisma`):
+
+```bash
+npm run prisma:migrate:dev
+```
+
+Gerar somente o client Prisma:
+
+```bash
+npm run prisma:generate
+```
+
+Criar usuário admin inicial (não armazene ADMIN_PASSWORD no .env):
+
+```bash
+ADMIN_PASSWORD='SenhaForte123!' npm run seed:admin
+```
+
+Reset local (cuidado - destrói dados):
+
+```bash
+npx prisma migrate reset
+```
 
 ---
 

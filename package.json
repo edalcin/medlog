@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed:admin": "ts-node --transpile-only scripts/seed-admin.ts",
-    "prisma:migrate:dev": "prisma migrate dev --name init",
+  "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate"
   },
