@@ -3,6 +3,7 @@
 > Sistema completo para gerenciamento de histórico médico pessoal e familiar
 
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
+[![GitHub Container Registry](https://img.shields.io/badge/container%20registry-ghcr.io-blue.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
 [![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/next.js-14+-black.svg)](https://nextjs.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -93,6 +94,58 @@ npm run dev
 2. Defina `ADMIN_EMAIL=seu-email@gmail.com` no `.env.local`
 3. Faça login com seu Gmail - você será o admin
 4. Comece a cadastrar profissionais e consultas!
+
+---
+
+## 🐳 Container Registry
+
+### Imagem Docker Oficial
+
+A imagem Docker do MedLog está disponível no **GitHub Container Registry**:
+
+```bash
+# Pull da imagem mais recente
+docker pull ghcr.io/edalcin/medlog:latest
+
+# Ou versão específica
+docker pull ghcr.io/edalcin/medlog:v1.0.0
+```
+
+### Deploy Rápido com Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  medlog:
+    image: ghcr.io/edalcin/medlog:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=your_db_host
+      - DB_PASSWORD=your_db_password
+      - GOOGLE_CLIENT_ID=your_google_client_id
+      - GOOGLE_CLIENT_SECRET=your_google_client_secret
+      - ADMIN_EMAIL=your-admin@gmail.com
+    volumes:
+      - ./uploads:/app/data/uploads
+```
+
+### Tags Disponíveis
+
+- `latest` - Última versão estável
+- `v1.0.0` - Versão específica (quando houver releases)
+- `main` - Build da branch main
+- `001-medlog-sistema-de` - Build da branch de desenvolvimento
+
+### Verificar Imagens
+
+```bash
+# Listar todas as versões disponíveis
+docker search ghcr.io/edalcin/medlog
+
+# Ver informações da imagem
+docker inspect ghcr.io/edalcin/medlog:latest
+```
 
 ---
 
