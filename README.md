@@ -43,157 +43,81 @@ Projetado especialmente para uso familiar, o sistema permite registrar consultas
 - Validação de dados
 - TypeScript completo
 
-**🔄 Próximas Etapas (Fase 2):**
-- Relatórios e dashboards
-- Busca avançada e filtros
-- Gestão de usuários familiares (admin)
-- Visualizações multi-perspectiva de arquivos
-- Timeline de histórico médico
-- Exportação de relatórios
-
-### Problema que Resolve
-
-A falta de um local centralizado onde todo o histórico médico possa ser consultado de forma organizada, causando:
-- Dificuldade em encontrar resultados de exames antigos
-- Perda de receitas e laudos médicos
-- Falta de histórico completo ao consultar novos médicos
-- Informações espalhadas em papéis, emails e diferentes aplicativos
-
----
-
-## 🚀 Início Rápido (Desenvolvimento)
+```bash
+```
+## 🐳 Instalação no Unraid (Interface "Add Container")
 
 ### Pré-requisitos
-- Node.js 20+
-- MariaDB 11+ ou Docker
+1. MariaDB já rodando (pode ser container separado) com base e usuário criados:
+    ```sql
+    CREATE DATABASE medlog CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE USER 'medlog_user'@'%' IDENTIFIED BY 'SUA_SENHA_SEGURA';
+    GRANT ALL PRIVILEGES ON medlog.* TO 'medlog_user'@'%';
+    FLUSH PRIVILEGES;
+    ```
+2. Diretório de uploads criado no Unraid:
+    ```bash
+    mkdir -p /mnt/user/appdata/medlog/uploads
+    chmod 755 /mnt/user/appdata/medlog/uploads
+    ```
+3. Token de acesso ao GHCR (se imagem privada) ou tornar o pacote público.
 
-### Setup Rápido
+### Passo a Passo
+1. Acesse o Dashboard do Unraid.
+2. Vá em: Docker → Add Container → (Switch para modo avançado se necessário).
+3. Em "Name": `medlog`.
+4. Em "Repository": `ghcr.io/edalcin/medlog:latest` (ou `:main` / `:v0.1.0`).
+5. Network: `bridge` (ou a rede custom que você usa com o banco).
+6. WebUI: `http://[IP]:[PORT:3000]`.
+7. Add Port: Container 3000 → Host 3000 (TCP).
+8. Add Path: Container `/app/data/uploads` → Host `/mnt/user/appdata/medlog/uploads` (RW).
+9. Add as variáveis de ambiente (Environment):
 
+| Variável | Valor Exemplo | Descrição |
+|----------|---------------|-----------|
+| DATABASE_URL | `mysql://medlog_user:SUA_SENHA_SEGURA@192.168.1.50:3306/medlog` | Conexão completa (recomendado) |
+| NEXTAUTH_SECRET | (gera com openssl) | Assinatura JWT/sessões |
+| NEXTAUTH_URL | `http://SEU_IP:3000` | URL pública do app |
+| ADMIN_EMAIL | `admin@dominio.com` | Email do admin inicial |
+| FILES_PATH | `/app/data/uploads` | Path de uploads dentro do container |
+| NODE_ENV | `production` | Ambiente |
+| SKIP_MIGRATIONS | `false` | (Opcional) `true` para pular migrations |
+
+Se preferir variáveis separadas ao invés de `DATABASE_URL` (não obrigatório):
+| DB_HOST | 192.168.1.50 |
+| DB_PORT | 3306 |
+| DB_NAME | medlog |
+| DB_USER | medlog_user |
+| DB_PASSWORD | SUA_SENHA_SEGURA |
+
+### Gerando segredos
 ```bash
-# Clone e instale
-git clone https://github.com/edalcin/medlog.git
-cd medlog
-npm install
-
-# Configure ambiente
-cp .env.example .env.local
-# Edite .env.local com suas configurações
-
-# Setup banco de dados
-npx prisma generate
-npx prisma db push
-
-# Inicie desenvolvimento
-npm run dev
+openssl rand -base64 32  # NEXTAUTH_SECRET
 ```
 
-**Acesse:** `http://localhost:3000`
-
-### Primeiro Login
-1. Crie usuário admin manualmente no banco ou via seed (futuro script)
-2. Defina `ADMIN_EMAIL=seu-email@dominio.com` no `.env.local`
-3. Acesse /auth/signin e entre com email e senha cadastrados
-4. Comece a cadastrar profissionais e consultas!
-
----
-
-## 🐳 Container Registry
-
-### Imagem Docker Oficial
-
-A imagem Docker do MedLog está disponível no **GitHub Container Registry**:
-
+### Criar admin (caso ainda não exista)
+Rode localmente no código fonte (fora do container) após configurar `.env`:
 ```bash
-# Pull da imagem mais recente
-docker pull ghcr.io/edalcin/medlog:latest
-
-# Ou versão específica
-docker pull ghcr.io/edalcin/medlog:v1.0.0
+ADMIN_PASSWORD='SenhaForte123!' npm run seed:admin
 ```
+Ou atualize manualmente a senha no banco (hash via bcrypt).
 
-### Deploy Rápido com Docker Compose
-
-```yaml
-version: '3.8'
-services:
-  medlog:
-    image: ghcr.io/edalcin/medlog:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - DB_HOST=your_db_host
-      - DB_PASSWORD=your_db_password
-      - GOOGLE_CLIENT_ID=your_google_client_id
-      - GOOGLE_CLIENT_SECRET=your_google_client_secret
-      - ADMIN_EMAIL=your-admin@gmail.com
-    volumes:
-      - ./uploads:/app/data/uploads
-```
-
-### Tags Disponíveis
-
-- `latest` - Última versão estável
-- `v1.0.0` - Versão específica (quando houver releases)
-- `main` - Build da branch main
-- `001-medlog-sistema-de` - Build da branch de desenvolvimento
-
-### Verificar Imagens
-
+### Logs e saúde
 ```bash
-# Listar todas as versões disponíveis
-docker search ghcr.io/edalcin/medlog
-
-# Ver informações da imagem
-docker inspect ghcr.io/edalcin/medlog:latest
-```
-
----
-
-## ✨ Funcionalidades
-
-### 🩺 Evento Central: Registro de Consulta Médica
-
-**O registro da consulta médica é o evento central do sistema.** Todo o fluxo foi otimizado para tornar este processo rápido e intuitivo:
-
-**Fluxo de Registro:**
-1. **Data da Consulta:** Selecione a data usando o date picker
-2. **Profissional de Saúde:** 
-   - Selecione de um pulldown (mostra apenas profissionais ativos)
-   - **Criação Rápida:** Se o profissional não está na lista, digite o nome diretamente
-   - O sistema cria um registro básico automaticamente
-   - Complete os dados do profissional depois (CRM, telefone, endereço)
-3. **Notas em Texto Livre:** Registre livremente com suporte a **Markdown**
-4. **Upload de Arquivos:** Anexe PDFs e imagens durante ou após o registro
-5. **Associação Dupla:** Arquivos ficam vinculados à consulta E ao profissional
-
-### 🏥 Registro de Consultas Médicas
-- Registre consultas com data, profissional, especialidade
-- Notas em texto livre com **suporte a Markdown** para formatação
-- Vincule profissionais de saúde às consultas
-- Especialidades com lista predefinida + opção customizada
-
-### 📄 Upload e Gestão de Arquivos
-- Anexe receitas, imagens de exames, resultados e laudos
-- Suporte para **PDF, PNG e JPG** (até 10MB por arquivo)
-- **Visualizador de PDF embutido** para consulta rápida
-- Geração automática de thumbnails para imagens
-- **Associação dupla:** Arquivos vinculados à consulta E ao profissional
-- Download seguro de arquivos
-
-### 🔍 Visualização Multi-Perspectiva de Arquivos
-
-**O sistema oferece três formas de visualizar arquivos:**
-
-1. **Por Consulta:** Ver todos os arquivos de uma consulta específica
-   - Uso: Revisar documentos de uma visita ao médico
-   
-2. **Por Profissional:** Ver todos os arquivos de todas as consultas com aquele profissional
-   - Uso: Histórico completo de exames com seu cardiologista, por exemplo
-   
-3. **Por Especialidade:** Ver todos os arquivos de consultas de uma especialidade
-   - Uso: Agrupar todos os exames cardiológicos, ortopédicos, etc.
-
 ### 👨‍⚕️ Gestão de Profissionais de Saúde
+curl http://SEU_IP:3000/api/health
+```
+
+### Atualização da imagem
+No Unraid: parar container → Edit → mudar tag (ex: `:v0.1.1`) → Apply.
+
+### Troubleshooting rápido
+| Sintoma | Causa Provável | Ação |
+|---------|----------------|------|
+| Sobe e cai imediatamente | Falha na conexão DB | Validar DATABASE_URL / firewall |
+| 404 em tudo | Porta errada no mapping | Confirmar 3000:3000 |
+| Não cria tabelas | Migrações puladas | Remover SKIP_MIGRATIONS ou setar false |
+| Login falha | Usuário não existe | Rodar seed admin |
 
 **Cadastro Completo:**
 - Nome, especialidade, CRM
