@@ -3,6 +3,9 @@
 .env.local
 .env.production
 
+# Next.js build output
+.next/
+
 # Dependencies
 node_modules/
 __pycache__/
