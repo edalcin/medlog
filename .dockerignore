@@ -1,0 +1,40 @@
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.env*
+README.md
+
+# Logs & caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+*.tgz
+*.tar.gz
+.nyc_output
+coverage
+.cache
+.parcel-cache
+.DS_Store
+*.tsbuildinfo
+
+# Build outputs
+.next
+.vercel
+
+# Tooling / meta
+.github
+.vscode
+.specify
+
+# Docs (mantém README principal já listado acima)
+specs
+**/*.md
+
+# Dependencies
+node_modules
+
+# Extra
+uploads
+prisma/migrations_init.sql

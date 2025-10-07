@@ -56,14 +56,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Create uploads directory with proper permissions
 RUN mkdir -p /app/data/uploads && chown -R nextjs:nodejs /app/data/uploads
 
+COPY --from=builder /app/prisma ./prisma
+
 USER nextjs
 
 EXPOSE 3000
 
 ENV PORT=3000
-# set hostname to localhost
 ENV HOSTNAME="0.0.0.0"
 
-# server.js is created by next build from the standalone output
-# https://nextjs.org/docs/pages/api-reference/next-config-js/output
-CMD ["node", "server.js"]
+# Entrypoint script para rodar migrations antes de subir o server
+ENTRYPOINT ["/bin/sh","-c","npx prisma migrate deploy && node server.js"]
