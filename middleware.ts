@@ -9,8 +9,11 @@ export default withAuth(
   {
     callbacks: {
       authorized: ({ token, req }) => {
-        // Allow access to auth routes
-        if (req.nextUrl.pathname.startsWith('/api/auth')) {
+        const { pathname } = req.nextUrl
+
+        // Allow public access to the root page and auth-related pages
+        const publicPaths = ['/', '/auth/signin']
+        if (publicPaths.includes(pathname) || pathname.startsWith('/api/auth')) {
           return true
         }
 
