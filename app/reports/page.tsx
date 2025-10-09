@@ -46,7 +46,7 @@ export default function ReportsPage() {
       fetchProfessionals()
       fetchConsultations()
     }
-  }, [session])
+  }, [session, fetchConsultations, fetchProfessionals])
 
   const fetchProfessionals = async () => {
     try {

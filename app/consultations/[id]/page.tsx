@@ -50,7 +50,7 @@ export default function ConsultationDetailsPage() {
     if (session && id) {
       fetchConsultation()
     }
-  }, [session, id])
+  }, [session, id, fetchConsultation])
 
   const fetchConsultation = async () => {
     try {

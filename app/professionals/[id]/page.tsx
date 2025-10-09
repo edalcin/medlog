@@ -37,7 +37,7 @@ export default function ProfessionalDetailsPage() {
     if (session && id) {
       fetchProfessional()
     }
-  }, [session, id])
+  }, [session, id, fetchProfessional])
 
   const fetchProfessional = async () => {
     try {
