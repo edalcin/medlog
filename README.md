@@ -86,7 +86,7 @@ cp .env.example .env
 
 | Variável          | Descrição                                            | Exemplo de Valor                                            |
 | ----------------- | ---------------------------------------------------- | ----------------------------------------------------------- |
-| `DATABASE_URL`    | URL de conexão para o banco de dados MariaDB.        | `mysql://medlog:medlog@192.168.1.10:3333/medlog`              |
+| `DATABASE_URL`    | URL de conexão para o banco de dados MariaDB.        | `mysql://user:password@hostname:port/database`              |
 | `NEXTAUTH_SECRET` | Chave secreta para assinar os tokens de sessão.      | Use `openssl rand -base64 32` para gerar uma.               |
 | `NEXTAUTH_URL`    | URL base da sua aplicação local.                     | `http://localhost:3000`                                     |
 
