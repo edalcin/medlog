@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -35,20 +35,7 @@ export default function ReportsPage() {
     endDate: '',
   })
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/')
-    }
-  }, [status, router])
-
-  useEffect(() => {
-    if (session) {
-      fetchProfessionals()
-      fetchConsultations()
-    }
-  }, [session, fetchConsultations, fetchProfessionals])
-
-  const fetchProfessionals = async () => {
+  const fetchProfessionals = useCallback(async () => {
     try {
       const response = await fetch('/api/professionals')
       if (!response.ok) {
@@ -59,9 +46,9 @@ export default function ReportsPage() {
     } catch (err) {
       // Handle error silently for professionals
     }
-  }
+  }, [])
 
-  const fetchConsultations = async () => {
+  const fetchConsultations = useCallback(async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
@@ -80,7 +67,20 @@ export default function ReportsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters])
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/')
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (session) {
+      fetchProfessionals()
+      fetchConsultations()
+    }
+  }, [session, fetchProfessionals, fetchConsultations])
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target

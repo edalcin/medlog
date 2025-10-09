@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -40,19 +40,7 @@ export default function ConsultationDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/')
-    }
-  }, [status, router])
-
-  useEffect(() => {
-    if (session && id) {
-      fetchConsultation()
-    }
-  }, [session, id, fetchConsultation])
-
-  const fetchConsultation = async () => {
+  const fetchConsultation = useCallback(async () => {
     try {
       const response = await fetch(`/api/consultations/${id}`)
       if (!response.ok) {
@@ -65,7 +53,19 @@ export default function ConsultationDetailsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/')
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (session && id) {
+      fetchConsultation()
+    }
+  }, [session, id, fetchConsultation])
   
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR')

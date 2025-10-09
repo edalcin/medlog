@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
@@ -27,19 +27,7 @@ export default function ProfessionalDetailsPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/')
-    }
-  }, [status, router])
-
-  useEffect(() => {
-    if (session && id) {
-      fetchProfessional()
-    }
-  }, [session, id, fetchProfessional])
-
-  const fetchProfessional = async () => {
+  const fetchProfessional = useCallback(async () => {
     try {
       const response = await fetch(`/api/professionals/${id}`)
       if (!response.ok) {
@@ -53,7 +41,19 @@ export default function ProfessionalDetailsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/')
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (session && id) {
+      fetchProfessional()
+    }
+  }, [session, id, fetchProfessional])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
