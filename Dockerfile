@@ -56,6 +56,7 @@ RUN chown nextjs:nodejs .next
 # Automatically leverage output traces to reduce image size
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client/runtime/ ./node_modules/@prisma/client/runtime/
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Create uploads directory with proper permissions
