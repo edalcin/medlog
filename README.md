@@ -1,6 +1,6 @@
 # MedLog - Sistema de Registro de Consultas Médicas
 
-> Sistema completo para gerenciamento de histórico médico pessoal e familiar
+> Sistema completo para gerenciamento de histórico médico pessoal e familiar, projetado para ser auto-hospedado (self-hosted).
 
 [![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/next.js-14+-black.svg)](https://nextjs.org/)
@@ -9,11 +9,45 @@
 
 ---
 
-## 📋 Visão Geral
+## 🎯 Visão Geral
 
-O MedLog é um sistema web self-hosted para centralizar todo o histórico médico de consultas, exames, laudos, receitas e procedimentos em um único local seguro e organizado.
+O MedLog é um sistema web que busca resolver a falta de um local centralizado para o histórico de saúde pessoal e familiar. Ele permite registrar e organizar consultas médicas, resultados de exames, laudos, receitas e informações sobre profissionais de saúde em um único ambiente seguro.
 
-Projetado especialmente para uso familiar, o sistema permite registrar consultas médicas em texto livre (com suporte a Markdown), fazer upload de PDFs e imagens de exames e resultados, além de gerenciar profissionais de saúde com suas especialidades.
+Projetado para rodar em um servidor doméstico (como Unraid) via Docker, ele permite que um pequeno grupo de usuários (uma família) mantenha seus registros médicos de forma privada e acessível, com uma interface moderna e limpa.
+
+---
+
+## ✨ Principais Funcionalidades
+
+A plataforma gira em torno do **Registro da Consulta Médica** como seu evento central.
+
+### 1. Registro de Consulta Detalhado
+- **Data e Profissional:** Inicie um registro informando a data da consulta e selecionando um profissional de saúde em uma lista (apenas profissionais ativos são exibidos).
+- **Criação Rápida de Profissional:** Se o profissional não estiver na lista, adicione-o diretamente no formulário da consulta para um cadastro rápido. Os detalhes completos podem ser adicionados mais tarde.
+- **Notas da Consulta:** Utilize um campo de texto livre com suporte a Markdown para registrar sintomas, diagnósticos, prescrições e orientações.
+- **Upload de Arquivos:** Anexe múltiplos documentos (PDF) e imagens (PNG, JPG) à consulta, como receitas, laudos e pedidos de exames.
+
+### 2. Gestão de Profissionais de Saúde
+- **Cadastro Completo:** Mantenha uma ficha para cada profissional com nome, especialidade, CRM, telefone e endereço.
+- **Status Ativo/Inativo:** Controle quais profissionais aparecem na lista de seleção para novas consultas. Profissionais inativos são mantidos no histórico, mas não podem ser selecionados para novos registros.
+
+### 3. Visualização e Relatórios
+O sistema oferece múltiplas formas de acessar e filtrar as informações:
+- **Por Consulta:** Veja todos os documentos de uma consulta específica.
+- **Por Profissional:** Acesse o histórico completo de consultas e documentos associados a um profissional.
+- **Por Especialidade:** Agrupe todas as consultas e documentos de uma mesma especialidade (ex: Ortopedia).
+- **Timeline Cronológica:** Navegue por todo o histórico médico em uma linha do tempo.
+
+---
+
+## 🏗️ Stack Tecnológico
+
+*   **Frontend:** Next.js 14 (App Router), React 18, TypeScript, shadcn/ui, Tailwind CSS
+*   **Autenticação:** NextAuth.js
+*   **Backend:** Node.js 20+
+*   **ORM:** Prisma
+*   **Banco de Dados:** MariaDB 11+
+*   **Deploy:** Docker
 
 ---
 
@@ -29,8 +63,6 @@ Esta seção descreve como configurar e executar o projeto em um ambiente de des
 
 ### Passo 1: Clonar e Instalar Dependências
 
-Primeiro, clone o repositório para sua máquina local e instale todas as dependências do projeto.
-
 ```bash
 git clone https://github.com/edalcin/medlog.git
 cd medlog
@@ -39,36 +71,36 @@ npm install
 
 ### Passo 2: Configurar Variáveis de Ambiente
 
-A aplicação precisa de algumas variáveis de ambiente para se conectar ao banco de dados e para segurança.
+Copie o arquivo de exemplo `.env.example` para um novo arquivo chamado `.env` e preencha as variáveis necessárias.
 
-1.  Copie o arquivo de exemplo `.env.example` para um novo arquivo chamado `.env`. No Windows, você pode usar:
-    ```powershell
-    copy .env.example .env
-    ```
-2.  Abra o arquivo `.env` e edite as seguintes variáveis:
+```powershell
+# No Windows
+copy .env.example .env
+```
+```bash
+# No Linux/macOS
+cp .env.example .env
+```
 
-| Variável          | Descrição                                                                 | Exemplo de Valor                                            |
-| ----------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `DATABASE_URL`    | A URL de conexão completa para o seu banco de dados MariaDB.              | `mysql://medlog:medlog@192.168.1.10:3333/medlog`              |
-| `NEXTAUTH_SECRET` | Uma chave secreta para assinar os tokens de sessão. Pode ser qualquer string aleatória. | `openssl rand -base64 32` (comando para gerar uma)          |
-| `NEXTAUTH_URL`    | A URL base da sua aplicação local.                                        | `http://localhost:3000`                                     |
+**Variáveis essenciais:**
 
+| Variável          | Descrição                                            | Exemplo de Valor                                            |
+| ----------------- | ---------------------------------------------------- | ----------------------------------------------------------- |
+| `DATABASE_URL`    | URL de conexão para o banco de dados MariaDB.        | `mysql://medlog:medlog@192.168.1.10:3333/medlog`              |
+| `NEXTAUTH_SECRET` | Chave secreta para assinar os tokens de sessão.      | Use `openssl rand -base64 32` para gerar uma.               |
+| `NEXTAUTH_URL`    | URL base da sua aplicação local.                     | `http://localhost:3000`                                     |
 
 ### Passo 3: Sincronizar o Banco de Dados
 
-Com o banco de dados MariaDB em execução e o arquivo `.env` configurado, execute o comando abaixo para criar todas as tabelas necessárias no banco de dados.
+Execute o comando abaixo para criar a estrutura de tabelas no banco de dados.
 
 ```bash
 npx prisma db push
 ```
 
-> **Nota sobre `db push` vs `migrate dev`**: Usamos `db push` para configurar rapidamente o banco de dados em desenvolvimento. Ele não cria arquivos de migração, mas é ideal para iniciar o projeto. Se você encontrar um erro sobre `mysql.proc` corrompido, pode ser necessário executar `mysql_upgrade` no seu servidor de banco de dados.
-
 ### Passo 4: Criar o Usuário Administrador
 
-Para fazer o primeiro login, você precisa criar um usuário administrador. Execute o comando abaixo no seu terminal.
-
-**Importante:** A sintaxe varia entre PowerShell (Windows) e Bash (Linux/macOS).
+Execute o comando abaixo para criar o primeiro usuário com perfil de administrador.
 
 *   **No PowerShell (Windows):**
     ```powershell
@@ -80,38 +112,37 @@ Para fazer o primeiro login, você precisa criar um usuário administrador. Exec
     ADMIN_PASSWORD='sua_senha_forte' npm run seed:admin
     ```
 
-Substitua `'sua_senha_forte'` por uma senha de sua escolha. Este comando criará um usuário com as seguintes credenciais:
-- **Email:** `admin@example.com`
-- **Senha:** A que você definiu no comando.
+O usuário será criado com o email `admin@example.com` e a senha que você definiu.
 
 ### Passo 5: Iniciar a Aplicação
-
-Finalmente, inicie o servidor de desenvolvimento:
 
 ```bash
 npm run dev
 ```
 
-A aplicação estará disponível em **http://localhost:3000**. Você pode fazer login com o usuário administrador que acabou de criar.
+A aplicação estará disponível em **http://localhost:3000**.
 
 ---
 
-## 🔐 Autenticação
+## 🐳 Deploy com Docker (Unraid)
 
-O sistema utiliza autenticação de **Email e Senha** gerenciada pelo NextAuth.js. As senhas são armazenadas no banco de dados de forma segura usando hash bcrypt.
+A aplicação é projetada para ser executada via Docker, o que é ideal para ambientes como o Unraid.
+
+1.  **Build da Imagem:**
+    ```bash
+    docker build -t medlog .
+    ```
+2.  **Execução:**
+    O `docker-compose.yml` fornecido pode ser usado como base. O mais importante é configurar as variáveis de ambiente para o container, apontando para o seu banco de dados e definindo um caminho (volume) para o armazenamento dos arquivos de upload.
+
+    **Exemplo de variáveis de ambiente para o container:**
+    - `DATABASE_URL`
+    - `NEXTAUTH_SECRET`
+    - `NEXTAUTH_URL` (deve ser a URL final da sua aplicação)
+    - `UPLOADS_PATH` (caminho dentro do container onde os arquivos serão salvos, ex: `/data/uploads`)
 
 ---
 
-## 🏗️ Stack Tecnológico
+## 📄 Licença
 
-*   **Frontend:** Next.js 14 (App Router), React 18, TypeScript, shadcn/ui, Tailwind CSS
-*   **Autenticação:** NextAuth.js
-*   **Backend:** Node.js 20+
-*   **ORM:** Prisma
-*   **Banco de Dados:** MariaDB 11+
-*   **Deploy:** Docker (configuração disponível)
-
----
-## 🐳 Deploy com Docker (Avançado)
-
-Para usuários que preferem rodar a aplicação via Docker, um `Dockerfile` e um `docker-compose.yml` estão incluídos. A configuração principal envolve definir as mesmas variáveis de ambiente (`DATABASE_URL`, `NEXTAUTH_SECRET`, etc.) no seu ambiente Docker. Para mais detalhes, consulte o `docker-compose.yml` e o `Dockerfile` no repositório.
+Este projeto é distribuído sob a licença MIT.
