@@ -345,11 +345,12 @@ export default function AdminPage() {
   }
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    })
+    // Parse the date string manually to avoid timezone issues
+    const date = new Date(dateString)
+    const year = date.getUTCFullYear()
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    return `${day}/${month}/${year}`
   }
 
   // Consultation handlers

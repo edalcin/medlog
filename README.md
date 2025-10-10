@@ -1,6 +1,8 @@
-# MedLog - Sistema de Registro de Consultas Médicas
-
-> Sistema completo para gerenciamento de histórico médico pessoal e familiar
+<div align="center">
+  <img src="public/doctor-icon.png" alt="MedLog Logo" width="120" height="120">
+  <h1>MedLog - Sistema de Registro de Consultas Médicas</h1>
+  <p><em>Sistema completo para gerenciamento de histórico médico pessoal e familiar</em></p>
+</div>
 
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
 [![GHCR Image](https://img.shields.io/badge/ghcr.io-edalcin%2Fmedlog-1f425f?logo=github)](https://github.com/users/edalcin/packages/container/package/medlog)

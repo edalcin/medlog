@@ -3,6 +3,7 @@
 import { signIn } from 'next-auth/react'
 import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 
 export default function SignInPage() {
   const [email, setEmail] = useState('')
@@ -35,9 +36,18 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">Entrar</h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <Image
+              src="/doctor-icon.png"
+              alt="MedLog"
+              width={80}
+              height={80}
+              className="rounded-lg"
+            />
+          </div>
+          <h2 className="text-3xl font-extrabold text-gray-900">MedLog</h2>
+          <p className="mt-2 text-sm text-gray-600">
             Use seu email e senha cadastrados
           </p>
         </div>

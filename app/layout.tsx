@@ -8,7 +8,11 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'MedLog - Sistema de Registro Médico',
-  description: 'Sistema para registro de consultas médicas e histórico de saúde',
+  description: 'Sistema completo para gerenciamento de histórico médico pessoal e familiar',
+  icons: {
+    icon: '/doctor-icon.png',
+    apple: '/doctor-icon.png',
+  },
 }
 
 export default function RootLayout({

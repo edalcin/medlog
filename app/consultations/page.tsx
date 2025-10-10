@@ -63,7 +63,12 @@ export default function ConsultationsPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR')
+    // Parse the date string manually to avoid timezone issues
+    const date = new Date(dateString)
+    const year = date.getUTCFullYear()
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const day = String(date.getUTCDate()).padStart(2, '0')
+    return `${day}/${month}/${year}`
   }
 
   const formatFileSize = (bytes: number) => {

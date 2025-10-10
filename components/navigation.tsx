@@ -2,6 +2,7 @@
 
 import { useSession, signIn, signOut } from 'next-auth/react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 
 export function Navigation() {
@@ -23,8 +24,15 @@ export function Navigation() {
       <nav className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
-            <Link href="/" className="text-xl font-bold text-gray-900">
-              MedLog
+            <Link href="/" className="flex items-center space-x-2">
+              <Image
+                src="/doctor-icon.png"
+                alt="MedLog"
+                width={32}
+                height={32}
+                className="rounded-lg"
+              />
+              <span className="text-xl font-bold text-gray-900">MedLog</span>
             </Link>
             <div className="text-sm text-gray-500">Carregando...</div>
           </div>
@@ -38,8 +46,15 @@ export function Navigation() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="text-xl font-bold text-gray-900">
-              MedLog
+            <Link href="/" className="flex items-center space-x-2">
+              <Image
+                src="/doctor-icon.png"
+                alt="MedLog"
+                width={32}
+                height={32}
+                className="rounded-lg"
+              />
+              <span className="text-xl font-bold text-gray-900">MedLog</span>
             </Link>
 
             {session && (
