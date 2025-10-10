@@ -55,7 +55,11 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            specialty: true,
+            specialties: {
+              include: {
+                specialty: true,
+              },
+            },
           },
         },
         files: {
@@ -75,8 +79,18 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
+    // Transform to include specialty names
+    const transformedConsultations = consultations.map((consultation) => ({
+      ...consultation,
+      professional: {
+        id: consultation.professional.id,
+        name: consultation.professional.name,
+        specialties: consultation.professional.specialties.map((ps) => ps.specialty),
+      },
+    }))
+
     const result = {
-      consultations,
+      consultations: transformedConsultations,
       pagination: {
         page,
         limit,
@@ -141,13 +155,31 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            specialty: true,
+            specialties: {
+              include: {
+                specialty: true,
+              },
+            },
           },
         },
       },
     })
 
-    return successResponse(consultation, 'Consulta registrada com sucesso', 201)
+    // Transform to include specialty names
+    const transformedConsultation = {
+      ...consultation,
+      professional: {
+        id: consultation.professional.id,
+        name: consultation.professional.name,
+        specialties: consultation.professional.specialties.map((ps) => ps.specialty),
+      },
+    }
+
+    return successResponse(
+      transformedConsultation,
+      'Consulta registrada com sucesso',
+      201
+    )
   } catch (error) {
     return handleApiError(error)
   }
