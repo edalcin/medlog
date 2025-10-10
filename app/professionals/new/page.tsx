@@ -9,6 +9,11 @@ interface Specialty {
   name: string
 }
 
+interface Clinic {
+  id: string
+  name: string
+}
+
 export default function NewProfessionalPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -18,6 +23,10 @@ export default function NewProfessionalPage() {
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([])
   const [newSpecialtyName, setNewSpecialtyName] = useState('')
   const [showNewSpecialty, setShowNewSpecialty] = useState(false)
+  const [clinics, setClinics] = useState<Clinic[]>([])
+  const [selectedClinic, setSelectedClinic] = useState<string>('')
+  const [newClinicName, setNewClinicName] = useState('')
+  const [showNewClinic, setShowNewClinic] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -35,6 +44,7 @@ export default function NewProfessionalPage() {
   useEffect(() => {
     if (session) {
       fetchSpecialties()
+      fetchClinics()
     }
   }, [session])
 
@@ -46,6 +56,17 @@ export default function NewProfessionalPage() {
       setSpecialties(data.data)
     } catch (err) {
       console.error('Erro ao carregar especialidades:', err)
+    }
+  }
+
+  const fetchClinics = async () => {
+    try {
+      const response = await fetch('/api/clinics')
+      if (!response.ok) throw new Error('Erro ao carregar clínicas')
+      const data = await response.json()
+      setClinics(data.data)
+    } catch (err) {
+      console.error('Erro ao carregar clínicas:', err)
     }
   }
 
@@ -73,6 +94,20 @@ export default function NewProfessionalPage() {
         throw new Error('Selecione pelo menos uma especialidade')
       }
 
+      // Add new clinic if provided
+      let finalClinicId = selectedClinic
+      if (showNewClinic && newClinicName.trim()) {
+        const clinicResponse = await fetch('/api/clinics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newClinicName.trim() }),
+        })
+        if (clinicResponse.ok) {
+          const clinicData = await clinicResponse.json()
+          finalClinicId = clinicData.data.id
+        }
+      }
+
       const response = await fetch('/api/professionals', {
         method: 'POST',
         headers: {
@@ -81,6 +116,7 @@ export default function NewProfessionalPage() {
         body: JSON.stringify({
           ...formData,
           specialtyIds: finalSpecialtyIds,
+          clinicId: finalClinicId || undefined,
         }),
       })
 
@@ -213,6 +249,44 @@ export default function NewProfessionalPage() {
                     </span>
                   ) : null
                 })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Clínica ou Hospital
+            </label>
+            <select
+              value={selectedClinic}
+              onChange={(e) => setSelectedClinic(e.target.value)}
+              className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+              <option value="">Selecione uma clínica (opcional)</option>
+              {clinics.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>
+                  {clinic.name}
+                </option>
+              ))}
+            </select>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setShowNewClinic(!showNewClinic)}
+                className="text-sm text-blue-600 hover:text-blue-500"
+              >
+                {showNewClinic ? '- Cancelar nova clínica' : '+ Adicionar nova clínica'}
+              </button>
+            </div>
+            {showNewClinic && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={newClinicName}
+                  onChange={(e) => setNewClinicName(e.target.value)}
+                  placeholder="Nome da nova clínica ou hospital"
+                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
               </div>
             )}
           </div>

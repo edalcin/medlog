@@ -32,9 +32,10 @@ A plataforma gira em torno do **Registro da Consulta Médica** como seu evento c
 - **Upload de Arquivos Categorizados:** Anexe múltiplos documentos (PDF) e imagens (PNG, JPG) à consulta, categorizando cada arquivo (Laudo, Receita, Pedido de Exame, etc.). Crie novas categorias diretamente durante o upload.
 
 ### 2. Gestão de Profissionais de Saúde
-- **Cadastro Completo:** Mantenha uma ficha para cada profissional com nome, múltiplas especialidades, CRM, telefone e endereço.
+- **Cadastro Completo:** Mantenha uma ficha para cada profissional com nome, múltiplas especialidades, clínica/hospital, CRM, telefone e endereço.
 - **Especialidades Múltiplas:** Associe um profissional a várias especialidades médicas através de um dicionário controlado com 28+ especialidades pré-cadastradas.
-- **Criação Rápida de Especialidade:** Adicione novas especialidades diretamente no formulário de cadastro do profissional.
+- **Associação com Clínicas:** Vincule profissionais a clínicas ou hospitais através de um dicionário controlado (Hospital Particular, UBS, Consultório Particular, etc.).
+- **Criação Rápida:** Adicione novas especialidades e clínicas diretamente no formulário de cadastro do profissional.
 - **Status Ativo/Inativo:** Controle quais profissionais aparecem na lista de seleção para novas consultas. Profissionais inativos são mantidos no histórico, mas não podem ser selecionados para novos registros.
 
 ### 3. Visualização e Relatórios
@@ -45,17 +46,19 @@ O sistema oferece múltiplas formas de acessar e filtrar as informações:
 - **Timeline Cronológica:** Navegue por todo o histórico médico em uma linha do tempo.
 
 ### 4. Painel Administrativo Completo
-Sistema de administração com 6 abas para gerenciamento completo:
+Sistema de administração com 7 abas para gerenciamento completo:
 - **Usuários:** CRUD completo para gerenciar usuários do sistema (ADMIN/USER).
 - **Consultas:** Visualização de todas as consultas com opção de exclusão individual ou em massa (bulk delete).
 - **Profissionais:** Listagem de profissionais com contagem de consultas, bulk delete com validação de integridade referencial.
 - **Especialidades:** Gestão completa do dicionário de especialidades médicas (adicionar, editar, excluir).
 - **Categorias:** Gestão completa do dicionário de categorias de arquivo (adicionar, editar, excluir).
+- **Clínicas:** Gestão completa do dicionário de clínicas e hospitais (adicionar, editar, excluir).
 - **Arquivos:** Visualização de todos os arquivos do sistema com metadados e opção de exclusão.
 
 **Validações de Integridade:**
 - Especialidades em uso não podem ser excluídas (proteção de dados)
 - Categorias em uso não podem ser excluídas (proteção de dados)
+- Clínicas em uso não podem ser excluídas (proteção de dados)
 - Profissionais com consultas não podem ser excluídos em massa (proteção de histórico)
 
 ---
@@ -127,6 +130,7 @@ Execute os comandos abaixo para criar o primeiro usuário e popular os dicionár
     $env:ADMIN_PASSWORD='sua_senha_forte'; npm run seed:admin
     npm run seed:categories
     npm run seed:specialties
+    npm run seed:clinics
     ```
 
 *   **No Bash (Linux/macOS):**
@@ -134,11 +138,13 @@ Execute os comandos abaixo para criar o primeiro usuário e popular os dicionár
     ADMIN_PASSWORD='sua_senha_forte' npm run seed:admin
     npm run seed:categories
     npm run seed:specialties
+    npm run seed:clinics
     ```
 
 O usuário administrador será criado com o email `admin@example.com` e a senha que você definiu. Os scripts de seed irão popular:
 - **Categorias de arquivo:** Laudo, Receita, Pedido de Exame, Atestado, Carteirinha, Outros
 - **Especialidades médicas:** 28 especialidades incluindo Cardiologia, Ortopedia, Pediatria, etc.
+- **Clínicas e hospitais:** Hospital Particular, Hospital Público, UBS, UPA, Consultório Particular, etc.
 
 ### Passo 5: Iniciar a Aplicação
 

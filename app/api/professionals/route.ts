@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, specialtyIds, crm, phone, address } = body
+    const { name, specialtyIds, clinicId, crm, phone, address } = body
 
     if (!name || !specialtyIds || specialtyIds.length === 0) {
       throw new ValidationError('Nome e pelo menos uma especialidade são obrigatórios')
@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
         crm: crm || null,
         phone: phone || null,
         address: address || null,
+        clinicId: clinicId || null,
         specialties: {
           create: specialtyIds.map((specialtyId: string) => ({
             specialtyId,

@@ -94,6 +94,15 @@ interface SpecialtyWithCount {
   }
 }
 
+interface ClinicWithCount {
+  id: string
+  name: string
+  createdAt: string
+  _count?: {
+    professionals: number
+  }
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -103,22 +112,26 @@ export default function AdminPage() {
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [specialties, setSpecialties] = useState<SpecialtyWithCount[]>([])
   const [fileCategories, setFileCategories] = useState<FileCategory[]>([])
+  const [clinics, setClinics] = useState<ClinicWithCount[]>([])
   const [loading, setLoading] = useState(true)
   const [filesLoading, setFilesLoading] = useState(true)
   const [consultationsLoading, setConsultationsLoading] = useState(true)
   const [professionalsLoading, setProfessionalsLoading] = useState(true)
   const [specialtiesLoading, setSpecialtiesLoading] = useState(true)
   const [categoriesLoading, setCategoriesLoading] = useState(true)
+  const [clinicsLoading, setClinicsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals' | 'specialties' | 'categories'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics'>('users')
   const [selectedConsultations, setSelectedConsultations] = useState<Set<string>>(new Set())
   const [selectedProfessionals, setSelectedProfessionals] = useState<Set<string>>(new Set())
   const [editingSpecialty, setEditingSpecialty] = useState<SpecialtyWithCount | null>(null)
   const [editingCategory, setEditingCategory] = useState<FileCategory | null>(null)
+  const [editingClinic, setEditingClinic] = useState<ClinicWithCount | null>(null)
   const [isSpecialtyFormOpen, setIsSpecialtyFormOpen] = useState(false)
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false)
+  const [isClinicFormOpen, setIsClinicFormOpen] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -137,6 +150,7 @@ export default function AdminPage() {
       fetchProfessionals()
       fetchSpecialties()
       fetchFileCategories()
+      fetchClinics()
     }
   }, [session])
 
@@ -233,6 +247,22 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setCategoriesLoading(false)
+    }
+  }
+
+  const fetchClinics = async () => {
+    try {
+      setClinicsLoading(true)
+      const response = await fetch('/api/clinics')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar clínicas')
+      }
+      const data = await response.json()
+      setClinics(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    } finally {
+      setClinicsLoading(false)
     }
   }
 
@@ -517,6 +547,63 @@ export default function AdminPage() {
     }
   }
 
+  // Clinic handlers
+  const handleCreateClinic = () => {
+    setEditingClinic(null)
+    setIsClinicFormOpen(true)
+  }
+
+  const handleEditClinic = (clinic: ClinicWithCount) => {
+    setEditingClinic(clinic)
+    setIsClinicFormOpen(true)
+  }
+
+  const handleDeleteClinic = async (clinicId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta clínica?')) {
+      try {
+        const response = await fetch(`/api/clinics/${clinicId}`, {
+          method: 'DELETE',
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Erro ao excluir clínica')
+        }
+        fetchClinics()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      }
+    }
+  }
+
+  const handleClinicFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const clinicData = Object.fromEntries(formData.entries())
+
+    try {
+      const url = editingClinic ? `/api/clinics/${editingClinic.id}` : '/api/clinics'
+      const method = editingClinic ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(clinicData),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || (editingClinic ? 'Erro ao atualizar clínica' : 'Erro ao criar clínica'))
+      }
+
+      setIsClinicFormOpen(false)
+      fetchClinics()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
@@ -594,6 +681,16 @@ export default function AdminPage() {
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
               Categorias ({fileCategories.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('clinics')}
+              className={`${
+                activeTab === 'clinics'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Clínicas ({clinics.length})
             </button>
             <button
               onClick={() => setActiveTab('files')}
@@ -1083,6 +1180,116 @@ export default function AdminPage() {
                   className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
                 >
                   {editingCategory ? 'Atualizar' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Clinics Tab */}
+      {activeTab === 'clinics' && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Clínicas e Hospitais</h2>
+            <button
+              onClick={handleCreateClinic}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              Nova Clínica
+            </button>
+          </div>
+
+          {clinicsLoading ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Carregando clínicas...</div>
+            </div>
+          ) : clinics.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Nenhuma clínica cadastrada</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nome
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Profissionais
+                    </th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {clinics.map((clinic) => (
+                    <tr key={clinic.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {clinic.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {clinic._count?.professionals || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleEditClinic(clinic)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClinic(clinic.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Clinic Form Modal */}
+      {isClinicFormOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              {editingClinic ? 'Editar Clínica' : 'Nova Clínica'}
+            </h3>
+            <form onSubmit={handleClinicFormSubmit}>
+              <div className="mb-4">
+                <label htmlFor="clinic-name" className="block text-sm font-medium text-gray-700">
+                  Nome *
+                </label>
+                <input
+                  type="text"
+                  id="clinic-name"
+                  name="name"
+                  required
+                  defaultValue={editingClinic?.name || ''}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsClinicFormOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {editingClinic ? 'Atualizar' : 'Criar'}
                 </button>
               </div>
             </form>

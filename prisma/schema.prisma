@@ -30,6 +30,7 @@ model Professional {
   crm       String?
   phone     String?
   address   String?
+  clinicId  String?
   isActive  Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -37,6 +38,7 @@ model Professional {
   consultations Consultation[]
   files         File[]
   specialties   ProfessionalSpecialty[]
+  clinic        Clinic? @relation(fields: [clinicId], references: [id])
 
   @@map("professionals")
 }
@@ -106,6 +108,16 @@ model FileCategory {
   files File[]
 
   @@map("file_categories")
+}
+
+model Clinic {
+  id        String @id @default(uuid())
+  name      String @unique
+  createdAt DateTime @default(now())
+
+  professionals Professional[]
+
+  @@map("clinics")
 }
 
 enum UserRole {

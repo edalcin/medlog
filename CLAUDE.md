@@ -30,6 +30,7 @@ ADMIN_PASSWORD='sua_senha' npm run seed:admin
 
 npm run seed:categories          # Seed default file categories
 npm run seed:specialties         # Seed default medical specialties
+npm run seed:clinics             # Seed default clinics/hospitals
 npm run fix:professionals        # Associate default specialty to existing professionals
 
 # Build and deploy
@@ -42,9 +43,10 @@ npm run lint                     # Run ESLint
 
 ### Data Model (Prisma)
 - **User**: Users of the system (ADMIN or USER role)
-- **Professional**: Healthcare professionals with active/inactive status and multiple specialties
+- **Professional**: Healthcare professionals with active/inactive status, multiple specialties, and optional clinic association
 - **Specialty**: Medical specialties dictionary (e.g., Cardiologia, Ortopedia)
 - **ProfessionalSpecialty**: N:N junction table linking professionals to specialties
+- **Clinic**: Clinics/hospitals dictionary (e.g., Hospital Particular, UBS)
 - **Consultation**: Central entity linking User + Professional + date + notes (Markdown) + Files
 - **File**: Uploaded documents (PDF) and images (PNG/JPG) with categorization
 - **FileCategory**: File category dictionary (e.g., Laudo, Receita, Pedido de Exame)
@@ -53,6 +55,7 @@ Key relationships:
 - User → Consultations (1:N)
 - Professional → Consultations (1:N)
 - Professional ↔ Specialty (N:N via ProfessionalSpecialty)
+- Professional → Clinic (N:1, optional)
 - Consultation → Files (1:N)
 - FileCategory → Files (1:N)
 - Professional → Files (1:N) - for filtering files by professional
@@ -85,6 +88,8 @@ app/
 │   │   └── [id]/                   # PUT/DELETE category by ID
 │   ├── specialties/                # Medical specialty dictionary management
 │   │   └── [id]/                   # PUT/DELETE specialty by ID
+│   ├── clinics/                    # Clinic/hospital dictionary management
+│   │   └── [id]/                   # PUT/DELETE clinic by ID
 │   └── admin/                      # Admin-only endpoints
 │       ├── stats/                  # Statistics
 │       ├── consultations/          # List all consultations
@@ -112,6 +117,7 @@ scripts/
 ├── seed-admin.ts                   # Create admin user
 ├── seed-file-categories.ts         # Seed default file categories
 ├── seed-specialties.ts             # Seed default specialties
+├── seed-clinics.ts                 # Seed default clinics/hospitals
 └── fix-professionals-add-default-specialty.ts  # Migration helper
 ```
 
@@ -135,13 +141,16 @@ scripts/
 
 9. **Referential Integrity**: Dictionaries (categories, specialties) cannot be deleted if in use. Professionals cannot be bulk-deleted if they have consultations.
 
-10. **Admin Panel Organization**: Admin panel has 6 tabs:
+10. **Admin Panel Organization**: Admin panel has 7 tabs:
     - Users: Full CRUD for system users
     - Consultations: View all + bulk delete
     - Professionals: View all + bulk delete (with validation)
     - Specialties: Full CRUD for specialty dictionary
     - Categories: Full CRUD for file category dictionary
+    - Clinics: Full CRUD for clinic/hospital dictionary
     - Files: View all files with metadata
+
+11. **Clinic Association**: Professionals can optionally be associated with a clinic/hospital from a controlled dictionary. Inline creation is supported during professional registration.
 
 ## Environment Variables
 
