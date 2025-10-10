@@ -79,8 +79,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            DATABASE_URL="mysql://dummy:dummy@dummy/dummy"
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Generate artifact attestation

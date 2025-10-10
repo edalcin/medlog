@@ -2,7 +2,11 @@ import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../lib/auth/config'
-import { successResponse, handleApiError, errorResponse } from '../../../lib/responses'
+import {
+  successResponse,
+  handleApiError,
+  errorResponse,
+} from '../../../lib/responses'
 import { ValidationError, NotFoundError } from '../../../lib/errors'
 
 const prisma = new PrismaClient()
@@ -51,11 +55,7 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            specialties: {
-              include: {
-                specialty: true,
-              },
-            },
+            specialty: true,
           },
         },
         files: {
@@ -75,18 +75,8 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
-    // Transform to include specialty names
-    const transformedConsultations = consultations.map(consultation => ({
-      ...consultation,
-      professional: {
-        id: consultation.professional.id,
-        name: consultation.professional.name,
-        specialties: consultation.professional.specialties.map(ps => ps.specialty),
-      },
-    }))
-
     const result = {
-      consultations: transformedConsultations,
+      consultations,
       pagination: {
         page,
         limit,

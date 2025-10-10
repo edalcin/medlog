@@ -2,7 +2,11 @@ import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../../lib/auth/config'
-import { successResponse, handleApiError, errorResponse } from '../../../../lib/responses'
+import {
+  successResponse,
+  handleApiError,
+  errorResponse,
+} from '../../../../lib/responses'
 import { ValidationError, NotFoundError } from '../../../../lib/errors'
 import { saveUploadedFile } from '../../../../lib/upload'
 
@@ -18,8 +22,6 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const consultationId = formData.get('consultationId') as string
-    const categoryId = formData.get('categoryId') as string | null
-    const newCategoryName = formData.get('newCategoryName') as string | null
 
     if (!file) {
       throw new ValidationError('Arquivo é obrigatório')
@@ -27,28 +29,6 @@ export async function POST(request: NextRequest) {
 
     if (!consultationId) {
       throw new ValidationError('ID da consulta é obrigatório')
-    }
-
-    // Handle new category creation if provided
-    let finalCategoryId = categoryId
-    if (newCategoryName && newCategoryName.trim().length > 0) {
-      // Check if category already exists
-      let category = await prisma.fileCategory.findFirst({
-        where: {
-          name: newCategoryName.trim(),
-        },
-      })
-
-      // Create if doesn't exist
-      if (!category) {
-        category = await prisma.fileCategory.create({
-          data: {
-            name: newCategoryName.trim(),
-          },
-        })
-      }
-
-      finalCategoryId = category.id
     }
 
     // Verify consultation exists and belongs to user
@@ -78,18 +58,21 @@ export async function POST(request: NextRequest) {
         size: uploadedFile.size,
         consultationId,
         professionalId: consultation.professionalId,
-        categoryId: finalCategoryId || null,
       },
     })
 
-    return successResponse({
-      id: fileRecord.id,
-      filename: fileRecord.filename,
-      mimeType: fileRecord.mimeType,
-      size: fileRecord.size,
-      url: `/api/files/${fileRecord.path}`,
-      createdAt: fileRecord.uploadedAt,
-    }, 'Arquivo enviado com sucesso', 201)
+    return successResponse(
+      {
+        id: fileRecord.id,
+        filename: fileRecord.filename,
+        mimeType: fileRecord.mimeType,
+        size: fileRecord.size,
+        url: `/api/files/${fileRecord.path}`,
+        createdAt: fileRecord.uploadedAt,
+      },
+      'Arquivo enviado com sucesso',
+      201
+    )
   } catch (error) {
     return handleApiError(error)
   }

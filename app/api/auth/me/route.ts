@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '../../../../lib/auth/utils'
 
-export const dynamic = 'force-dynamic'
-
 export async function GET() {
   try {
     const session = await getSession()
@@ -12,10 +10,13 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      user: session.user
+      user: session.user,
     })
   } catch (error) {
     console.error('Error fetching user:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
