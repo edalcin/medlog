@@ -62,13 +62,12 @@ Projetado especialmente para uso familiar, o sistema permite registrar consultas
     mkdir -p /mnt/user/appdata/medlog/uploads
     chmod 755 /mnt/user/appdata/medlog/uploads
     ```
-3. Token de acesso ao GHCR (se imagem privada) ou tornar o pacote público.
 
 ### Passo a Passo
 1. Acesse o Dashboard do Unraid.
-2. Vá em: Docker → Add Container → (Switch para modo avançado se necessário).
+2. Vá em: Docker → Add Container.
 3. Em "Name": `medlog`.
-4. Em "Repository": `ghcr.io/edalcin/medlog:latest` (ou `:main` / `:v0.1.0`).
+4. Em "Repository": `ghcr.io/edalcin/medlog:latest`.
 5. Network: `bridge` (ou a rede custom que você usa com o banco).
 6. WebUI: `http://[IP]:[PORT:3000]`.
 7. Add Port: Container 3000 → Host 3000 (TCP).
@@ -77,49 +76,39 @@ Projetado especialmente para uso familiar, o sistema permite registrar consultas
 
 | Variável | Valor Exemplo | Descrição |
 |----------|---------------|-----------|
-| DATABASE_URL | `mysql://medlog_user:SUA_SENHA_SEGURA@192.168.1.50:3306/medlog` | Conexão completa (recomendado) |
-| NEXTAUTH_SECRET | (gera com openssl) | Assinatura JWT/sessões |
-| NEXTAUTH_URL | `http://SEU_IP:3000` | URL pública do app |
-| ADMIN_EMAIL | `admin@dominio.com` | Email do admin inicial |
-| FILES_PATH | `/app/data/uploads` | Path de uploads dentro do container |
-| NODE_ENV | `production` | Ambiente |
-| SKIP_MIGRATIONS | `false` | (Opcional) `true` para pular migrations |
+| `DATABASE_URL` | `mysql://medlog_user:SUA_SENHA@192.168.1.50:3306/medlog` | String de conexão completa com o banco |
+| `NEXTAUTH_SECRET` | `(gera com openssl)` | Token para assinatura de sessões JWT |
+| `NEXTAUTH_URL` | `http://192.168.1.100:3000` | URL completa onde o app será acessado |
+| `FILES_PATH` | `/app/data/uploads` | Caminho interno dos uploads (não alterar) |
 
-Se preferir variáveis separadas ao invés de `DATABASE_URL` (não obrigatório):
-| DB_HOST | 192.168.1.50 |
-| DB_PORT | 3306 |
-| DB_NAME | medlog |
-| DB_USER | medlog_user |
-| DB_PASSWORD | SUA_SENHA_SEGURA |
-
-### Gerando segredos
+### Gerando o NEXTAUTH_SECRET
 ```bash
-openssl rand -base64 32  # NEXTAUTH_SECRET
+openssl rand -base64 32
 ```
 
-### Criar admin (caso ainda não exista)
-Rode localmente no código fonte (fora do container) após configurar `.env`:
+### Criar usuário administrador
+Após o container iniciar pela primeira vez, execute:
 ```bash
-ADMIN_PASSWORD='SenhaForte123!' npm run seed:admin
+docker exec -it medlog npm run seed:admin
 ```
-Ou atualize manualmente a senha no banco (hash via bcrypt).
+Será solicitada a senha do administrador.
 
-### Logs e saúde
+### Verificar se está funcionando
 ```bash
-### 👨‍⚕️ Gestão de Profissionais de Saúde
-curl http://SEU_IP:3000/api/health
+curl http://SEU_IP:3000/api/auth/me
+docker logs medlog
 ```
 
 ### Atualização da imagem
-No Unraid: parar container → Edit → mudar tag (ex: `:v0.1.1`) → Apply.
+No Unraid: Docker → medlog → Stop → Edit → Apply (puxa nova versão automaticamente).
 
 ### Troubleshooting rápido
 | Sintoma | Causa Provável | Ação |
 |---------|----------------|------|
-| Sobe e cai imediatamente | Falha na conexão DB | Validar DATABASE_URL / firewall |
-| 404 em tudo | Porta errada no mapping | Confirmar 3000:3000 |
-| Não cria tabelas | Migrações puladas | Remover SKIP_MIGRATIONS ou setar false |
-| Login falha | Usuário não existe | Rodar seed admin |
+| Container não inicia | Erro na DATABASE_URL | Verificar credenciais e IP do MariaDB |
+| Porta não responde | Mapping incorreto | Confirmar 3000:3000 no Unraid |
+| Tabelas não existem | Migrations falharam | Verificar logs: `docker logs medlog` |
+| Login não funciona | Admin não criado | Executar `docker exec -it medlog npm run seed:admin` |
 
 **Cadastro Completo:**
 - Nome, especialidade, CRM
@@ -227,13 +216,13 @@ No Unraid: parar container → Edit → mudar tag (ex: `:v0.1.1`) → Apply.
 
 ---
 
-## 🚀 Instalação
+## 🚀 Desenvolvimento Local
 
 ### Pré-requisitos
 
-- **Unraid 6.10+** ou Docker/Docker Compose
+- **Node.js 20+**
+- **npm ou yarn**
 - **MariaDB 11+** instalado e rodando
-- **Conta Google Cloud** com OAuth 2.0 configurado
 
 ### Migrações e Seed
 
@@ -269,201 +258,15 @@ npx prisma migrate reset
 
 ---
 
-## 🐳 Instalação no Unraid
-
-### Método 1: Via Docker Compose (Recomendado)
-
-1. **Prepare o banco de dados MariaDB:**
-
-```bash
-# No terminal do Unraid, crie o banco de dados
-docker exec -it mariadb mysql -u root -p
-```
-
-```sql
-CREATE DATABASE medlog CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'medlog_user'@'%' IDENTIFIED BY 'SUA_SENHA_SEGURA';
-GRANT ALL PRIVILEGES ON medlog.* TO 'medlog_user'@'%';
-FLUSH PRIVILEGES;
-EXIT;
-```
-
-2. **Crie a estrutura de diretórios:**
-
-```bash
-mkdir -p /mnt/user/appdata/medlog/uploads
-chmod 755 /mnt/user/appdata/medlog/uploads
-```
-
-3. **Crie o arquivo docker-compose.yml:**
-
-```yaml
-version: '3.8'
-
-services:
-  medlog:
-    image: ghcr.io/edalcin/medlog:latest
-    container_name: medlog
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      # Database
-      DB_HOST: 192.168.1.100  # IP do seu MariaDB
-      DB_PORT: 3306
-      DB_NAME: medlog
-      DB_USER: medlog_user
-      DB_PASSWORD: SUA_SENHA_SEGURA
-      
-      # Application
-      NODE_ENV: production
-      PORT: 3000
-      APP_URL: http://192.168.1.100:3000  # Seu IP/domínio
-      
-      # Files
-      FILES_PATH: /app/data/uploads
-      
-      # Google OAuth (copie do Google Cloud Console)
-      GOOGLE_CLIENT_ID: xxx.apps.googleusercontent.com
-      GOOGLE_CLIENT_SECRET: xxx
-      GOOGLE_CALLBACK_URL: http://192.168.1.100:3000/api/auth/callback/google
-      
-      # Security (gere strings aleatórias)
-      SESSION_SECRET: generate_random_string_min_32_chars
-      JWT_SECRET: generate_another_random_string_min_32_chars
-      NEXTAUTH_SECRET: generate_nextauth_random_string_min_32_chars
-      NEXTAUTH_URL: http://192.168.1.100:3000
-      
-      # Admin (seu email do Gmail)
-      ADMIN_EMAIL: seu-email@gmail.com
-    volumes:
-      - /mnt/user/appdata/medlog/uploads:/app/data/uploads
-    networks:
-      - medlog-network
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 40s
-
-networks:
-  medlog-network:
-    driver: bridge
-```
-
-4. **Gere strings aleatórias para os secrets:**
-
-```bash
-# No terminal do Unraid
-openssl rand -base64 32  # Para SESSION_SECRET
-openssl rand -base64 32  # Para JWT_SECRET
-openssl rand -base64 32  # Para NEXTAUTH_SECRET
-```
-
-5. **Inicie o container:**
-
-```bash
-cd /mnt/user/appdata/medlog
-docker-compose up -d
-```
-
-6. **Verifique os logs:**
-
-```bash
-docker logs -f medlog
-```
-
-### Método 2: Via Interface do Unraid
-
-1. **Acesse o Unraid Dashboard**
-2. Vá em **Docker → Add Container**
-3. Configure os seguintes parâmetros:
-
-**Configurações Básicas:**
-- **Name:** `medlog`
-- **Repository:** `ghcr.io/edalcin/medlog:latest`
-- **Network Type:** `Bridge`
-- **WebUI:** `http://[IP]:[PORT:3000]`
-
-**Port Mappings:**
-| Container Port | Host Port | Type |
-|----------------|-----------|------|
-| 3000           | 3000      | TCP  |
-
-**Volume Mappings:**
-| Container Path      | Host Path                        | Mode |
-|---------------------|----------------------------------|------|
-| /app/data/uploads   | /mnt/user/appdata/medlog/uploads | RW   |
-
-**Environment Variables:**
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `DB_HOST` | `192.168.1.100` | IP do servidor MariaDB |
-| `DB_PORT` | `3306` | Porta do MariaDB |
-| `DB_NAME` | `medlog` | Nome do banco de dados |
-| `DB_USER` | `medlog_user` | Usuário do banco |
-| `DB_PASSWORD` | `sua_senha_segura` | Senha do banco |
-| `FILES_PATH` | `/app/data/uploads` | Path dos uploads (não alterar) |
-| `NODE_ENV` | `production` | Ambiente |
-| `PORT` | `3000` | Porta da aplicação |
-| `APP_URL` | `http://SEU_IP:3000` | URL completa |
-| `GOOGLE_CLIENT_ID` | `xxx.apps.googleusercontent.com` | Do Google Cloud |
-| `GOOGLE_CLIENT_SECRET` | `xxx` | Do Google Cloud |
-| `GOOGLE_CALLBACK_URL` | `http://SEU_IP:3000/api/auth/callback/google` | URL de callback |
-| `SESSION_SECRET` | `gere_string_aleatoria` | Min 32 caracteres |
-| `JWT_SECRET` | `gere_outra_string_aleatoria` | Min 32 caracteres |
-| `NEXTAUTH_SECRET` | `gere_mais_uma_string` | Min 32 caracteres |
-| `NEXTAUTH_URL` | `http://SEU_IP:3000` | URL da aplicação |
-| `ADMIN_EMAIL` | `seu-email@gmail.com` | Email do admin |
-
-4. Clique em **Apply** para criar e iniciar o container
-
----
-
-## 🔒 Configuração HTTPS com Cloudflare Tunnel
-
-Para acesso externo seguro via HTTPS:
-
-1. **Instale Cloudflare Tunnel no Unraid:**
-   - Community Applications → Cloudflare Tunnel
-   - Configure seu domínio no Cloudflare
-
-2. **Configure o tunnel para apontar para o MedLog:**
-   - Service: `http://medlog:3000`
-   - Hostname: `medlog.seu-dominio.com`
-
-3. **Atualize as variáveis de ambiente:**
-   - `APP_URL`: `https://medlog.seu-dominio.com`
-   - `NEXTAUTH_URL`: `https://medlog.seu-dominio.com`
-   - `GOOGLE_CALLBACK_URL`: `https://medlog.seu-dominio.com/api/auth/callback/google`
-
-4. **Atualize o Google OAuth:**
-   - Adicione a URL HTTPS nas URIs autorizadas
-
----
-
 ## 🎯 Primeiro Acesso
 
-1. **Acesse o sistema:** `http://SEU_IP:3000` (ou sua URL configurada)
+1. **Acesse o sistema:** `http://SEU_IP:3000`
 
-2. **Faça login com Google:**
-   - Clique em "Entrar com Google"
-   - Use o email definido em `ADMIN_EMAIL`
-   - Você será criado como **administrador**
+2. **Faça login:**
+   - Use as credenciais do usuário administrador criado
+   - Email e senha definidos no seed
 
-3. **Configure seu perfil:**
-   - O sistema criará automaticamente seu usuário
-   - Você terá acesso total ao sistema
-
-4. **Cadastre usuários da família:**
-   - Vá em **Admin → Usuários**
-   - Clique em "Novo Usuário"
-   - Insira o email Gmail do familiar
-   - Ele poderá fazer login na próxima vez
-
-5. **Comece a usar:**
+3. **Comece a usar:**
    - Cadastre profissionais de saúde
    - Registre consultas
    - Faça upload de exames e laudos
@@ -677,35 +480,17 @@ Se preferir cadastrar com todos os dados de uma vez:
 
 ```env
 # Database (Obrigatório)
-DB_HOST=192.168.1.100           # IP do MariaDB
-DB_PORT=3306                    # Porta do MariaDB
-DB_NAME=medlog                  # Nome do banco
-DB_USER=medlog_user             # Usuário
-DB_PASSWORD=senha_segura        # Senha
+DATABASE_URL=mysql://medlog_user:senha_segura@192.168.1.100:3306/medlog
 
-# Application (Obrigatório)
-NODE_ENV=production             # production ou development
-PORT=3000                       # Porta do app
-APP_URL=http://192.168.1.100:3000  # URL completa
-
-# Files (Obrigatório)
-FILES_PATH=/app/data/uploads    # Path dos uploads
-
-# Google OAuth (Obrigatório)
-GOOGLE_CLIENT_ID=xxx.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=xxx
-GOOGLE_CALLBACK_URL=http://192.168.1.100:3000/api/auth/callback/google
-
-# Security (Obrigatório - gere strings aleatórias)
-SESSION_SECRET=min_32_caracteres_aleatorios
-JWT_SECRET=min_32_caracteres_aleatorios
-NEXTAUTH_SECRET=min_32_caracteres_aleatorios
+# Security (Obrigatório - gere com openssl rand -base64 32)
+NEXTAUTH_SECRET=string_aleatoria_min_32_caracteres
 NEXTAUTH_URL=http://192.168.1.100:3000
 
-# Admin (Obrigatório)
-ADMIN_EMAIL=seu-email@gmail.com  # Primeiro admin
+# Files (Obrigatório)
+FILES_PATH=/app/data/uploads    # Path dos uploads no container
 
 # Opcional
+NODE_ENV=production             # production ou development
 MAX_FILE_SIZE=10485760          # 10MB em bytes (padrão)
 ALLOWED_FILE_TYPES=pdf,png,jpg,jpeg  # Tipos permitidos
 ```
@@ -791,41 +576,22 @@ Configure no Unraid:
 # Verificar logs
 docker logs medlog
 
-# Verificar se todas as variáveis estão definidas
-docker exec medlog env | grep -E "DB_|GOOGLE_|NEXTAUTH_"
+# Verificar variáveis de ambiente
+docker exec medlog env | grep -E "DATABASE_URL|NEXTAUTH_"
 ```
 
 ### Erro de conexão com banco de dados
 
 ```bash
 # Testar conexão com MariaDB
-docker exec -it mariadb mysql -h DB_HOST -u DB_USER -p DB_NAME
+docker exec -it mariadb mysql -u medlog_user -p medlog
 
 # Verificar se banco existe
 docker exec -it mariadb mysql -u root -p -e "SHOW DATABASES;"
 
-# Verificar se usuário tem permissões
+# Verificar permissões do usuário
 docker exec -it mariadb mysql -u root -p -e "SHOW GRANTS FOR 'medlog_user'@'%';"
 ```
-
-### Erro no OAuth Google
-
-1. **Verificar Client ID e Secret:**
-   - Confirme que estão corretos no `.env`
-   - Sem espaços extras ou caracteres invisíveis
-
-2. **Verificar URLs no Google Cloud:**
-   - Callback URL deve estar exatamente igual
-   - `http://` vs `https://` importa!
-
-3. **Verificar Google+ API:**
-   - Deve estar ativada no projeto
-   - APIs & Services → Library → Google+ API
-
-4. **Logs detalhados:**
-   ```bash
-   docker logs -f medlog
-   ```
 
 ### Arquivos não aparecem
 
@@ -847,14 +613,14 @@ chown -R nobody:users /mnt/user/appdata/medlog/uploads
    df -h /mnt/user/appdata/medlog/uploads
    ```
 
-### Health check falha
+### Login não funciona
 
 ```bash
-# Verificar se app está respondendo
-curl http://localhost:3000/health
+# Criar ou recriar usuário admin
+docker exec -it medlog npm run seed:admin
 
-# Verificar se porta está escutando
-netstat -tulpn | grep 3000
+# Verificar logs de autenticação
+docker logs -f medlog
 ```
 
 ---
@@ -923,7 +689,6 @@ sessions
 - Node.js 20+
 - npm ou yarn
 - MariaDB 11+
-- Conta Google Cloud (OAuth)
 
 ### Setup
 
@@ -935,15 +700,17 @@ cd medlog
 # Instale dependências
 npm install
 
-# Configure variáveis de ambiente
-cp .env.example .env.local
-# Edite .env.local com suas configurações
+# Configure variáveis de ambiente (.env.local)
+DATABASE_URL="mysql://medlog_user:senha@localhost:3306/medlog"
+NEXTAUTH_SECRET="gere_com_openssl_rand_base64_32"
+NEXTAUTH_URL="http://localhost:3000"
+FILES_PATH="./uploads"
 
 # Execute migrations
-npx prisma migrate dev
+npx prisma db push
 
-# Seed (opcional)
-npx prisma db seed
+# Crie usuário admin
+ADMIN_PASSWORD='SenhaForte123!' npm run seed:admin
 
 # Inicie desenvolvimento
 npm run dev
