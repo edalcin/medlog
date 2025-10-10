@@ -72,7 +72,7 @@ jobs:
             type=raw,value=unraid-test,enable=true
       - name: Build and push Docker image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
