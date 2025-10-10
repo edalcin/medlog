@@ -51,7 +51,11 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
-            specialty: true,
+            specialties: {
+              include: {
+                specialty: true,
+              },
+            },
           },
         },
         files: {
@@ -71,8 +75,18 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
+    // Transform to include specialty names
+    const transformedConsultations = consultations.map(consultation => ({
+      ...consultation,
+      professional: {
+        id: consultation.professional.id,
+        name: consultation.professional.name,
+        specialties: consultation.professional.specialties.map(ps => ps.specialty),
+      },
+    }))
+
     const result = {
-      consultations,
+      consultations: transformedConsultations,
       pagination: {
         page,
         limit,

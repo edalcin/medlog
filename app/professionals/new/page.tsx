@@ -1,25 +1,52 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+
+interface Specialty {
+  id: string
+  name: string
+}
 
 export default function NewProfessionalPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [specialties, setSpecialties] = useState<Specialty[]>([])
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([])
+  const [newSpecialtyName, setNewSpecialtyName] = useState('')
+  const [showNewSpecialty, setShowNewSpecialty] = useState(false)
 
   const [formData, setFormData] = useState({
     name: '',
-    specialty: '',
     crm: '',
     phone: '',
     address: '',
   })
 
-  if (status === 'unauthenticated') {
-    router.push('/')
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/')
+    }
+  }, [status, router])
+
+  useEffect(() => {
+    if (session) {
+      fetchSpecialties()
+    }
+  }, [session])
+
+  const fetchSpecialties = async () => {
+    try {
+      const response = await fetch('/api/specialties')
+      if (!response.ok) throw new Error('Erro ao carregar especialidades')
+      const data = await response.json()
+      setSpecialties(data.data)
+    } catch (err) {
+      console.error('Erro ao carregar especialidades:', err)
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,12 +55,33 @@ export default function NewProfessionalPage() {
     setError(null)
 
     try {
+      // Add new specialty if provided
+      let finalSpecialtyIds = [...selectedSpecialties]
+      if (showNewSpecialty && newSpecialtyName.trim()) {
+        const specialtyResponse = await fetch('/api/specialties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newSpecialtyName.trim() }),
+        })
+        if (specialtyResponse.ok) {
+          const specialtyData = await specialtyResponse.json()
+          finalSpecialtyIds.push(specialtyData.data.id)
+        }
+      }
+
+      if (finalSpecialtyIds.length === 0) {
+        throw new Error('Selecione pelo menos uma especialidade')
+      }
+
       const response = await fetch('/api/professionals', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          specialtyIds: finalSpecialtyIds,
+        }),
       })
 
       if (!response.ok) {
@@ -47,6 +95,14 @@ export default function NewProfessionalPage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const toggleSpecialty = (specialtyId: string) => {
+    setSelectedSpecialties(prev =>
+      prev.includes(specialtyId)
+        ? prev.filter(id => id !== specialtyId)
+        : [...prev, specialtyId]
+    )
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -102,18 +158,63 @@ export default function NewProfessionalPage() {
           </div>
 
           <div>
-            <label htmlFor="specialty" className="block text-sm font-medium text-gray-700">
-              Especialidade *
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Especialidades *
             </label>
-            <input
-              type="text"
-              id="specialty"
-              name="specialty"
-              required
-              value={formData.specialty}
-              onChange={handleInputChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
+            <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-300 rounded-md p-3">
+              {specialties.map((specialty) => (
+                <div key={specialty.id} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`specialty-${specialty.id}`}
+                    checked={selectedSpecialties.includes(specialty.id)}
+                    onChange={() => toggleSpecialty(specialty.id)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor={`specialty-${specialty.id}`}
+                    className="ml-2 text-sm text-gray-700 cursor-pointer"
+                  >
+                    {specialty.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setShowNewSpecialty(!showNewSpecialty)}
+                className="text-sm text-blue-600 hover:text-blue-500"
+              >
+                {showNewSpecialty ? '- Cancelar nova especialidade' : '+ Adicionar nova especialidade'}
+              </button>
+            </div>
+            {showNewSpecialty && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={newSpecialtyName}
+                  onChange={(e) => setNewSpecialtyName(e.target.value)}
+                  placeholder="Nome da nova especialidade"
+                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+            )}
+            {selectedSpecialties.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selectedSpecialties.map((id) => {
+                  const specialty = specialties.find(s => s.id === id)
+                  return specialty ? (
+                    <span
+                      key={id}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {specialty.name}
+                    </span>
+                  ) : null
+                })}
+              </div>
+            )}
           </div>
 
           <div>

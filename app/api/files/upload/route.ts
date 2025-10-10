@@ -18,6 +18,8 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const consultationId = formData.get('consultationId') as string
+    const categoryId = formData.get('categoryId') as string | null
+    const newCategoryName = formData.get('newCategoryName') as string | null
 
     if (!file) {
       throw new ValidationError('Arquivo é obrigatório')
@@ -25,6 +27,28 @@ export async function POST(request: NextRequest) {
 
     if (!consultationId) {
       throw new ValidationError('ID da consulta é obrigatório')
+    }
+
+    // Handle new category creation if provided
+    let finalCategoryId = categoryId
+    if (newCategoryName && newCategoryName.trim().length > 0) {
+      // Check if category already exists
+      let category = await prisma.fileCategory.findFirst({
+        where: {
+          name: newCategoryName.trim(),
+        },
+      })
+
+      // Create if doesn't exist
+      if (!category) {
+        category = await prisma.fileCategory.create({
+          data: {
+            name: newCategoryName.trim(),
+          },
+        })
+      }
+
+      finalCategoryId = category.id
     }
 
     // Verify consultation exists and belongs to user
@@ -54,6 +78,7 @@ export async function POST(request: NextRequest) {
         size: uploadedFile.size,
         consultationId,
         professionalId: consultation.professionalId,
+        categoryId: finalCategoryId || null,
       },
     })
 

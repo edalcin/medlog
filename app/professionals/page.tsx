@@ -5,10 +5,15 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+interface Specialty {
+  id: string
+  name: string
+}
+
 interface Professional {
   id: string
   name: string
-  specialty: string
+  specialties: Specialty[]
   crm: string | null
   phone: string | null
 }
@@ -110,9 +115,18 @@ export default function ProfessionalsPage() {
                         <div className="text-sm font-medium text-gray-900">
                           {professional.name}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {professional.specialty}
-                          {professional.crm && ` • CRM: ${professional.crm}`}
+                        <div className="text-sm text-gray-500 flex items-center gap-2 flex-wrap">
+                          {professional.specialties.map((specialty) => (
+                            <span
+                              key={specialty.id}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                            >
+                              {specialty.name}
+                            </span>
+                          ))}
+                          {professional.crm && (
+                            <span className="text-gray-500">• CRM: {professional.crm}</span>
+                          )}
                         </div>
                       </div>
                     </div>

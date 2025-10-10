@@ -5,6 +5,11 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+interface Specialty {
+  id: string
+  name: string
+}
+
 interface Consultation {
   id: string
   date: string
@@ -12,7 +17,7 @@ interface Consultation {
   professional: {
     id: string
     name: string
-    specialty: string
+    specialties: Specialty[]
   }
   files: Array<{
     id: string
@@ -138,7 +143,7 @@ export default function ConsultationsPage() {
                           {consultation.professional.name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {consultation.professional.specialty} • {formatDate(consultation.date)}
+                          {consultation.professional.specialties.map(s => s.name).join(', ')} • {formatDate(consultation.date)}
                         </div>
                       </div>
                     </div>

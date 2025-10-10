@@ -13,19 +13,28 @@ export async function GET(request: NextRequest) {
       where: {
         isActive: true,
       },
-      select: {
-        id: true,
-        name: true,
-        specialty: true,
-        crm: true,
-        phone: true,
+      include: {
+        specialties: {
+          include: {
+            specialty: true,
+          },
+        },
       },
       orderBy: {
         name: 'asc',
       },
     })
 
-    return successResponse(professionals, 'Profissionais ativos listados com sucesso')
+    // Transform to include specialty names
+    const transformedProfessionals = professionals.map(prof => ({
+      id: prof.id,
+      name: prof.name,
+      crm: prof.crm,
+      phone: prof.phone,
+      specialties: prof.specialties.map(ps => ps.specialty),
+    }))
+
+    return successResponse(transformedProfessionals, 'Profissionais ativos listados com sucesso')
   } catch (error) {
     return handleApiError(error)
   }
@@ -39,19 +48,30 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, specialty, crm, phone, address } = body
+    const { name, specialtyIds, crm, phone, address } = body
 
-    if (!name || !specialty) {
-      throw new ValidationError('Nome e especialidade são obrigatórios')
+    if (!name || !specialtyIds || specialtyIds.length === 0) {
+      throw new ValidationError('Nome e pelo menos uma especialidade são obrigatórios')
     }
 
     const professional = await prisma.professional.create({
       data: {
         name,
-        specialty,
         crm: crm || null,
         phone: phone || null,
         address: address || null,
+        specialties: {
+          create: specialtyIds.map((specialtyId: string) => ({
+            specialtyId,
+          })),
+        },
+      },
+      include: {
+        specialties: {
+          include: {
+            specialty: true,
+          },
+        },
       },
     })
 

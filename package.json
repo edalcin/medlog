@@ -8,6 +8,11 @@
     "start": "next start",
     "lint": "next lint",
     "seed:admin": "ts-node --transpile-only scripts/seed-admin.ts",
+    "seed:categories": "ts-node --transpile-only scripts/seed-file-categories.ts",
+    "seed:specialties": "ts-node --transpile-only scripts/seed-specialties.ts",
+    "migrate:specialties": "ts-node --transpile-only scripts/migrate-professionals-specialties.ts",
+    "check:professionals": "ts-node --transpile-only scripts/check-professionals-without-specialties.ts",
+    "fix:professionals": "ts-node --transpile-only scripts/fix-professionals-add-default-specialty.ts",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate"
