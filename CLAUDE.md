@@ -21,11 +21,16 @@ npx prisma generate              # Generate Prisma Client
 npm run prisma:migrate:dev       # Create and apply migrations (development)
 npm run prisma:migrate:deploy    # Apply migrations (production)
 
-# Admin user setup
+# Seed scripts
+# Admin user setup:
 # Windows PowerShell:
 $env:ADMIN_PASSWORD='sua_senha'; npm run seed:admin
 # Linux/macOS:
 ADMIN_PASSWORD='sua_senha' npm run seed:admin
+
+npm run seed:categories          # Seed default file categories
+npm run seed:specialties         # Seed default medical specialties
+npm run fix:professionals        # Associate default specialty to existing professionals
 
 # Build and deploy
 npm run build                    # Build for production
@@ -37,14 +42,19 @@ npm run lint                     # Run ESLint
 
 ### Data Model (Prisma)
 - **User**: Users of the system (ADMIN or USER role)
-- **Professional**: Healthcare professionals (doctors, specialists) with active/inactive status
+- **Professional**: Healthcare professionals with active/inactive status and multiple specialties
+- **Specialty**: Medical specialties dictionary (e.g., Cardiologia, Ortopedia)
+- **ProfessionalSpecialty**: N:N junction table linking professionals to specialties
 - **Consultation**: Central entity linking User + Professional + date + notes (Markdown) + Files
-- **File**: Uploaded documents (PDF) and images (PNG/JPG) attached to consultations
+- **File**: Uploaded documents (PDF) and images (PNG/JPG) with categorization
+- **FileCategory**: File category dictionary (e.g., Laudo, Receita, Pedido de Exame)
 
 Key relationships:
 - User → Consultations (1:N)
 - Professional → Consultations (1:N)
+- Professional ↔ Specialty (N:N via ProfessionalSpecialty)
 - Consultation → Files (1:N)
+- FileCategory → Files (1:N)
 - Professional → Files (1:N) - for filtering files by professional
 
 ### Authentication (NextAuth.js)
@@ -65,29 +75,44 @@ Key relationships:
 ### App Structure (Next.js App Router)
 ```
 app/
-├── api/                      # API routes
-│   ├── auth/                 # NextAuth endpoints + /me
-│   ├── consultations/        # CRUD for consultations
-│   ├── professionals/        # CRUD for professionals
-│   ├── files/                # File upload and serving
-│   ├── users/                # User management (ADMIN only)
-│   └── admin/stats/          # Admin statistics
-├── consultations/            # Consultation pages (list, detail, new)
-├── professionals/            # Professional pages (list, detail, new)
-├── reports/                  # Reports/timeline view
-├── admin/                    # Admin panel
-└── auth/signin/              # Sign-in page
+├── api/                            # API routes
+│   ├── auth/                       # NextAuth endpoints + /me
+│   ├── consultations/              # CRUD for consultations
+│   ├── professionals/              # CRUD for professionals
+│   ├── files/                      # File upload and serving
+│   ├── users/                      # User management (ADMIN only)
+│   ├── file-categories/            # File category dictionary management
+│   │   └── [id]/                   # PUT/DELETE category by ID
+│   ├── specialties/                # Medical specialty dictionary management
+│   │   └── [id]/                   # PUT/DELETE specialty by ID
+│   └── admin/                      # Admin-only endpoints
+│       ├── stats/                  # Statistics
+│       ├── consultations/          # List all consultations
+│       │   └── bulk-delete/        # Bulk delete consultations
+│       └── professionals/          # List all professionals
+│           └── bulk-delete/        # Bulk delete professionals
+├── consultations/                  # Consultation pages (list, detail, new)
+├── professionals/                  # Professional pages (list, detail, new)
+├── reports/                        # Reports/timeline view
+├── admin/                          # Admin panel (6 tabs)
+└── auth/signin/                    # Sign-in page
 
 lib/
-├── auth/                     # Auth config and utilities
-├── prisma/client.ts          # Singleton Prisma client
-├── upload.ts                 # File upload utilities
-├── responses.ts              # API response helpers
-└── errors.ts                 # Error handling
+├── auth/                           # Auth config and utilities
+├── prisma/client.ts                # Singleton Prisma client
+├── upload.ts                       # File upload utilities
+├── responses.ts                    # API response helpers
+└── errors.ts                       # Error handling
 
 components/
-├── providers.tsx             # React providers (SessionProvider)
-└── navigation.tsx            # Navigation component
+├── providers.tsx                   # React providers (SessionProvider)
+└── navigation.tsx                  # Navigation component
+
+scripts/
+├── seed-admin.ts                   # Create admin user
+├── seed-file-categories.ts         # Seed default file categories
+├── seed-specialties.ts             # Seed default specialties
+└── fix-professionals-add-default-specialty.ts  # Migration helper
 ```
 
 ## Key Patterns
@@ -96,11 +121,27 @@ components/
 
 2. **Quick Professional Creation**: Forms for creating consultations allow inline creation of professionals without full details.
 
-3. **File Associations**: Files belong to both a Consultation and a Professional (for filtering).
+3. **Multiple Specialties**: Professionals can have multiple specialties via N:N relationship. Inline creation of new specialties is supported during professional registration.
 
-4. **Markdown Support**: Consultation notes support Markdown formatting.
+4. **File Categorization**: Files must be categorized when uploaded (e.g., Laudo, Receita). Inline creation of new categories is supported during file upload.
 
-5. **Cascade Deletes**: Deleting a user cascades to their consultations; deleting a consultation cascades to its files.
+5. **Controlled Dictionaries**: Both file categories and medical specialties are managed through controlled dictionaries in the admin panel.
+
+6. **File Associations**: Files belong to both a Consultation and a Professional (for filtering), plus a FileCategory for organization.
+
+7. **Markdown Support**: Consultation notes support Markdown formatting.
+
+8. **Cascade Deletes**: Deleting a user cascades to their consultations; deleting a consultation cascades to its files. Professional-Specialty associations cascade on delete.
+
+9. **Referential Integrity**: Dictionaries (categories, specialties) cannot be deleted if in use. Professionals cannot be bulk-deleted if they have consultations.
+
+10. **Admin Panel Organization**: Admin panel has 6 tabs:
+    - Users: Full CRUD for system users
+    - Consultations: View all + bulk delete
+    - Professionals: View all + bulk delete (with validation)
+    - Specialties: Full CRUD for specialty dictionary
+    - Categories: Full CRUD for file category dictionary
+    - Files: View all files with metadata
 
 ## Environment Variables
 

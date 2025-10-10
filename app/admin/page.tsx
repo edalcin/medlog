@@ -76,6 +76,24 @@ interface Professional {
   }
 }
 
+interface FileCategory {
+  id: string
+  name: string
+  createdAt: string
+  _count?: {
+    files: number
+  }
+}
+
+interface SpecialtyWithCount {
+  id: string
+  name: string
+  createdAt: string
+  _count?: {
+    professionals: number
+  }
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -83,16 +101,24 @@ export default function AdminPage() {
   const [files, setFiles] = useState<FileRecord[]>([])
   const [consultations, setConsultations] = useState<Consultation[]>([])
   const [professionals, setProfessionals] = useState<Professional[]>([])
+  const [specialties, setSpecialties] = useState<SpecialtyWithCount[]>([])
+  const [fileCategories, setFileCategories] = useState<FileCategory[]>([])
   const [loading, setLoading] = useState(true)
   const [filesLoading, setFilesLoading] = useState(true)
   const [consultationsLoading, setConsultationsLoading] = useState(true)
   const [professionalsLoading, setProfessionalsLoading] = useState(true)
+  const [specialtiesLoading, setSpecialtiesLoading] = useState(true)
+  const [categoriesLoading, setCategoriesLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals' | 'specialties' | 'categories'>('users')
   const [selectedConsultations, setSelectedConsultations] = useState<Set<string>>(new Set())
   const [selectedProfessionals, setSelectedProfessionals] = useState<Set<string>>(new Set())
+  const [editingSpecialty, setEditingSpecialty] = useState<SpecialtyWithCount | null>(null)
+  const [editingCategory, setEditingCategory] = useState<FileCategory | null>(null)
+  const [isSpecialtyFormOpen, setIsSpecialtyFormOpen] = useState(false)
+  const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -109,6 +135,8 @@ export default function AdminPage() {
       fetchFiles()
       fetchConsultations()
       fetchProfessionals()
+      fetchSpecialties()
+      fetchFileCategories()
     }
   }, [session])
 
@@ -173,6 +201,38 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setProfessionalsLoading(false)
+    }
+  }
+
+  const fetchSpecialties = async () => {
+    try {
+      setSpecialtiesLoading(true)
+      const response = await fetch('/api/specialties')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar especialidades')
+      }
+      const data = await response.json()
+      setSpecialties(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    } finally {
+      setSpecialtiesLoading(false)
+    }
+  }
+
+  const fetchFileCategories = async () => {
+    try {
+      setCategoriesLoading(true)
+      const response = await fetch('/api/file-categories')
+      if (!response.ok) {
+        throw new Error('Erro ao carregar categorias')
+      }
+      const data = await response.json()
+      setFileCategories(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    } finally {
+      setCategoriesLoading(false)
     }
   }
 
@@ -343,6 +403,120 @@ export default function AdminPage() {
     }
   }
 
+  // Specialty handlers
+  const handleCreateSpecialty = () => {
+    setEditingSpecialty(null)
+    setIsSpecialtyFormOpen(true)
+  }
+
+  const handleEditSpecialty = (specialty: SpecialtyWithCount) => {
+    setEditingSpecialty(specialty)
+    setIsSpecialtyFormOpen(true)
+  }
+
+  const handleDeleteSpecialty = async (specialtyId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta especialidade?')) {
+      try {
+        const response = await fetch(`/api/specialties/${specialtyId}`, {
+          method: 'DELETE',
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Erro ao excluir especialidade')
+        }
+        fetchSpecialties()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      }
+    }
+  }
+
+  const handleSpecialtyFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const specialtyData = Object.fromEntries(formData.entries())
+
+    try {
+      const url = editingSpecialty ? `/api/specialties/${editingSpecialty.id}` : '/api/specialties'
+      const method = editingSpecialty ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(specialtyData),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || (editingSpecialty ? 'Erro ao atualizar especialidade' : 'Erro ao criar especialidade'))
+      }
+
+      setIsSpecialtyFormOpen(false)
+      fetchSpecialties()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    }
+  }
+
+  // Category handlers
+  const handleCreateCategory = () => {
+    setEditingCategory(null)
+    setIsCategoryFormOpen(true)
+  }
+
+  const handleEditCategory = (category: FileCategory) => {
+    setEditingCategory(category)
+    setIsCategoryFormOpen(true)
+  }
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (window.confirm('Tem certeza que deseja excluir esta categoria?')) {
+      try {
+        const response = await fetch(`/api/file-categories/${categoryId}`, {
+          method: 'DELETE',
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Erro ao excluir categoria')
+        }
+        fetchFileCategories()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      }
+    }
+  }
+
+  const handleCategoryFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formData = new FormData(event.currentTarget)
+    const categoryData = Object.fromEntries(formData.entries())
+
+    try {
+      const url = editingCategory ? `/api/file-categories/${editingCategory.id}` : '/api/file-categories'
+      const method = editingCategory ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(categoryData),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || (editingCategory ? 'Erro ao atualizar categoria' : 'Erro ao criar categoria'))
+      }
+
+      setIsCategoryFormOpen(false)
+      fetchFileCategories()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
@@ -400,6 +574,26 @@ export default function AdminPage() {
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
               Profissionais ({professionals.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('specialties')}
+              className={`${
+                activeTab === 'specialties'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Especialidades ({specialties.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('categories')}
+              className={`${
+                activeTab === 'categories'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Categorias ({fileCategories.length})
             </button>
             <button
               onClick={() => setActiveTab('files')}
@@ -673,6 +867,226 @@ export default function AdminPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Specialties Tab */}
+      {activeTab === 'specialties' && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Especialidades Médicas</h2>
+            <button
+              onClick={handleCreateSpecialty}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              Nova Especialidade
+            </button>
+          </div>
+
+          {specialtiesLoading ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Carregando especialidades...</div>
+            </div>
+          ) : specialties.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Nenhuma especialidade cadastrada</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nome
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Profissionais
+                    </th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {specialties.map((specialty) => (
+                    <tr key={specialty.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {specialty.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {specialty._count?.professionals || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleEditSpecialty(specialty)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSpecialty(specialty.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Specialty Form Modal */}
+      {isSpecialtyFormOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              {editingSpecialty ? 'Editar Especialidade' : 'Nova Especialidade'}
+            </h3>
+            <form onSubmit={handleSpecialtyFormSubmit}>
+              <div className="mb-4">
+                <label htmlFor="specialty-name" className="block text-sm font-medium text-gray-700">
+                  Nome *
+                </label>
+                <input
+                  type="text"
+                  id="specialty-name"
+                  name="name"
+                  required
+                  defaultValue={editingSpecialty?.name || ''}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsSpecialtyFormOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {editingSpecialty ? 'Atualizar' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Categories Tab */}
+      {activeTab === 'categories' && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Categorias de Arquivo</h2>
+            <button
+              onClick={handleCreateCategory}
+              className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700"
+            >
+              Nova Categoria
+            </button>
+          </div>
+
+          {categoriesLoading ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Carregando categorias...</div>
+            </div>
+          ) : fileCategories.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Nenhuma categoria cadastrada</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nome
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Arquivos
+                    </th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Ações</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {fileCategories.map((category) => (
+                    <tr key={category.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {category.name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {category._count?.files || 0}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleEditCategory(category)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(category.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Excluir
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Category Form Modal */}
+      {isCategoryFormOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              {editingCategory ? 'Editar Categoria' : 'Nova Categoria'}
+            </h3>
+            <form onSubmit={handleCategoryFormSubmit}>
+              <div className="mb-4">
+                <label htmlFor="category-name" className="block text-sm font-medium text-gray-700">
+                  Nome *
+                </label>
+                <input
+                  type="text"
+                  id="category-name"
+                  name="name"
+                  required
+                  defaultValue={editingCategory?.name || ''}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryFormOpen(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {editingCategory ? 'Atualizar' : 'Criar'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

@@ -1,11 +1,15 @@
-# MedLog - Sistema de Registro de Consultas Médicas
+<div align="center">
+  <img src="http://dalcinweb.s3-website-us-east-1.amazonaws.com/github/icones/doctor.png" alt="MedLog Logo" width="120" />
 
-> Sistema completo para gerenciamento de histórico médico pessoal e familiar, projetado para ser auto-hospedado (self-hosted).
+  # MedLog - Sistema de Registro de Consultas Médicas
 
-[![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/next.js-14+-black.svg)](https://nextjs.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-MVP%20Ready-green.svg)](https://github.com/edalcin/medlog)
+  > Sistema completo para gerenciamento de histórico médico pessoal e familiar, projetado para ser auto-hospedado (self-hosted).
+
+  [![TypeScript](https://img.shields.io/badge/typescript-5.0+-blue.svg)](https://www.typescriptlang.org/)
+  [![Next.js](https://img.shields.io/badge/next.js-14+-black.svg)](https://nextjs.org/)
+  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+  [![Status](https://img.shields.io/badge/status-MVP%20Ready-green.svg)](https://github.com/edalcin/medlog)
+</div>
 
 ---
 
@@ -25,10 +29,12 @@ A plataforma gira em torno do **Registro da Consulta Médica** como seu evento c
 - **Data e Profissional:** Inicie um registro informando a data da consulta e selecionando um profissional de saúde em uma lista (apenas profissionais ativos são exibidos).
 - **Criação Rápida de Profissional:** Se o profissional não estiver na lista, adicione-o diretamente no formulário da consulta para um cadastro rápido. Os detalhes completos podem ser adicionados mais tarde.
 - **Notas da Consulta:** Utilize um campo de texto livre com suporte a Markdown para registrar sintomas, diagnósticos, prescrições e orientações.
-- **Upload de Arquivos:** Anexe múltiplos documentos (PDF) e imagens (PNG, JPG) à consulta, como receitas, laudos e pedidos de exames.
+- **Upload de Arquivos Categorizados:** Anexe múltiplos documentos (PDF) e imagens (PNG, JPG) à consulta, categorizando cada arquivo (Laudo, Receita, Pedido de Exame, etc.). Crie novas categorias diretamente durante o upload.
 
 ### 2. Gestão de Profissionais de Saúde
-- **Cadastro Completo:** Mantenha uma ficha para cada profissional com nome, especialidade, CRM, telefone e endereço.
+- **Cadastro Completo:** Mantenha uma ficha para cada profissional com nome, múltiplas especialidades, CRM, telefone e endereço.
+- **Especialidades Múltiplas:** Associe um profissional a várias especialidades médicas através de um dicionário controlado com 28+ especialidades pré-cadastradas.
+- **Criação Rápida de Especialidade:** Adicione novas especialidades diretamente no formulário de cadastro do profissional.
 - **Status Ativo/Inativo:** Controle quais profissionais aparecem na lista de seleção para novas consultas. Profissionais inativos são mantidos no histórico, mas não podem ser selecionados para novos registros.
 
 ### 3. Visualização e Relatórios
@@ -37,6 +43,20 @@ O sistema oferece múltiplas formas de acessar e filtrar as informações:
 - **Por Profissional:** Acesse o histórico completo de consultas e documentos associados a um profissional.
 - **Por Especialidade:** Agrupe todas as consultas e documentos de uma mesma especialidade (ex: Ortopedia).
 - **Timeline Cronológica:** Navegue por todo o histórico médico em uma linha do tempo.
+
+### 4. Painel Administrativo Completo
+Sistema de administração com 6 abas para gerenciamento completo:
+- **Usuários:** CRUD completo para gerenciar usuários do sistema (ADMIN/USER).
+- **Consultas:** Visualização de todas as consultas com opção de exclusão individual ou em massa (bulk delete).
+- **Profissionais:** Listagem de profissionais com contagem de consultas, bulk delete com validação de integridade referencial.
+- **Especialidades:** Gestão completa do dicionário de especialidades médicas (adicionar, editar, excluir).
+- **Categorias:** Gestão completa do dicionário de categorias de arquivo (adicionar, editar, excluir).
+- **Arquivos:** Visualização de todos os arquivos do sistema com metadados e opção de exclusão.
+
+**Validações de Integridade:**
+- Especialidades em uso não podem ser excluídas (proteção de dados)
+- Categorias em uso não podem ser excluídas (proteção de dados)
+- Profissionais com consultas não podem ser excluídos em massa (proteção de histórico)
 
 ---
 
@@ -98,21 +118,27 @@ Execute o comando abaixo para criar a estrutura de tabelas no banco de dados.
 npx prisma db push
 ```
 
-### Passo 4: Criar o Usuário Administrador
+### Passo 4: Criar o Usuário Administrador e Dados Iniciais
 
-Execute o comando abaixo para criar o primeiro usuário com perfil de administrador.
+Execute os comandos abaixo para criar o primeiro usuário e popular os dicionários com dados padrão.
 
 *   **No PowerShell (Windows):**
     ```powershell
     $env:ADMIN_PASSWORD='sua_senha_forte'; npm run seed:admin
+    npm run seed:categories
+    npm run seed:specialties
     ```
 
 *   **No Bash (Linux/macOS):**
     ```bash
     ADMIN_PASSWORD='sua_senha_forte' npm run seed:admin
+    npm run seed:categories
+    npm run seed:specialties
     ```
 
-O usuário será criado com o email `admin@example.com` e a senha que você definiu.
+O usuário administrador será criado com o email `admin@example.com` e a senha que você definiu. Os scripts de seed irão popular:
+- **Categorias de arquivo:** Laudo, Receita, Pedido de Exame, Atestado, Carteirinha, Outros
+- **Especialidades médicas:** 28 especialidades incluindo Cardiologia, Ortopedia, Pediatria, etc.
 
 ### Passo 5: Iniciar a Aplicação
 
