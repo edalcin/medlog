@@ -13,10 +13,15 @@ interface File {
   size: number
 }
 
+interface Specialty {
+  id: string
+  name: string
+}
+
 interface Professional {
   id: string
   name: string
-  specialty: string
+  specialties: Specialty[]
   crm: string | null
   phone: string | null
   address: string | null
@@ -39,6 +44,7 @@ export default function ConsultationDetailsPage() {
   const [consultation, setConsultation] = useState<Consultation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchConsultation = useCallback(async () => {
     try {
@@ -79,6 +85,28 @@ export default function ConsultationDetailsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
+  const handleDelete = async () => {
+    if (!window.confirm('Tem certeza que deseja excluir esta consulta? Esta ação não pode ser desfeita.')) {
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const response = await fetch(`/api/consultations/${id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Erro ao excluir consulta')
+      }
+
+      router.push('/consultations')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setDeleting(false)
+    }
+  }
+
   if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
@@ -113,10 +141,29 @@ export default function ConsultationDetailsPage() {
         <Link href="/consultations" className="text-blue-600 hover:text-blue-500 mb-4 inline-block">
           &larr; Voltar para Consultas
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Detalhes da Consulta</h1>
-        <p className="mt-2 text-gray-600">
-          Consulta de {consultation.professional.specialty} com {consultation.professional.name} em {formatDate(consultation.date)}
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Detalhes da Consulta</h1>
+            <p className="mt-2 text-gray-600">
+              Consulta de {consultation.professional.specialties?.map(s => s.name).join(', ') || 'Especialidade não definida'} com {consultation.professional.name} em {formatDate(consultation.date)}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Link
+              href={`/consultations/${id}/edit`}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+            >
+              Editar
+            </Link>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium disabled:opacity-50"
+            >
+              {deleting ? 'Excluindo...' : 'Excluir'}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="bg-white shadow rounded-lg p-6">
