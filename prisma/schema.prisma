@@ -27,18 +27,43 @@ model User {
 model Professional {
   id        String @id @default(uuid())
   name      String
-  specialty String
   crm       String?
   phone     String?
   address   String?
+  clinicId  String?
   isActive  Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   consultations Consultation[]
   files         File[]
+  specialties   ProfessionalSpecialty[]
+  clinic        Clinic? @relation(fields: [clinicId], references: [id])
 
   @@map("professionals")
+}
+
+model Specialty {
+  id        String @id @default(uuid())
+  name      String @unique
+  createdAt DateTime @default(now())
+
+  professionals ProfessionalSpecialty[]
+
+  @@map("specialties")
+}
+
+model ProfessionalSpecialty {
+  id             String @id @default(uuid())
+  professionalId String
+  specialtyId    String
+  createdAt      DateTime @default(now())
+
+  professional Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  specialty    Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@unique([professionalId, specialtyId])
+  @@map("professional_specialties")
 }
 
 model Consultation {
@@ -65,12 +90,34 @@ model File {
   size           Int
   consultationId String
   professionalId String
+  categoryId     String?
   uploadedAt     DateTime @default(now())
 
   consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
   professional Professional @relation(fields: [professionalId], references: [id])
+  category     FileCategory? @relation(fields: [categoryId], references: [id])
 
   @@map("files")
+}
+
+model FileCategory {
+  id        String @id @default(uuid())
+  name      String @unique
+  createdAt DateTime @default(now())
+
+  files File[]
+
+  @@map("file_categories")
+}
+
+model Clinic {
+  id        String @id @default(uuid())
+  name      String @unique
+  createdAt DateTime @default(now())
+
+  professionals Professional[]
+
+  @@map("clinics")
 }
 
 enum UserRole {
