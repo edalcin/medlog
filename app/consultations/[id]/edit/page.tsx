@@ -150,7 +150,7 @@ export default function EditConsultationPage() {
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Editar Consulta</h1>
         <p className="mt-2 text-gray-600">
-          Atualize os dados da consulta médica.
+          Atualize os dados da consulta mÃ©dica.
         </p>
       </div>
 
@@ -180,7 +180,7 @@ export default function EditConsultationPage() {
 
           <div>
             <label htmlFor="professionalId" className="block text-sm font-medium text-gray-700">
-              Profissional de Saúde *
+              Profissional de SaÃºde *
             </label>
             <select
               id="professionalId"
@@ -202,7 +202,7 @@ export default function EditConsultationPage() {
 
           <div>
             <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-              Observações
+              ObservaÃ§Ãµes
             </label>
             <textarea
               id="notes"
@@ -210,11 +210,11 @@ export default function EditConsultationPage() {
               rows={8}
               value={formData.notes}
               onChange={handleInputChange}
-              placeholder="Descreva os sintomas, diagnóstico, tratamento, medicamentos receitados, etc."
+              placeholder="Descreva os sintomas, diagnÃ³stico, tratamento, medicamentos receitados, etc."
               className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
             <p className="mt-1 text-sm text-gray-500">
-              Você pode usar Markdown para formatar o texto.
+              VocÃª pode usar Markdown para formatar o texto.
             </p>
           </div>
 
@@ -231,7 +231,7 @@ export default function EditConsultationPage() {
               disabled={submitting}
               className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? 'Salvando...' : 'Salvar Alterações'}
+              {submitting ? 'Salvando...' : 'Salvar AlteraÃ§Ãµes'}
             </button>
           </div>
         </form>
