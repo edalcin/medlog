@@ -15,7 +15,11 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(git commit:*)",
-      "Bash(npx prisma db pull:*)"
+      "Bash(npx prisma db pull:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(gh run view:*)",
+      "Bash(npm install)",
+      "Bash(when your package.json and package-lock.json are in sync\"\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
