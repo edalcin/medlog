@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const body = await request.json()
-    const { date, professionalId, notes } = body
+    const { date, professionalId, proposito, notes } = body
 
     // Validate required fields
     if (!date || !professionalId) {
@@ -131,6 +131,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       where: { id: params.id },
       data: {
         date: consultationDate,
+        proposito: proposito || null,
         notes: notes || null,
         professionalId,
       },

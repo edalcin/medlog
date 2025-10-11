@@ -33,6 +33,7 @@ interface Professional {
 interface Consultation {
   id: string
   date: string
+  proposito: string | null
   notes: string | null
   professional: Professional
   files: File[]
@@ -173,6 +174,13 @@ export default function ConsultationDetailsPage() {
           </div>
         </div>
       </div>
+
+      {consultation.proposito && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Propósito da Consulta</h2>
+          <p className="text-gray-700">{consultation.proposito}</p>
+        </div>
+      )}
 
       <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Observações</h2>

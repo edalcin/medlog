@@ -64,6 +64,7 @@ model ProfessionalSpecialty {
 model Consultation {
   id             String       @id @default(uuid())
   date           DateTime
+  proposito      String?
   notes          String?      @db.Text
   userId         String
   professionalId String

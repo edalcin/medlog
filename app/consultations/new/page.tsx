@@ -47,6 +47,7 @@ export default function NewConsultationPage() {
   const [formData, setFormData] = useState({
     date: '',
     professionalId: '',
+    proposito: '',
     notes: '',
   })
   const [selectedFiles, setSelectedFiles] = useState<FileWithCategory[]>([])
@@ -280,6 +281,21 @@ export default function NewConsultationPage() {
                 Cadastre um novo
               </a>
             </p>
+          </div>
+
+          <div>
+            <label htmlFor="proposito" className="block text-sm font-medium text-gray-700">
+              Propósito da Consulta
+            </label>
+            <input
+              type="text"
+              id="proposito"
+              name="proposito"
+              value={formData.proposito}
+              onChange={handleInputChange}
+              placeholder="Ex: Consulta de rotina, Retorno, Exame, etc."
+              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            />
           </div>
 
           <div>

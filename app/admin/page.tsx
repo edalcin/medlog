@@ -134,6 +134,14 @@ export default function AdminPage() {
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false)
   const [isClinicFormOpen, setIsClinicFormOpen] = useState(false)
 
+  // File management states
+  const [editingFile, setEditingFile] = useState<FileRecord | null>(null)
+  const [isFileEditFormOpen, setIsFileEditFormOpen] = useState(false)
+  const [fileFilters, setFileFilters] = useState({ category: '', professional: '', date: '' })
+  const [fileSortColumn, setFileSortColumn] = useState<'filename' | 'category' | 'professional' | 'date'>('date')
+  const [fileSortDirection, setFileSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [submitting, setSubmitting] = useState(false)
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/')
@@ -604,6 +612,100 @@ export default function AdminPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     }
+  }
+
+  // File management functions
+  const handleEditFile = (file: FileRecord) => {
+    setEditingFile(file)
+    setIsFileEditFormOpen(true)
+  }
+
+  const handleFileEditSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingFile) return
+
+    setSubmitting(true)
+    const formData = new FormData(event.currentTarget)
+    const fileData = Object.fromEntries(formData.entries())
+
+    try {
+      const response = await fetch(`/api/files/edit/${editingFile.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fileData),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao atualizar arquivo')
+      }
+
+      setIsFileEditFormOpen(false)
+      setEditingFile(null)
+      fetchFiles()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleFileSortChange = (column: 'filename' | 'category' | 'professional' | 'date') => {
+    if (fileSortColumn === column) {
+      setFileSortDirection(fileSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setFileSortColumn(column)
+      setFileSortDirection('asc')
+    }
+  }
+
+  // Filter and sort files
+  const getFilteredAndSortedFiles = () => {
+    let filtered = [...files]
+
+    // Apply filters
+    if (fileFilters.category) {
+      filtered = filtered.filter(f =>
+        f.category?.id === fileFilters.category
+      )
+    }
+    if (fileFilters.professional) {
+      filtered = filtered.filter(f =>
+        f.professional.id === fileFilters.professional
+      )
+    }
+    if (fileFilters.date) {
+      filtered = filtered.filter(f => {
+        const fileDate = new Date(f.consultation.date).toISOString().split('T')[0]
+        return fileDate === fileFilters.date
+      })
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let comparison = 0
+
+      switch (fileSortColumn) {
+        case 'filename':
+          comparison = (a.customName || a.filename).localeCompare(b.customName || b.filename)
+          break
+        case 'category':
+          comparison = (a.category?.name || '').localeCompare(b.category?.name || '')
+          break
+        case 'professional':
+          comparison = a.professional.name.localeCompare(b.professional.name)
+          break
+        case 'date':
+          comparison = new Date(a.consultation.date).getTime() - new Date(b.consultation.date).getTime()
+          break
+      }
+
+      return fileSortDirection === 'asc' ? comparison : -comparison
+    })
+
+    return filtered
   }
 
   if (status === 'loading' || loading) {
@@ -1313,9 +1415,75 @@ export default function AdminPage() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">Gerenciamento de Arquivos</h2>
             <div className="text-sm text-gray-600">
-              Total: {files.length} arquivo{files.length !== 1 ? 's' : ''}
+              {getFilteredAndSortedFiles().length} de {files.length} arquivo(s)
             </div>
           </div>
+
+          {/* Filters */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="filter-category" className="block text-sm font-medium text-gray-700 mb-1">
+                Categoria
+              </label>
+              <select
+                id="filter-category"
+                value={fileFilters.category}
+                onChange={(e) => setFileFilters(prev => ({ ...prev, category: e.target.value }))}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">Todas</option>
+                {fileCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="filter-professional" className="block text-sm font-medium text-gray-700 mb-1">
+                Profissional
+              </label>
+              <select
+                id="filter-professional"
+                value={fileFilters.professional}
+                onChange={(e) => setFileFilters(prev => ({ ...prev, professional: e.target.value }))}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">Todos</option>
+                {professionals.map((prof) => (
+                  <option key={prof.id} value={prof.id}>
+                    {prof.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="filter-date" className="block text-sm font-medium text-gray-700 mb-1">
+                Data da Consulta
+              </label>
+              <input
+                type="date"
+                id="filter-date"
+                value={fileFilters.date}
+                onChange={(e) => setFileFilters(prev => ({ ...prev, date: e.target.value }))}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Clear filters button */}
+          {(fileFilters.category || fileFilters.professional || fileFilters.date) && (
+            <div className="mb-4">
+              <button
+                onClick={() => setFileFilters({ category: '', professional: '', date: '' })}
+                className="text-sm text-indigo-600 hover:text-indigo-900"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
 
           {filesLoading ? (
             <div className="text-center py-8">
@@ -1325,28 +1493,65 @@ export default function AdminPage() {
             <div className="text-center py-8">
               <div className="text-gray-500">Nenhum arquivo encontrado</div>
             </div>
+          ) : getFilteredAndSortedFiles().length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Nenhum arquivo corresponde aos filtros selecionados</div>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Arquivo
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleFileSortChange('filename')}
+                    >
+                      <div className="flex items-center">
+                        Arquivo
+                        {fileSortColumn === 'filename' && (
+                          <span className="ml-1">{fileSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Categoria
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleFileSortChange('category')}
+                    >
+                      <div className="flex items-center">
+                        Categoria
+                        {fileSortColumn === 'category' && (
+                          <span className="ml-1">{fileSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Consulta
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleFileSortChange('date')}
+                    >
+                      <div className="flex items-center">
+                        Data Consulta
+                        {fileSortColumn === 'date' && (
+                          <span className="ml-1">{fileSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Usuário
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Profissional
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Data Upload
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleFileSortChange('professional')}
+                    >
+                      <div className="flex items-center">
+                        Profissional
+                        {fileSortColumn === 'professional' && (
+                          <span className="ml-1">{fileSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
                     </th>
                     <th scope="col" className="relative px-6 py-3">
                       <span className="sr-only">Ações</span>
@@ -1354,7 +1559,7 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {files.map((file) => (
+                  {getFilteredAndSortedFiles().map((file) => (
                     <tr key={file.id}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -1407,17 +1612,20 @@ export default function AdminPage() {
                           {file.professional.specialties.map(s => s.name).join(', ')}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(file.uploadedAt)}
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleEditFile(file)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        >
+                          Editar
+                        </button>
                         <a
                           href={`/api/files/${file.path}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-indigo-600 hover:text-indigo-900 mr-4"
                         >
-                          Visualizar
+                          Ver
                         </a>
                         <button
                           onClick={() => handleDeleteFile(file.path)}
@@ -1432,6 +1640,70 @@ export default function AdminPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* File Edit Modal */}
+      {isFileEditFormOpen && editingFile && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Editar Arquivo</h3>
+            <form onSubmit={handleFileEditSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="customName" className="block text-sm font-medium text-gray-700">
+                  Nome Personalizado
+                </label>
+                <input
+                  type="text"
+                  id="customName"
+                  name="customName"
+                  defaultValue={editingFile.customName || ''}
+                  placeholder="Nome personalizado do arquivo"
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+                <p className="mt-1 text-xs text-gray-500">Nome original: {editingFile.filename}</p>
+              </div>
+
+              <div>
+                <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700">
+                  Categoria
+                </label>
+                <select
+                  id="categoryId"
+                  name="categoryId"
+                  defaultValue={editingFile.category?.id || ''}
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                >
+                  <option value="">Selecione uma categoria</option>
+                  {fileCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFileEditFormOpen(false)
+                    setEditingFile(null)
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {submitting ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

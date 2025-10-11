@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { date, professionalId, notes } = body
+    const { date, professionalId, proposito, notes } = body
 
     // Validate required fields
     if (!date || !professionalId) {
@@ -146,6 +146,7 @@ export async function POST(request: NextRequest) {
     const consultation = await prisma.consultation.create({
       data: {
         date: consultationDate,
+        proposito: proposito || null,
         notes: notes || null,
         userId: session.user.id,
         professionalId,
