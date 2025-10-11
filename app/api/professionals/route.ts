@@ -14,21 +14,31 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         name: true,
-        specialty: true,
         crm: true,
         phone: true,
+        specialties: {
+          include: {
+            specialty: true,
+          },
+        },
       },
       orderBy: {
         name: 'asc',
       },
     })
 
-    if (professionals.length === 0) {
+    // Transform to include specialty names
+    const transformedProfessionals = professionals.map((professional) => ({
+      ...professional,
+      specialties: professional.specialties.map((ps) => ps.specialty),
+    }))
+
+    if (transformedProfessionals.length === 0) {
       throw new NotFoundError('Profissionais')
     }
 
     return successResponse(
-      professionals,
+      transformedProfessionals,
       'Profissionais ativos listados com sucesso'
     )
   } catch (error) {
