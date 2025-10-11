@@ -1,15 +1,11 @@
-# Use Node.js 20 Alpine as base image
-FROM node:20-alpine AS base
+# Use Node.js 20 Alpine 3.19 which includes OpenSSL 1.1 (required by Prisma)
+# Alpine 3.20+ uses OpenSSL 3 which is not compatible with Prisma 5.x
+FROM node:20-alpine3.19 AS base
 
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-# Install OpenSSL 1.1 for Prisma compatibility (Alpine 3.22+ uses OpenSSL 3)
-# Download OpenSSL 1.1 library directly from Alpine 3.19 repository
-RUN apk add --no-cache libc6-compat \
-    && wget -O /tmp/libssl1.1.apk https://dl-cdn.alpinelinux.org/alpine/v3.19/main/x86_64/libssl1.1-1.1.1w-r1.apk \
-    && apk add --no-cache --allow-untrusted /tmp/libssl1.1.apk \
-    && rm /tmp/libssl1.1.apk
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -21,10 +17,6 @@ RUN \
 
 # Rebuild the source code only when needed
 FROM base AS builder
-# Install OpenSSL 1.1 for Prisma compatibility during build
-RUN wget -O /tmp/libssl1.1.apk https://dl-cdn.alpinelinux.org/alpine/v3.19/main/x86_64/libssl1.1-1.1.1w-r1.apk \
-    && apk add --no-cache --allow-untrusted /tmp/libssl1.1.apk \
-    && rm /tmp/libssl1.1.apk
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -41,10 +33,6 @@ RUN npm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
-# Install OpenSSL 1.1 for Prisma compatibility at runtime
-RUN wget -O /tmp/libssl1.1.apk https://dl-cdn.alpinelinux.org/alpine/v3.19/main/x86_64/libssl1.1-1.1.1w-r1.apk \
-    && apk add --no-cache --allow-untrusted /tmp/libssl1.1.apk \
-    && rm /tmp/libssl1.1.apk
 WORKDIR /app
 
 ENV NODE_ENV=production
