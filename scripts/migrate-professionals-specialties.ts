@@ -23,10 +23,7 @@ async function main() {
     // Check if specialty exists
     let specialty = await prisma.specialty.findFirst({
       where: {
-        name: {
-          equals: professional.specialty.trim(),
-          mode: 'insensitive',
-        },
+        name: professional.specialty.trim(),
       },
     })
 

@@ -38,21 +38,21 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         }
 
         const body = await request.json()
-        const { name, specialty, crm, phone, address, isActive } = body
+        const { name, crm, phone, address, isActive, clinicId } = body
 
-        if (!name || !specialty) {
-            throw new ValidationError('Nome e especialidade são obrigatórios')
+        if (!name) {
+            throw new ValidationError('Nome é obrigatório')
         }
 
         const professional = await prisma.professional.update({
             where: { id: params.id },
             data: {
                 name,
-                specialty,
                 crm,
                 phone,
                 address,
                 isActive,
+                clinicId,
             },
         })
 

@@ -26,12 +26,21 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { name, email, role } = body
+    const { name, email, role, password } = body
+
+    if (!password) {
+      return NextResponse.json({ error: 'Password is required' }, { status: 400 })
+    }
+
+    const bcrypt = require('bcryptjs')
+    const passwordHash = await bcrypt.hash(password, 10)
+
     const user = await prisma.user.create({
       data: {
         name,
         email,
         role,
+        passwordHash,
       },
     })
     return NextResponse.json({ data: user }, { status: 201 })
