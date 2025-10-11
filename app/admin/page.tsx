@@ -19,6 +19,7 @@ interface Specialty {
 interface FileRecord {
   id: string
   filename: string
+  customName?: string | null
   path: string
   mimeType: string
   size: number
@@ -1373,7 +1374,8 @@ export default function AdminPage() {
                             )}
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{file.filename}</div>
+                            <div className="text-sm font-medium text-gray-900">{file.customName || file.filename}</div>
+                            {file.customName && <div className="text-xs text-gray-400">{file.filename}</div>}
                             <div className="text-sm text-gray-500">{formatFileSize(file.size)}</div>
                           </div>
                         </div>

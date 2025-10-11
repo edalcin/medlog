@@ -11,7 +11,7 @@ const prisma = new PrismaClient()
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: { path: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -19,7 +19,7 @@ export async function GET(
       throw new ForbiddenError()
     }
 
-    const filename = params.filename
+    const filename = params.path
 
     // Find file record
     const file = await prisma.file.findFirst({

@@ -11,7 +11,7 @@ const prisma = new PrismaClient()
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { filename: string } }
+  { params }: { params: { path: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -19,7 +19,7 @@ export async function DELETE(
       return errorResponse('Não autorizado', 401)
     }
 
-    const { filename } = params
+    const filename = params.path
 
     // Find file in database
     const file = await prisma.file.findFirst({

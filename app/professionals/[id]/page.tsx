@@ -5,14 +5,26 @@ import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
+interface Specialty {
+  id: string
+  name: string
+}
+
+interface Clinic {
+  id: string
+  name: string
+}
+
 interface Professional {
   id: string
   name: string
-  specialty: string
+  specialties: Specialty[]
   crm: string | null
   phone: string | null
   address: string | null
   isActive: boolean
+  clinicId: string | null
+  clinic: Clinic | null
 }
 
 export default function ProfessionalDetailsPage() {
@@ -26,6 +38,14 @@ export default function ProfessionalDetailsPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [specialties, setSpecialties] = useState<Specialty[]>([])
+  const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([])
+  const [newSpecialtyName, setNewSpecialtyName] = useState('')
+  const [showNewSpecialty, setShowNewSpecialty] = useState(false)
+  const [clinics, setClinics] = useState<Clinic[]>([])
+  const [selectedClinic, setSelectedClinic] = useState<string>('')
+  const [newClinicName, setNewClinicName] = useState('')
+  const [showNewClinic, setShowNewClinic] = useState(false)
 
   const fetchProfessional = useCallback(async () => {
     try {
@@ -36,12 +56,36 @@ export default function ProfessionalDetailsPage() {
       const data = await response.json()
       setProfessional(data.data)
       setFormData(data.data)
+      setSelectedSpecialties(data.data.specialties?.map((s: Specialty) => s.id) || [])
+      setSelectedClinic(data.data.clinicId || '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setLoading(false)
     }
   }, [id])
+
+  const fetchSpecialties = useCallback(async () => {
+    try {
+      const response = await fetch('/api/specialties')
+      if (!response.ok) throw new Error('Erro ao carregar especialidades')
+      const data = await response.json()
+      setSpecialties(data.data)
+    } catch (err) {
+      console.error('Erro ao carregar especialidades:', err)
+    }
+  }, [])
+
+  const fetchClinics = useCallback(async () => {
+    try {
+      const response = await fetch('/api/clinics')
+      if (!response.ok) throw new Error('Erro ao carregar clínicas')
+      const data = await response.json()
+      setClinics(data.data)
+    } catch (err) {
+      console.error('Erro ao carregar clínicas:', err)
+    }
+  }, [])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -52,8 +96,18 @@ export default function ProfessionalDetailsPage() {
   useEffect(() => {
     if (session && id) {
       fetchProfessional()
+      fetchSpecialties()
+      fetchClinics()
     }
-  }, [session, id, fetchProfessional])
+  }, [session, id, fetchProfessional, fetchSpecialties, fetchClinics])
+
+  const toggleSpecialty = (specialtyId: string) => {
+    setSelectedSpecialties(prev =>
+      prev.includes(specialtyId)
+        ? prev.filter(id => id !== specialtyId)
+        : [...prev, specialtyId]
+    )
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -70,10 +124,46 @@ export default function ProfessionalDetailsPage() {
     setError(null)
 
     try {
+      // Add new specialty if provided
+      let finalSpecialtyIds = [...selectedSpecialties]
+      if (showNewSpecialty && newSpecialtyName.trim()) {
+        const specialtyResponse = await fetch('/api/specialties', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newSpecialtyName.trim() }),
+        })
+        if (specialtyResponse.ok) {
+          const specialtyData = await specialtyResponse.json()
+          finalSpecialtyIds.push(specialtyData.data.id)
+        }
+      }
+
+      if (finalSpecialtyIds.length === 0) {
+        throw new Error('Selecione pelo menos uma especialidade')
+      }
+
+      // Add new clinic if provided
+      let finalClinicId = selectedClinic
+      if (showNewClinic && newClinicName.trim()) {
+        const clinicResponse = await fetch('/api/clinics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: newClinicName.trim() }),
+        })
+        if (clinicResponse.ok) {
+          const clinicData = await clinicResponse.json()
+          finalClinicId = clinicData.data.id
+        }
+      }
+
       const response = await fetch(`/api/professionals/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          specialtyIds: finalSpecialtyIds,
+          clinicId: finalClinicId || null,
+        }),
       })
 
       if (!response.ok) {
@@ -151,8 +241,101 @@ export default function ProfessionalDetailsPage() {
           </div>
 
           <div>
-            <label htmlFor="specialty" className="block text-sm font-medium text-gray-700">Especialidade *</label>
-            <input type="text" id="specialty" name="specialty" required value={formData.specialty || ''} onChange={handleInputChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" />
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Especialidades *
+            </label>
+            <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-300 rounded-md p-3">
+              {specialties.map((specialty) => (
+                <div key={specialty.id} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`specialty-${specialty.id}`}
+                    checked={selectedSpecialties.includes(specialty.id)}
+                    onChange={() => toggleSpecialty(specialty.id)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor={`specialty-${specialty.id}`}
+                    className="ml-2 text-sm text-gray-700 cursor-pointer"
+                  >
+                    {specialty.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setShowNewSpecialty(!showNewSpecialty)}
+                className="text-sm text-blue-600 hover:text-blue-500"
+              >
+                {showNewSpecialty ? '- Cancelar nova especialidade' : '+ Adicionar nova especialidade'}
+              </button>
+            </div>
+            {showNewSpecialty && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={newSpecialtyName}
+                  onChange={(e) => setNewSpecialtyName(e.target.value)}
+                  placeholder="Nome da nova especialidade"
+                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+            )}
+            {selectedSpecialties.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {selectedSpecialties.map((id) => {
+                  const specialty = specialties.find(s => s.id === id)
+                  return specialty ? (
+                    <span
+                      key={id}
+                      className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    >
+                      {specialty.name}
+                    </span>
+                  ) : null
+                })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Clínica ou Hospital
+            </label>
+            <select
+              value={selectedClinic}
+              onChange={(e) => setSelectedClinic(e.target.value)}
+              className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            >
+              <option value="">Selecione uma clínica (opcional)</option>
+              {clinics.map((clinic) => (
+                <option key={clinic.id} value={clinic.id}>
+                  {clinic.name}
+                </option>
+              ))}
+            </select>
+            <div className="mt-2">
+              <button
+                type="button"
+                onClick={() => setShowNewClinic(!showNewClinic)}
+                className="text-sm text-blue-600 hover:text-blue-500"
+              >
+                {showNewClinic ? '- Cancelar nova clínica' : '+ Adicionar nova clínica'}
+              </button>
+            </div>
+            {showNewClinic && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  value={newClinicName}
+                  onChange={(e) => setNewClinicName(e.target.value)}
+                  placeholder="Nome da nova clínica ou hospital"
+                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+              </div>
+            )}
           </div>
 
           <div>

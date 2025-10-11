@@ -18,13 +18,27 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       where: {
         id: params.id,
       },
+      include: {
+        specialties: {
+          include: {
+            specialty: true,
+          },
+        },
+        clinic: true,
+      },
     })
 
     if (!professional) {
       throw new NotFoundError('Profissional')
     }
 
-    return successResponse(professional, 'Profissional encontrado com sucesso')
+    // Transform to include specialty names
+    const transformedProfessional = {
+      ...professional,
+      specialties: professional.specialties.map((ps) => ps.specialty),
+    }
+
+    return successResponse(transformedProfessional, 'Profissional encontrado com sucesso')
   } catch (error) {
     return handleApiError(error)
   }
@@ -38,25 +52,50 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         }
 
         const body = await request.json()
-        const { name, crm, phone, address, isActive, clinicId } = body
+        const { name, crm, phone, address, isActive, clinicId, specialtyIds } = body
 
         if (!name) {
             throw new ValidationError('Nome é obrigatório')
         }
 
+        if (!specialtyIds || !Array.isArray(specialtyIds) || specialtyIds.length === 0) {
+            throw new ValidationError('Selecione pelo menos uma especialidade')
+        }
+
+        // Update professional and replace specialties
         const professional = await prisma.professional.update({
             where: { id: params.id },
             data: {
                 name,
-                crm,
-                phone,
-                address,
+                crm: crm || null,
+                phone: phone || null,
+                address: address || null,
                 isActive,
-                clinicId,
+                clinicId: clinicId || null,
+                specialties: {
+                    deleteMany: {}, // Remove all existing specialty associations
+                    create: specialtyIds.map((specialtyId: string) => ({
+                        specialtyId,
+                    })),
+                },
+            },
+            include: {
+                specialties: {
+                    include: {
+                        specialty: true,
+                    },
+                },
+                clinic: true,
             },
         })
 
-        return successResponse(professional, 'Profissional atualizado com sucesso')
+        // Transform to include specialty names
+        const transformedProfessional = {
+            ...professional,
+            specialties: professional.specialties.map((ps) => ps.specialty),
+        }
+
+        return successResponse(transformedProfessional, 'Profissional atualizado com sucesso')
     } catch (error) {
         return handleApiError(error)
     }

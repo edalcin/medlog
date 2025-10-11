@@ -22,6 +22,9 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get('file') as File
     const consultationId = formData.get('consultationId') as string
+    const customName = formData.get('customName') as string | null
+    const categoryId = formData.get('categoryId') as string | null
+    const newCategoryName = formData.get('newCategoryName') as string | null
 
     if (!file) {
       throw new ValidationError('Arquivo é obrigatório')
@@ -49,15 +52,28 @@ export async function POST(request: NextRequest) {
     // Save file
     const uploadedFile = await saveUploadedFile(file)
 
+    // Handle category creation if needed
+    let finalCategoryId = categoryId
+    if (newCategoryName) {
+      const newCategory = await prisma.fileCategory.create({
+        data: {
+          name: newCategoryName,
+        },
+      })
+      finalCategoryId = newCategory.id
+    }
+
     // Create file record in database
     const fileRecord = await prisma.file.create({
       data: {
         filename: file.name,
+        customName: customName || null,
         path: uploadedFile.path,
         mimeType: uploadedFile.mimeType,
         size: uploadedFile.size,
         consultationId,
         professionalId: consultation.professionalId,
+        categoryId: finalCategoryId || null,
       },
     })
 

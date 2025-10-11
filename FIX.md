@@ -8,3 +8,9 @@
 * Usar este ícone para ilustrar o projeto: http://dalcinweb.s3-website-us-east-1.amazonaws.com/github/icones/doctor.png
 * Profissionais não podem ser deletados se houver consulta associada
 * Consultas deletadas devem deletar os arquivos associados
+
+
+
+## No Unraid:
+
+* Arquivos enviados não aparecem associados à consulta

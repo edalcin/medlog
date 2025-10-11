@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface File {
   id: string
   filename: string
+  customName?: string | null
   path: string
   mimeType: string
   size: number
@@ -174,7 +177,11 @@ export default function ConsultationDetailsPage() {
       <div className="bg-white shadow rounded-lg p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Observações</h2>
         {consultation.notes ? (
-          <div className="prose max-w-none" dangerouslySetInnerHTML={{ __html: consultation.notes }} />
+          <div className="prose max-w-none">
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {consultation.notes}
+            </ReactMarkdown>
+          </div>
         ) : (
           <p className="text-gray-500">Nenhuma observação registrada.</p>
         )}
@@ -188,7 +195,8 @@ export default function ConsultationDetailsPage() {
               {consultation.files.map(file => (
                 <li key={file.id} className="px-6 py-4 flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{file.filename}</p>
+                    <p className="text-sm font-medium text-gray-900">{file.customName || file.filename}</p>
+                    {file.customName && <p className="text-xs text-gray-400">{file.filename}</p>}
                     <p className="text-sm text-gray-500">{formatFileSize(file.size)}</p>
                   </div>
                   <a

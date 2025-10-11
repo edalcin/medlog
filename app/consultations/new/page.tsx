@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
+
+const MDEditor = dynamic(
+  () => import('@uiw/react-md-editor'),
+  { ssr: false }
+)
 
 interface Specialty {
   id: string
@@ -24,6 +30,7 @@ interface FileCategory {
 
 interface FileWithCategory {
   file: File
+  customName: string
   categoryId: string
   newCategoryName: string
 }
@@ -115,6 +122,10 @@ export default function NewConsultationPage() {
           fileFormData.append('file', fileWithCat.file)
           fileFormData.append('consultationId', consultationId)
 
+          if (fileWithCat.customName && fileWithCat.customName !== fileWithCat.file.name) {
+            fileFormData.append('customName', fileWithCat.customName)
+          }
+
           if (fileWithCat.categoryId === 'new' && fileWithCat.newCategoryName) {
             fileFormData.append('newCategoryName', fileWithCat.newCategoryName)
           } else if (fileWithCat.categoryId && fileWithCat.categoryId !== 'new') {
@@ -140,11 +151,18 @@ export default function NewConsultationPage() {
     }
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
     setFormData(prev => ({
       ...prev,
       [name]: value
+    }))
+  }
+
+  const handleNotesChange = (value: string | undefined) => {
+    setFormData(prev => ({
+      ...prev,
+      notes: value || ''
     }))
   }
 
@@ -153,6 +171,7 @@ export default function NewConsultationPage() {
       const filesArray = Array.from(e.target.files)
       const newFiles = filesArray.map(file => ({
         file,
+        customName: file.name,
         categoryId: '',
         newCategoryName: '',
       }))
@@ -173,6 +192,12 @@ export default function NewConsultationPage() {
   const updateFileNewCategory = (index: number, newCategoryName: string) => {
     setSelectedFiles(prev => prev.map((item, i) =>
       i === index ? { ...item, newCategoryName } : item
+    ))
+  }
+
+  const updateFileCustomName = (index: number, customName: string) => {
+    setSelectedFiles(prev => prev.map((item, i) =>
+      i === index ? { ...item, customName } : item
     ))
   }
 
@@ -258,20 +283,23 @@ export default function NewConsultationPage() {
           </div>
 
           <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
               Observações
             </label>
-            <textarea
-              id="notes"
-              name="notes"
-              rows={4}
-              value={formData.notes}
-              onChange={handleInputChange}
-              placeholder="Descreva os sintomas, diagnóstico, tratamento, medicamentos receitados, etc."
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
+            <div data-color-mode="light">
+              <MDEditor
+                value={formData.notes}
+                onChange={handleNotesChange}
+                preview="edit"
+                height={300}
+                visibleDragbar={false}
+                textareaProps={{
+                  placeholder: 'Descreva os sintomas, diagnóstico, tratamento, medicamentos receitados, etc.'
+                }}
+              />
+            </div>
             <p className="mt-1 text-sm text-gray-500">
-              Você pode usar Markdown para formatar o texto.
+              Você pode usar Markdown para formatar o texto (negrito, itálico, listas, etc.)
             </p>
           </div>
 
@@ -350,9 +378,27 @@ export default function NewConsultationPage() {
                       </button>
                     </div>
 
+                    <div>
+                      <label htmlFor={`customName-${index}`} className="block text-xs font-medium text-gray-600 mb-1">
+                        Nome para exibição
+                      </label>
+                      <input
+                        type="text"
+                        id={`customName-${index}`}
+                        value={fileWithCat.customName}
+                        onChange={(e) => updateFileCustomName(index, e.target.value)}
+                        placeholder="Nome do arquivo"
+                        className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+
                     <div className="flex gap-2">
                       <div className="flex-1">
+                        <label htmlFor={`category-${index}`} className="block text-xs font-medium text-gray-600 mb-1">
+                          Categoria
+                        </label>
                         <select
+                          id={`category-${index}`}
                           value={fileWithCat.categoryId}
                           onChange={(e) => updateFileCategory(index, e.target.value)}
                           className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
@@ -368,8 +414,12 @@ export default function NewConsultationPage() {
                       </div>
                       {fileWithCat.categoryId === 'new' && (
                         <div className="flex-1">
+                          <label htmlFor={`newCategory-${index}`} className="block text-xs font-medium text-gray-600 mb-1">
+                            Nome da categoria
+                          </label>
                           <input
                             type="text"
+                            id={`newCategory-${index}`}
                             value={fileWithCat.newCategoryName}
                             onChange={(e) => updateFileNewCategory(index, e.target.value)}
                             placeholder="Nome da nova categoria"

@@ -64,7 +64,7 @@ model ProfessionalSpecialty {
 model Consultation {
   id             String       @id @default(uuid())
   date           DateTime
-  notes          String?
+  notes          String?      @db.Text
   userId         String
   professionalId String
   createdAt      DateTime     @default(now())
@@ -81,6 +81,7 @@ model Consultation {
 model File {
   id             String        @id @default(uuid())
   filename       String
+  customName     String?
   path           String
   mimeType       String
   size           Int
