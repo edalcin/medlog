@@ -10,11 +10,17 @@ interface Specialty {
   name: string
 }
 
+interface Clinic {
+  id: string
+  name: string
+}
+
 interface Professional {
   id: string
   name: string
   specialties: Specialty[]
   crm: string | null
+  clinic: Clinic | null
   isActive: boolean
   _count: {
     consultations: number
@@ -77,7 +83,7 @@ export default function ProfessionalsPage() {
     let filtered = professionals.filter((prof) => {
       const matchesSearch = prof.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         prof.specialties.some(s => s.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (prof.crm && prof.crm.toLowerCase().includes(searchTerm.toLowerCase()))
+        (prof.clinic?.name && prof.clinic.name.toLowerCase().includes(searchTerm.toLowerCase()))
 
       const matchesStatus = statusFilter === 'all' ||
         (statusFilter === 'active' && prof.isActive) ||
@@ -173,7 +179,7 @@ export default function ProfessionalsPage() {
         <div>
           <input
             type="text"
-            placeholder="Buscar por nome, especialidade ou CRM..."
+            placeholder="Buscar por nome, especialidade ou clínica..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -259,7 +265,7 @@ export default function ProfessionalsPage() {
                     Especialidades
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    CRM
+                    Clínica
                   </th>
                   <th
                     scope="col"
@@ -315,7 +321,7 @@ export default function ProfessionalsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{professional.crm || '-'}</div>
+                      <div className="text-sm text-gray-900">{professional.clinic?.name || '-'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
