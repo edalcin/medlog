@@ -41,6 +41,9 @@ ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Install su-exec for running as non-root user
+RUN apk add --no-cache su-exec
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
@@ -63,7 +66,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x docker-entrypoint.sh
 
-USER nextjs
+# Don't switch to nextjs user yet - entrypoint will handle permissions and switch user
+# USER nextjs
 
 EXPOSE 3000
 
