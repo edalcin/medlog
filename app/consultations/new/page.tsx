@@ -67,7 +67,7 @@ export default function NewConsultationPage() {
 
   const fetchProfessionals = async () => {
     try {
-      const response = await fetch('/api/professionals')
+      const response = await fetch('/api/professionals?status=active')
       if (!response.ok) {
         throw new Error('Erro ao carregar profissionais')
       }

@@ -22,6 +22,7 @@ interface Professional {
   specialties: Specialty[]
   crm: string | null
   phone: string | null
+  isActive: boolean
 }
 
 interface Consultation {
@@ -84,7 +85,7 @@ export default function EditConsultationPage() {
 
   const fetchProfessionals = async () => {
     try {
-      const response = await fetch('/api/professionals')
+      const response = await fetch('/api/professionals?status=all')
       if (!response.ok) {
         throw new Error('Erro ao carregar profissionais')
       }
@@ -211,6 +212,7 @@ export default function EditConsultationPage() {
                 <option key={professional.id} value={professional.id}>
                   {professional.name} - {professional.specialties.map(s => s.name).join(', ')}
                   {professional.crm && ` (CRM: ${professional.crm})`}
+                  {!professional.isActive && ' [INATIVO]'}
                 </option>
               ))}
             </select>
