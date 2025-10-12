@@ -128,6 +128,9 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics'>('users')
   const [selectedConsultations, setSelectedConsultations] = useState<Set<string>>(new Set())
   const [selectedProfessionals, setSelectedProfessionals] = useState<Set<string>>(new Set())
+  const [professionalFilters, setProfessionalFilters] = useState({ name: '', specialty: '', status: '', crm: '' })
+  const [professionalSortColumn, setProfessionalSortColumn] = useState<'name' | 'specialty' | 'crm' | 'status' | 'consultations'>('name')
+  const [professionalSortDirection, setProfessionalSortDirection] = useState<'asc' | 'desc'>('asc')
   const [editingSpecialty, setEditingSpecialty] = useState<SpecialtyWithCount | null>(null)
   const [editingCategory, setEditingCategory] = useState<FileCategory | null>(null)
   const [editingClinic, setEditingClinic] = useState<ClinicWithCount | null>(null)
@@ -442,6 +445,93 @@ export default function AdminPage() {
         setError(err instanceof Error ? err.message : 'Erro desconhecido')
       }
     }
+  }
+
+  const handleActivateProfessionals = async (isActive: boolean) => {
+    if (selectedProfessionals.size === 0) return
+
+    const action = isActive ? 'ativar' : 'desativar'
+    if (window.confirm(`Tem certeza que deseja ${action} ${selectedProfessionals.size} profissional(is)?`)) {
+      try {
+        const response = await fetch('/api/admin/professionals/bulk-activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: Array.from(selectedProfessionals), isActive }),
+        })
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || `Erro ao ${action} profissionais`)
+        }
+        setSelectedProfessionals(new Set())
+        fetchProfessionals()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      }
+    }
+  }
+
+  const handleProfessionalSortChange = (column: 'name' | 'specialty' | 'crm' | 'status' | 'consultations') => {
+    if (professionalSortColumn === column) {
+      setProfessionalSortDirection(professionalSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setProfessionalSortColumn(column)
+      setProfessionalSortDirection('asc')
+    }
+  }
+
+  // Filter and sort professionals
+  const getFilteredAndSortedProfessionals = () => {
+    let filtered = [...professionals]
+
+    // Apply filters
+    if (professionalFilters.name) {
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(professionalFilters.name.toLowerCase())
+      )
+    }
+    if (professionalFilters.specialty) {
+      filtered = filtered.filter(p =>
+        p.specialties.some(s => s.id === professionalFilters.specialty)
+      )
+    }
+    if (professionalFilters.status) {
+      const isActive = professionalFilters.status === 'active'
+      filtered = filtered.filter(p => p.isActive === isActive)
+    }
+    if (professionalFilters.crm) {
+      filtered = filtered.filter(p =>
+        p.crm && p.crm.toLowerCase().includes(professionalFilters.crm.toLowerCase())
+      )
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let comparison = 0
+
+      switch (professionalSortColumn) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name)
+          break
+        case 'specialty':
+          const aSpecialty = a.specialties[0]?.name || ''
+          const bSpecialty = b.specialties[0]?.name || ''
+          comparison = aSpecialty.localeCompare(bSpecialty)
+          break
+        case 'crm':
+          comparison = (a.crm || '').localeCompare(b.crm || '')
+          break
+        case 'status':
+          comparison = (a.isActive === b.isActive) ? 0 : (a.isActive ? -1 : 1)
+          break
+        case 'consultations':
+          comparison = a._count.consultations - b._count.consultations
+          break
+      }
+
+      return professionalSortDirection === 'asc' ? comparison : -comparison
+    })
+
+    return filtered
   }
 
   // Specialty handlers
@@ -974,14 +1064,106 @@ export default function AdminPage() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-900">Gerenciamento de Profissionais</h2>
             {selectedProfessionals.size > 0 && (
-              <button
-                onClick={handleDeleteProfessionals}
-                className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
-              >
-                Excluir ({selectedProfessionals.size})
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleActivateProfessionals(true)}
+                  className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700"
+                >
+                  Ativar ({selectedProfessionals.size})
+                </button>
+                <button
+                  onClick={() => handleActivateProfessionals(false)}
+                  className="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700"
+                >
+                  Desativar ({selectedProfessionals.size})
+                </button>
+                <button
+                  onClick={handleDeleteProfessionals}
+                  className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700"
+                >
+                  Excluir ({selectedProfessionals.size})
+                </button>
+              </div>
             )}
           </div>
+
+          {/* Filters */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="filter-name" className="block text-sm font-medium text-gray-700 mb-1">
+                Nome
+              </label>
+              <input
+                type="text"
+                id="filter-name"
+                value={professionalFilters.name}
+                onChange={(e) => setProfessionalFilters(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Filtrar por nome"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="filter-specialty-prof" className="block text-sm font-medium text-gray-700 mb-1">
+                Especialidade
+              </label>
+              <select
+                id="filter-specialty-prof"
+                value={professionalFilters.specialty}
+                onChange={(e) => setProfessionalFilters(prev => ({ ...prev, specialty: e.target.value }))}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">Todas</option>
+                {specialties.map((spec) => (
+                  <option key={spec.id} value={spec.id}>
+                    {spec.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="filter-status" className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                id="filter-status"
+                value={professionalFilters.status}
+                onChange={(e) => setProfessionalFilters(prev => ({ ...prev, status: e.target.value }))}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">Todos</option>
+                <option value="active">Ativos</option>
+                <option value="inactive">Inativos</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="filter-crm" className="block text-sm font-medium text-gray-700 mb-1">
+                CRM
+              </label>
+              <input
+                type="text"
+                id="filter-crm"
+                value={professionalFilters.crm}
+                onChange={(e) => setProfessionalFilters(prev => ({ ...prev, crm: e.target.value }))}
+                placeholder="Filtrar por CRM"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Clear filters button */}
+          {(professionalFilters.name || professionalFilters.specialty || professionalFilters.status || professionalFilters.crm) && (
+            <div className="mb-4">
+              <button
+                onClick={() => setProfessionalFilters({ name: '', specialty: '', status: '', crm: '' })}
+                className="text-sm text-indigo-600 hover:text-indigo-900"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
 
           {professionalsLoading ? (
             <div className="text-center py-8">
@@ -991,95 +1173,155 @@ export default function AdminPage() {
             <div className="text-center py-8">
               <div className="text-gray-500">Nenhum profissional encontrado</div>
             </div>
+          ) : getFilteredAndSortedProfessionals().length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Nenhum profissional corresponde aos filtros selecionados</div>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-3 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedProfessionals.size === professionals.length}
-                        onChange={toggleAllProfessionals}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      />
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nome
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Especialidades
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      CRM
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Consultas
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">Ações</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {professionals.map((professional) => (
-                    <tr key={professional.id} className={selectedProfessionals.has(professional.id) ? 'bg-blue-50' : ''}>
-                      <td className="px-3 py-4 whitespace-nowrap">
+            <>
+              <div className="mb-4 text-sm text-gray-600">
+                {getFilteredAndSortedProfessionals().length} de {professionals.length} profissional(is)
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-3 py-3">
                         <input
                           type="checkbox"
-                          checked={selectedProfessionals.has(professional.id)}
-                          onChange={() => toggleProfessionalSelection(professional.id)}
+                          checked={selectedProfessionals.size === getFilteredAndSortedProfessionals().length && getFilteredAndSortedProfessionals().length > 0}
+                          onChange={() => {
+                            if (selectedProfessionals.size === getFilteredAndSortedProfessionals().length) {
+                              setSelectedProfessionals(new Set())
+                            } else {
+                              setSelectedProfessionals(new Set(getFilteredAndSortedProfessionals().map(p => p.id)))
+                            }
+                          }}
                           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                         />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {professional.name}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {professional.specialties.map((specialty) => (
-                            <span
-                              key={specialty.id}
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
-                            >
-                              {specialty.name}
-                            </span>
-                          ))}
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleProfessionalSortChange('name')}
+                      >
+                        <div className="flex items-center">
+                          Nome
+                          {professionalSortColumn === 'name' && (
+                            <span className="ml-1">{professionalSortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {professional.crm || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {professional._count.consultations}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          professional.isActive
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {professional.isActive ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <a
-                          href={`/professionals/${professional.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          Ver detalhes
-                        </a>
-                      </td>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleProfessionalSortChange('specialty')}
+                      >
+                        <div className="flex items-center">
+                          Especialidades
+                          {professionalSortColumn === 'specialty' && (
+                            <span className="ml-1">{professionalSortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleProfessionalSortChange('crm')}
+                      >
+                        <div className="flex items-center">
+                          CRM
+                          {professionalSortColumn === 'crm' && (
+                            <span className="ml-1">{professionalSortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleProfessionalSortChange('consultations')}
+                      >
+                        <div className="flex items-center">
+                          Consultas
+                          {professionalSortColumn === 'consultations' && (
+                            <span className="ml-1">{professionalSortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                        onClick={() => handleProfessionalSortChange('status')}
+                      >
+                        <div className="flex items-center">
+                          Status
+                          {professionalSortColumn === 'status' && (
+                            <span className="ml-1">{professionalSortDirection === 'asc' ? '↑' : '↓'}</span>
+                          )}
+                        </div>
+                      </th>
+                      <th scope="col" className="relative px-6 py-3">
+                        <span className="sr-only">Ações</span>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {getFilteredAndSortedProfessionals().map((professional) => (
+                      <tr key={professional.id} className={selectedProfessionals.has(professional.id) ? 'bg-blue-50' : ''}>
+                        <td className="px-3 py-4 whitespace-nowrap">
+                          <input
+                            type="checkbox"
+                            checked={selectedProfessionals.has(professional.id)}
+                            onChange={() => toggleProfessionalSelection(professional.id)}
+                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                          />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {professional.name}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-wrap gap-1">
+                            {professional.specialties.map((specialty) => (
+                              <span
+                                key={specialty.id}
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {specialty.name}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {professional.crm || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {professional._count.consultations}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            professional.isActive
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {professional.isActive ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <a
+                            href={`/professionals/${professional.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            Ver detalhes
+                          </a>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
