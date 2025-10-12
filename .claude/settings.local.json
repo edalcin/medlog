@@ -17,7 +17,13 @@
       "Bash(git commit -m \"$(cat <<''EOF''\ndocs: Atualizar FIX.md com itens concluídos e pendências\n\n- Marcar renomeação de arquivos como concluída\n- Adicionar pendências: criação de usuários, validações de delete\n- Adicionar problema no Unraid com arquivos\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git reset:*)",
       "Bash(git commit:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(tskill:*)",
+      "Bash(git log:*)",
+      "Bash(npm run migrate:phones:*)"
     ],
     "deny": [],
     "ask": []

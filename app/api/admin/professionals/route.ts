@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
             specialty: true,
           },
         },
+        clinic: true,
         _count: {
           select: {
             consultations: true,

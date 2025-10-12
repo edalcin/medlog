@@ -34,10 +34,12 @@ export default function NewProfessionalPage() {
   const [formData, setFormData] = useState({
     name: '',
     crm: '',
-    phone: '',
     address: '',
   })
   const [notes, setNotes] = useState<string | undefined>('')
+  const [phones, setPhones] = useState<{ number: string; label: string }[]>([])
+  const [newPhone, setNewPhone] = useState({ number: '', label: '' })
+  const [showAddPhone, setShowAddPhone] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -72,6 +74,20 @@ export default function NewProfessionalPage() {
     } catch (err) {
       console.error('Erro ao carregar clínicas:', err)
     }
+  }
+
+  const handleAddPhone = () => {
+    if (!newPhone.number.trim()) {
+      alert('Por favor, insira um número de telefone')
+      return
+    }
+    setPhones([...phones, { number: newPhone.number.trim(), label: newPhone.label.trim() }])
+    setNewPhone({ number: '', label: '' })
+    setShowAddPhone(false)
+  }
+
+  const handleRemovePhone = (index: number) => {
+    setPhones(phones.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,6 +144,18 @@ export default function NewProfessionalPage() {
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || 'Erro ao criar profissional')
+      }
+
+      const professionalData = await response.json()
+      const professionalId = professionalData.data.id
+
+      // Create phones if any
+      for (const phone of phones) {
+        await fetch(`/api/professionals/${professionalId}/phones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(phone),
+        })
       }
 
       router.push('/professionals')
@@ -311,17 +339,74 @@ export default function NewProfessionalPage() {
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-              Telefone
-            </label>
-            <input
-              type="text"
-              id="phone"
-              name="phone"
-              value={formData.phone}
-              onChange={handleInputChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-2">Telefones</label>
+            {phones.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {phones.map((phone, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded border">
+                    <div className="flex-1">
+                      <span className="text-sm font-medium">{phone.number}</span>
+                      {phone.label && (
+                        <span className="text-xs text-gray-500 ml-2">({phone.label})</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhone(index)}
+                      className="text-red-600 hover:text-red-800 text-sm ml-2"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showAddPhone ? (
+              <div className="border border-gray-300 rounded-md p-3 space-y-2">
+                <input
+                  type="text"
+                  value={newPhone.number}
+                  onChange={(e) => setNewPhone({ ...newPhone, number: e.target.value })}
+                  placeholder="Número do telefone"
+                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+                <input
+                  type="text"
+                  value={newPhone.label}
+                  onChange={(e) => setNewPhone({ ...newPhone, label: e.target.value })}
+                  placeholder="Etiqueta (ex: Comercial, Celular) - opcional"
+                  className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleAddPhone}
+                    className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  >
+                    Adicionar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddPhone(false)
+                      setNewPhone({ number: '', label: '' })
+                    }}
+                    className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddPhone(true)}
+                className="text-sm text-blue-600 hover:text-blue-500"
+              >
+                + Adicionar telefone
+              </button>
+            )}
           </div>
 
           <div>

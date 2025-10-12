@@ -65,6 +65,11 @@ interface Consultation {
   }>
 }
 
+interface Clinic {
+  id: string
+  name: string
+}
+
 interface Professional {
   id: string
   name: string
@@ -73,6 +78,7 @@ interface Professional {
   address: string | null
   isActive: boolean
   specialties: Specialty[]
+  clinic: Clinic | null
   _count: {
     consultations: number
   }
@@ -96,9 +102,17 @@ interface SpecialtyWithCount {
   }
 }
 
+interface Phone {
+  id: string
+  number: string
+  label?: string | null
+}
+
 interface ClinicWithCount {
   id: string
   name: string
+  address?: string | null
+  phones?: Phone[]
   createdAt: string
   _count?: {
     professionals: number
@@ -128,8 +142,8 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics'>('users')
   const [selectedConsultations, setSelectedConsultations] = useState<Set<string>>(new Set())
   const [selectedProfessionals, setSelectedProfessionals] = useState<Set<string>>(new Set())
-  const [professionalFilters, setProfessionalFilters] = useState({ name: '', specialty: '', status: '', crm: '' })
-  const [professionalSortColumn, setProfessionalSortColumn] = useState<'name' | 'specialty' | 'crm' | 'status' | 'consultations'>('name')
+  const [professionalFilters, setProfessionalFilters] = useState({ name: '', specialty: '', status: '', clinic: '' })
+  const [professionalSortColumn, setProfessionalSortColumn] = useState<'name' | 'specialty' | 'clinic' | 'status' | 'consultations'>('name')
   const [professionalSortDirection, setProfessionalSortDirection] = useState<'asc' | 'desc'>('asc')
   const [editingSpecialty, setEditingSpecialty] = useState<SpecialtyWithCount | null>(null)
   const [editingCategory, setEditingCategory] = useState<FileCategory | null>(null)
@@ -470,7 +484,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleProfessionalSortChange = (column: 'name' | 'specialty' | 'crm' | 'status' | 'consultations') => {
+  const handleProfessionalSortChange = (column: 'name' | 'specialty' | 'clinic' | 'status' | 'consultations') => {
     if (professionalSortColumn === column) {
       setProfessionalSortDirection(professionalSortDirection === 'asc' ? 'desc' : 'asc')
     } else {
@@ -498,10 +512,8 @@ export default function AdminPage() {
       const isActive = professionalFilters.status === 'active'
       filtered = filtered.filter(p => p.isActive === isActive)
     }
-    if (professionalFilters.crm) {
-      filtered = filtered.filter(p =>
-        p.crm && p.crm.toLowerCase().includes(professionalFilters.crm.toLowerCase())
-      )
+    if (professionalFilters.clinic) {
+      filtered = filtered.filter(p => p.clinic?.id === professionalFilters.clinic)
     }
 
     // Apply sorting
@@ -517,8 +529,8 @@ export default function AdminPage() {
           const bSpecialty = b.specialties[0]?.name || ''
           comparison = aSpecialty.localeCompare(bSpecialty)
           break
-        case 'crm':
-          comparison = (a.crm || '').localeCompare(b.crm || '')
+        case 'clinic':
+          comparison = (a.clinic?.name || '').localeCompare(b.clinic?.name || '')
           break
         case 'status':
           comparison = (a.isActive === b.isActive) ? 0 : (a.isActive ? -1 : 1)
@@ -1139,25 +1151,30 @@ export default function AdminPage() {
             </div>
 
             <div>
-              <label htmlFor="filter-crm" className="block text-sm font-medium text-gray-700 mb-1">
-                CRM
+              <label htmlFor="filter-clinic" className="block text-sm font-medium text-gray-700 mb-1">
+                Clínica
               </label>
-              <input
-                type="text"
-                id="filter-crm"
-                value={professionalFilters.crm}
-                onChange={(e) => setProfessionalFilters(prev => ({ ...prev, crm: e.target.value }))}
-                placeholder="Filtrar por CRM"
+              <select
+                id="filter-clinic"
+                value={professionalFilters.clinic}
+                onChange={(e) => setProfessionalFilters(prev => ({ ...prev, clinic: e.target.value }))}
                 className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
+              >
+                <option value="">Todas</option>
+                {clinics.map((clinic) => (
+                  <option key={clinic.id} value={clinic.id}>
+                    {clinic.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
           {/* Clear filters button */}
-          {(professionalFilters.name || professionalFilters.specialty || professionalFilters.status || professionalFilters.crm) && (
+          {(professionalFilters.name || professionalFilters.specialty || professionalFilters.status || professionalFilters.clinic) && (
             <div className="mb-4">
               <button
-                onClick={() => setProfessionalFilters({ name: '', specialty: '', status: '', crm: '' })}
+                onClick={() => setProfessionalFilters({ name: '', specialty: '', status: '', clinic: '' })}
                 className="text-sm text-indigo-600 hover:text-indigo-900"
               >
                 Limpar filtros
@@ -1227,11 +1244,11 @@ export default function AdminPage() {
                       <th
                         scope="col"
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                        onClick={() => handleProfessionalSortChange('crm')}
+                        onClick={() => handleProfessionalSortChange('clinic')}
                       >
                         <div className="flex items-center">
-                          CRM
-                          {professionalSortColumn === 'crm' && (
+                          Clínica
+                          {professionalSortColumn === 'clinic' && (
                             <span className="ml-1">{professionalSortDirection === 'asc' ? '↑' : '↓'}</span>
                           )}
                         </div>
@@ -1292,7 +1309,7 @@ export default function AdminPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {professional.crm || '-'}
+                          {professional.clinic?.name || '-'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {professional._count.consultations}
@@ -1593,6 +1610,12 @@ export default function AdminPage() {
                         {clinic._count?.professionals || 0}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <a
+                          href={`/clinics/${clinic.id}`}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        >
+                          Ver detalhes
+                        </a>
                         <button
                           onClick={() => handleEditClinic(clinic)}
                           className="text-indigo-600 hover:text-indigo-900 mr-4"
@@ -1636,6 +1659,40 @@ export default function AdminPage() {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
               </div>
+              <div className="mb-4">
+                <label htmlFor="clinic-address" className="block text-sm font-medium text-gray-700">
+                  Endereço
+                </label>
+                <input
+                  type="text"
+                  id="clinic-address"
+                  name="address"
+                  defaultValue={editingClinic?.address || ''}
+                  placeholder="Rua, Número, Bairro, Cidade - Estado"
+                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+
+              {editingClinic && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Telefones
+                  </label>
+                  <div className="text-xs text-gray-500 mb-2">
+                    Os telefones devem ser gerenciados na página de detalhes da clínica após salvar
+                  </div>
+                  {editingClinic.phones && editingClinic.phones.length > 0 && (
+                    <div className="space-y-1">
+                      {editingClinic.phones.map((phone) => (
+                        <div key={phone.id} className="text-sm text-gray-600">
+                          {phone.number} {phone.label && `(${phone.label})`}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"

@@ -1,8 +1,14 @@
 # Necessidades de correções:
 
-* Não estou conseguindo criar usuários. Usuários podem ser "Admin", "User" ou "Convidado". 
-* Profissionais não podem ser deletados se houver consulta associada
-* Consultas deletadas devem deletar os arquivos associados
+* A lista de profissionais (http://192.168.1.10:3123/professionals) deve mostrar todos, por default. Quero uma tabela filtrável e indexável
+
+* A URL no Docker está voltando para http://192.168.1.10:3123/
+
+* Criar campo para endereço e telefone no cadastro de clínicas. Uma vez selecionada a clínica no registro de novos profissionais, preencher automaticamente o endereço e o telefone, vindos da clínica
+
+* No painel administrativo de profissionais, substituir CRM por Clinica
+
+  
 
 
 

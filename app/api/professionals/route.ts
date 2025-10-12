@@ -27,11 +27,15 @@ export async function GET(request: NextRequest) {
         id: true,
         name: true,
         crm: true,
-        phone: true,
         isActive: true,
         specialties: {
           include: {
             specialty: true,
+          },
+        },
+        phones: {
+          orderBy: {
+            createdAt: 'asc',
           },
         },
         _count: {
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, crm, phone, address, notes, specialtyIds, clinicId } = body
+    const { name, crm, address, notes, specialtyIds, clinicId } = body
 
     if (!name) {
       throw new ValidationError('Nome é obrigatório')
@@ -88,7 +92,6 @@ export async function POST(request: NextRequest) {
       data: {
         name,
         crm: crm || null,
-        phone: phone || null,
         address: address || null,
         notes: notes || null,
         clinicId: clinicId || null,
@@ -105,6 +108,7 @@ export async function POST(request: NextRequest) {
           },
         },
         clinic: true,
+        phones: true,
       },
     })
 

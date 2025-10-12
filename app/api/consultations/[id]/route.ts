@@ -24,7 +24,6 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             id: true,
             name: true,
             crm: true,
-            phone: true,
             specialties: {
               include: {
                 specialty: true,

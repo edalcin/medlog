@@ -13,13 +13,13 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.role || session.user.role !== 'ADMIN') {
+    if (!session) {
       return errorResponse('Não autorizado', 401)
     }
 
     const { id } = params
     const body = await request.json()
-    const { name } = body
+    const { name, address } = body
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new ValidationError('Nome da clínica é obrigatório')
@@ -50,6 +50,10 @@ export async function PUT(
       where: { id },
       data: {
         name: name.trim(),
+        address: address?.trim() || null,
+      },
+      include: {
+        phones: true,
       },
     })
 
@@ -65,7 +69,7 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.role || session.user.role !== 'ADMIN') {
+    if (!session) {
       return errorResponse('Não autorizado', 401)
     }
 

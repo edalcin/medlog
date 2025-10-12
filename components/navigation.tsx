@@ -12,6 +12,7 @@ export function Navigation() {
   const navigation = [
     { name: 'Consultas', href: '/consultations' },
     { name: 'Profissionais', href: '/professionals' },
+    { name: 'Clínicas', href: '/clinics' },
     { name: 'Relatórios', href: '/reports' },
   ]
 

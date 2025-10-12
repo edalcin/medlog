@@ -20,7 +20,6 @@ interface Professional {
   name: string
   specialties: Specialty[]
   crm: string | null
-  phone: string | null
 }
 
 interface FileCategory {

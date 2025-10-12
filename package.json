@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed:admin": "ts-node --transpile-only scripts/seed-admin.ts",
+    "migrate:phones": "ts-node --transpile-only scripts/migrate-phones.ts",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate"

@@ -26,7 +26,6 @@ interface Professional {
   name: string
   specialties: Specialty[]
   crm: string | null
-  phone: string | null
   address: string | null
 }
 
@@ -170,66 +169,52 @@ export default function ConsultationDetailsPage() {
         </div>
       </div>
 
-      {/* Informações principais da consulta */}
-      <div className="bg-white shadow-lg rounded-lg p-8 mb-6 border-l-4 border-blue-500">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Informações da consulta */}
+      <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
-              Data da Consulta
-            </label>
-            <p className="text-3xl font-bold text-gray-900">
-              {formatDate(consultation.date)}
-            </p>
+            <span className="text-gray-600">Data da Consulta: </span>
+            <span className="font-medium text-gray-900">{formatDate(consultation.date)}</span>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
-              Profissional
-            </label>
-            <p className="text-2xl font-bold text-gray-900 mb-2">
-              {consultation.professional.name}
-            </p>
+            <span className="text-gray-600">Profissional: </span>
+            <span className="font-medium text-gray-900">{consultation.professional.name}</span>
             {consultation.professional.crm && (
-              <p className="text-sm text-gray-600">CRM: {consultation.professional.crm}</p>
+              <span className="text-gray-600"> • CRM: {consultation.professional.crm}</span>
             )}
           </div>
-        </div>
 
-        <div className="mt-6">
-          <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-            Especialidades
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {consultation.professional.specialties?.map(specialty => (
-              <span
-                key={specialty.id}
-                className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-100 text-blue-800 border border-blue-200"
-              >
-                {specialty.name}
+          <div>
+            <span className="text-gray-600">Especialidades: </span>
+            {consultation.professional.specialties?.map((specialty, index) => (
+              <span key={specialty.id}>
+                <span className="font-medium text-gray-900">{specialty.name}</span>
+                {index < consultation.professional.specialties.length - 1 && ', '}
               </span>
             ))}
           </div>
-        </div>
-      </div>
 
-      {consultation.proposito && (
-        <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Propósito da Consulta</h2>
-          <p className="text-gray-700">{consultation.proposito}</p>
-        </div>
-      )}
+          {consultation.proposito && (
+            <div>
+              <span className="text-gray-600">Propósito da Consulta: </span>
+              <span className="font-medium text-gray-900">{consultation.proposito}</span>
+            </div>
+          )}
 
-      <div className="bg-white shadow rounded-lg p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Observações</h2>
-        {consultation.notes ? (
-          <div className="prose max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {consultation.notes}
-            </ReactMarkdown>
+          <div>
+            <div className="text-gray-600 mb-2">Observações:</div>
+            {consultation.notes ? (
+              <div className="prose max-w-none pl-4">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {consultation.notes}
+                </ReactMarkdown>
+              </div>
+            ) : (
+              <span className="text-gray-500 italic pl-4">Nenhuma observação registrada.</span>
+            )}
           </div>
-        ) : (
-          <p className="text-gray-500">Nenhuma observação registrada.</p>
-        )}
+        </div>
       </div>
 
       {consultation.files.length > 0 && (

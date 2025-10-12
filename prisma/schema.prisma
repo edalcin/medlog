@@ -25,7 +25,6 @@ model Professional {
   id            String                  @id @default(uuid())
   name          String
   crm           String?
-  phone         String?
   address       String?
   notes         String?                 @db.Text
   isActive      Boolean                 @default(true)
@@ -35,6 +34,7 @@ model Professional {
   consultations Consultation[]
   files         File[]
   specialties   ProfessionalSpecialty[]
+  phones        Phone[]
   clinic        Clinic?                 @relation(fields: [clinicId], references: [id])
 
   @@index([clinicId], map: "professionals_clinicId_fkey")
@@ -114,10 +114,27 @@ model FileCategory {
 model Clinic {
   id            String         @id @default(uuid())
   name          String         @unique
+  address       String?
   createdAt     DateTime       @default(now())
   professionals Professional[]
+  phones        Phone[]
 
   @@map("clinics")
+}
+
+model Phone {
+  id             String        @id @default(uuid())
+  number         String
+  label          String?
+  professionalId String?
+  clinicId       String?
+  createdAt      DateTime      @default(now())
+  professional   Professional? @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  clinic         Clinic?       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+
+  @@index([professionalId], map: "phones_professionalId_fkey")
+  @@index([clinicId], map: "phones_clinicId_fkey")
+  @@map("phones")
 }
 
 enum UserRole {

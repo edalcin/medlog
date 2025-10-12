@@ -10,7 +10,7 @@ const prisma = new PrismaClient()
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.role || session.user.role !== 'ADMIN') {
+    if (!session) {
       return errorResponse('Não autorizado', 401)
     }
 
@@ -19,6 +19,11 @@ export async function GET() {
         name: 'asc',
       },
       include: {
+        phones: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
         _count: {
           select: {
             professionals: true,
@@ -36,12 +41,12 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.role || session.user.role !== 'ADMIN') {
+    if (!session) {
       return errorResponse('Não autorizado', 401)
     }
 
     const body = await request.json()
-    const { name } = body
+    const { name, address } = body
 
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new ValidationError('Nome da clínica é obrigatório')
@@ -59,6 +64,10 @@ export async function POST(request: NextRequest) {
     const clinic = await prisma.clinic.create({
       data: {
         name: name.trim(),
+        address: address?.trim() || null,
+      },
+      include: {
+        phones: true,
       },
     })
 

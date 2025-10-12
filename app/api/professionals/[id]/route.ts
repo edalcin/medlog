@@ -25,6 +25,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           },
         },
         clinic: true,
+        phones: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
     })
 
@@ -52,7 +57,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         }
 
         const body = await request.json()
-        const { name, crm, phone, address, notes, isActive, clinicId, specialtyIds } = body
+        const { name, crm, address, notes, isActive, clinicId, specialtyIds } = body
 
         if (!name) {
             throw new ValidationError('Nome é obrigatório')
@@ -68,7 +73,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
             data: {
                 name,
                 crm: crm || null,
-                phone: phone || null,
                 address: address || null,
                 notes: notes || null,
                 isActive,
@@ -87,6 +91,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
                     },
                 },
                 clinic: true,
+                phones: {
+                  orderBy: {
+                    createdAt: 'asc',
+                  },
+                },
             },
         })
 
