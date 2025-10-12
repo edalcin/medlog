@@ -151,12 +151,7 @@ export default function ConsultationDetailsPage() {
           &larr; Voltar para Consultas
         </Link>
         <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Detalhes da Consulta</h1>
-            <p className="mt-2 text-gray-600">
-              Consulta de {consultation.professional.specialties?.map(s => s.name).join(', ') || 'Especialidade não definida'} com {consultation.professional.name} em {formatDate(consultation.date)}
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-gray-900">Detalhes da Consulta</h1>
           <div className="flex gap-2">
             <Link
               href={`/consultations/${id}/edit`}
@@ -171,6 +166,48 @@ export default function ConsultationDetailsPage() {
             >
               {deleting ? 'Excluindo...' : 'Excluir'}
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Informações principais da consulta */}
+      <div className="bg-white shadow-lg rounded-lg p-8 mb-6 border-l-4 border-blue-500">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
+              Data da Consulta
+            </label>
+            <p className="text-3xl font-bold text-gray-900">
+              {formatDate(consultation.date)}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-2">
+              Profissional
+            </label>
+            <p className="text-2xl font-bold text-gray-900 mb-2">
+              {consultation.professional.name}
+            </p>
+            {consultation.professional.crm && (
+              <p className="text-sm text-gray-600">CRM: {consultation.professional.crm}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <label className="block text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
+            Especialidades
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {consultation.professional.specialties?.map(specialty => (
+              <span
+                key={specialty.id}
+                className="inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold bg-blue-100 text-blue-800 border border-blue-200"
+              >
+                {specialty.name}
+              </span>
+            ))}
           </div>
         </div>
       </div>

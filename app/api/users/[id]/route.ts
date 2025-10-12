@@ -37,17 +37,49 @@ export async function PUT(
 
   try {
     const body = await request.json()
-    const { name, email, role } = body
+    const { name, username, email, role, password } = body
+
+    // Check if username is being changed and if it's already taken
+    if (username) {
+      const existingUser = await prisma.user.findUnique({
+        where: { username },
+      })
+      if (existingUser && existingUser.id !== params.id) {
+        return NextResponse.json({ error: 'Username already exists' }, { status: 400 })
+      }
+    }
+
+    // Check if email is being changed and if it's already taken
+    if (email) {
+      const existingEmail = await prisma.user.findUnique({
+        where: { email },
+      })
+      if (existingEmail && existingEmail.id !== params.id) {
+        return NextResponse.json({ error: 'Email already exists' }, { status: 400 })
+      }
+    }
+
+    // Prepare update data
+    const updateData: any = {
+      name,
+      username,
+      email,
+      role,
+    }
+
+    // If password is provided, hash it and update
+    if (password && password.trim() !== '') {
+      const bcrypt = require('bcryptjs')
+      updateData.passwordHash = await bcrypt.hash(password, 10)
+    }
+
     const user = await prisma.user.update({
       where: { id: params.id },
-      data: {
-        name,
-        email,
-        role,
-      },
+      data: updateData,
     })
     return NextResponse.json({ data: user })
   } catch (error) {
+    console.error('Error updating user:', error)
     return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
   }
 }

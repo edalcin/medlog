@@ -52,7 +52,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         }
 
         const body = await request.json()
-        const { name, crm, phone, address, isActive, clinicId, specialtyIds } = body
+        const { name, crm, phone, address, notes, isActive, clinicId, specialtyIds } = body
 
         if (!name) {
             throw new ValidationError('Nome é obrigatório')
@@ -70,6 +70,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
                 crm: crm || null,
                 phone: phone || null,
                 address: address || null,
+                notes: notes || null,
                 isActive,
                 clinicId: clinicId || null,
                 specialties: {
@@ -106,6 +107,30 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         const session = await getServerSession(authOptions)
         if (session?.user?.role !== 'ADMIN') {
             return errorResponse('Não autorizado', 403)
+        }
+
+        // Check if professional exists
+        const professional = await prisma.professional.findUnique({
+            where: { id: params.id },
+            include: {
+                _count: {
+                    select: {
+                        consultations: true,
+                    },
+                },
+            },
+        })
+
+        if (!professional) {
+            throw new NotFoundError('Profissional')
+        }
+
+        // Check if professional has consultations
+        if (professional._count.consultations > 0) {
+            return errorResponse(
+                `Não é possível excluir este profissional pois existem ${professional._count.consultations} consulta(s) associada(s). Desative o profissional em vez de excluí-lo.`,
+                400
+            )
         }
 
         await prisma.professional.delete({

@@ -26,8 +26,11 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
 
     // Build where clause
-    const where: any = {
-      userId: session.user.id,
+    const where: any = {}
+
+    // ADMIN users see all consultations, regular users only see their own
+    if (session.user.role !== 'ADMIN') {
+      where.userId = session.user.id
     }
 
     if (professionalId) {
@@ -51,6 +54,14 @@ export async function GET(request: NextRequest) {
     const consultations = await prisma.consultation.findMany({
       where,
       include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            email: true,
+          },
+        },
         professional: {
           select: {
             id: true,

@@ -15,6 +15,13 @@ export async function GET(request: NextRequest) {
     }
 
     const specialties = await prisma.specialty.findMany({
+      include: {
+        _count: {
+          select: {
+            professionals: true,
+          },
+        },
+      },
       orderBy: {
         name: 'asc',
       },

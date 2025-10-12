@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
 
 interface Specialty {
   id: string
@@ -22,6 +27,7 @@ interface Professional {
   crm: string | null
   phone: string | null
   address: string | null
+  notes: string | null
   isActive: boolean
   clinicId: string | null
   clinic: Clinic | null
@@ -46,6 +52,8 @@ export default function ProfessionalDetailsPage() {
   const [selectedClinic, setSelectedClinic] = useState<string>('')
   const [newClinicName, setNewClinicName] = useState('')
   const [showNewClinic, setShowNewClinic] = useState(false)
+  const [notes, setNotes] = useState<string | undefined>('')
+  const [isEditing, setIsEditing] = useState(false)
 
   const fetchProfessional = useCallback(async () => {
     try {
@@ -58,6 +66,7 @@ export default function ProfessionalDetailsPage() {
       setFormData(data.data)
       setSelectedSpecialties(data.data.specialties?.map((s: Specialty) => s.id) || [])
       setSelectedClinic(data.data.clinicId || '')
+      setNotes(data.data.notes || '')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
@@ -161,6 +170,7 @@ export default function ProfessionalDetailsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          notes,
           specialtyIds: finalSpecialtyIds,
           clinicId: finalClinicId || null,
         }),
@@ -352,7 +362,42 @@ export default function ProfessionalDetailsPage() {
             <label htmlFor="address" className="block text-sm font-medium text-gray-700">Endereço</label>
             <textarea id="address" name="address" rows={3} value={formData.address || ''} onChange={handleInputChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" />
           </div>
-          
+
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">
+                Observações
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsEditing(!isEditing)}
+                className="text-sm text-blue-600 hover:text-blue-500"
+              >
+                {isEditing ? 'Visualizar' : 'Editar'}
+              </button>
+            </div>
+            {isEditing ? (
+              <div data-color-mode="light">
+                <MDEditor
+                  value={notes}
+                  onChange={setNotes}
+                  preview="edit"
+                  height={300}
+                />
+              </div>
+            ) : (
+              <div className="prose prose-sm max-w-none border border-gray-300 rounded-md p-4 min-h-[100px] bg-gray-50">
+                {notes ? (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {notes}
+                  </ReactMarkdown>
+                ) : (
+                  <p className="text-gray-400 italic">Nenhuma observação registrada</p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center">
             <input type="checkbox" id="isActive" name="isActive" checked={formData.isActive || false} onChange={handleInputChange} className="h-4 w-4 text-blue-600 border-gray-300 rounded" />
             <label htmlFor="isActive" className="ml-2 block text-sm text-gray-900">Ativo</label>

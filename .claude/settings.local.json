@@ -14,7 +14,10 @@
       "Bash(timeout 10 npm run dev:*)",
       "Bash(npm install:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Adicionar renomeação de arquivos, editor Markdown e melhorar edição de profissionais\n\n- Adicionar campo customName ao modelo File para renomear arquivos\n- Alterar coluna notes de VARCHAR para TEXT para suportar textos longos\n- Implementar editor Markdown (@uiw/react-md-editor) nas páginas de consulta\n- Adicionar renderização de Markdown com react-markdown e remark-gfm\n- Configurar @tailwindcss/typography para estilização de Markdown\n- Atualizar página de edição de profissionais para usar checkboxes de especialidades\n- Adicionar suporte a múltiplas especialidades na API de profissionais\n- Criar endpoint de edição de arquivos (/api/files/edit/[id])\n- Renomear rotas de arquivos de [filename] para [path] para evitar conflitos\n- Atualizar formulário de upload para permitir renomear arquivos\n- Mostrar customName ou filename nas visualizações de arquivos\n- Adicionar suporte a clínicas na edição de profissionais\n- Limpar cache do Next.js (.next) para resolver problemas de chunk loading\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: Atualizar FIX.md com itens concluídos e pendências\n\n- Marcar renomeação de arquivos como concluída\n- Adicionar pendências: criação de usuários, validações de delete\n- Adicionar problema no Unraid com arquivos\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\ndocs: Atualizar FIX.md com itens concluídos e pendências\n\n- Marcar renomeação de arquivos como concluída\n- Adicionar pendências: criação de usuários, validações de delete\n- Adicionar problema no Unraid com arquivos\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git reset:*)",
+      "Bash(git commit:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

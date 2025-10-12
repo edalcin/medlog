@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import dynamic from 'next/dynamic'
+
+const MDEditor = dynamic(() => import('@uiw/react-md-editor'), { ssr: false })
 
 interface Specialty {
   id: string
@@ -34,6 +37,7 @@ export default function NewProfessionalPage() {
     phone: '',
     address: '',
   })
+  const [notes, setNotes] = useState<string | undefined>('')
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -115,6 +119,7 @@ export default function NewProfessionalPage() {
         },
         body: JSON.stringify({
           ...formData,
+          notes,
           specialtyIds: finalSpecialtyIds,
           clinicId: finalClinicId || undefined,
         }),
@@ -331,6 +336,20 @@ export default function NewProfessionalPage() {
               onChange={handleInputChange}
               className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Observações
+            </label>
+            <div data-color-mode="light">
+              <MDEditor
+                value={notes}
+                onChange={setNotes}
+                preview="edit"
+                height={300}
+              />
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3">

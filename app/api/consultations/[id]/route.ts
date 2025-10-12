@@ -187,6 +187,13 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     // Check if consultation exists and user owns it
     const existingConsultation = await prisma.consultation.findUnique({
       where: { id: params.id },
+      include: {
+        files: {
+          select: {
+            path: true,
+          },
+        },
+      },
     })
 
     if (!existingConsultation) {
@@ -198,12 +205,29 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       return errorResponse('Não autorizado', 403)
     }
 
-    // Delete consultation (files will be cascade deleted)
+    // Delete physical files before deleting consultation
+    const fs = require('fs')
+    const path = require('path')
+    const uploadsDir = process.env.FILES_PATH || path.join(process.cwd(), 'uploads')
+
+    for (const file of existingConsultation.files) {
+      try {
+        const filePath = path.join(uploadsDir, file.path)
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath)
+        }
+      } catch (fileError) {
+        console.error(`Erro ao deletar arquivo físico ${file.path}:`, fileError)
+        // Continue even if file deletion fails
+      }
+    }
+
+    // Delete consultation (files records will be cascade deleted)
     await prisma.consultation.delete({
       where: { id: params.id },
     })
 
-    return successResponse({}, 'Consulta removida com sucesso')
+    return successResponse({}, 'Consulta e arquivos removidos com sucesso')
   } catch (error) {
     return handleApiError(error)
   }

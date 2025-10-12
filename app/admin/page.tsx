@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 interface User {
   id: string
   name: string
+  username?: string
   email: string
   role: string
 }
@@ -829,6 +830,9 @@ export default function AdminPage() {
                 Nome
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Username
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Email
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -843,6 +847,7 @@ export default function AdminPage() {
             {users.map((user) => (
               <tr key={user.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.username || '-'}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.role}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -1708,24 +1713,41 @@ export default function AdminPage() {
       )}
 
       {isFormOpen && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full">
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">{editingUser ? 'Editar Usuário' : 'Novo Usuário'}</h2>
             <form onSubmit={handleFormSubmit}>
               <div className="mb-4">
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nome</label>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nome *</label>
                 <input type="text" name="name" id="name" defaultValue={editingUser?.name} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required />
               </div>
               <div className="mb-4">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username *</label>
+                <input type="text" name="username" id="username" defaultValue={editingUser?.username} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required />
+              </div>
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email *</label>
                 <input type="email" name="email" id="email" defaultValue={editingUser?.email} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required />
               </div>
               <div className="mb-4">
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
+                <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role *</label>
                 <select name="role" id="role" defaultValue={editingUser?.role} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" required>
                   <option value="USER">USER</option>
                   <option value="ADMIN">ADMIN</option>
                 </select>
+              </div>
+              <div className="mb-4">
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Senha {editingUser ? '(deixe em branco para não alterar)' : '*'}
+                </label>
+                <input
+                  type="password"
+                  name="password"
+                  id="password"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                  required={!editingUser}
+                  placeholder={editingUser ? 'Deixe em branco para manter a senha atual' : ''}
+                />
               </div>
               <div className="flex justify-end">
                 <button type="button" onClick={() => setIsFormOpen(false)} className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md mr-2 hover:bg-gray-300">Cancelar</button>

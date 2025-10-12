@@ -15,6 +15,13 @@ export async function GET(request: NextRequest) {
     }
 
     const categories = await prisma.fileCategory.findMany({
+      include: {
+        _count: {
+          select: {
+            files: true,
+          },
+        },
+      },
       orderBy: {
         name: 'asc',
       },

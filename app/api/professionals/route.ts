@@ -9,18 +9,35 @@ const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url)
+    const statusFilter = searchParams.get('status') // 'active', 'inactive', 'all'
+
+    // Build where clause based on filter
+    const whereClause: any = {}
+    if (statusFilter === 'active') {
+      whereClause.isActive = true
+    } else if (statusFilter === 'inactive') {
+      whereClause.isActive = false
+    }
+    // If 'all' or no filter, don't add isActive filter
+
     const professionals = await prisma.professional.findMany({
-      where: {
-        isActive: true,
-      },
+      where: whereClause,
       select: {
         id: true,
         name: true,
         crm: true,
         phone: true,
+        isActive: true,
         specialties: {
           include: {
             specialty: true,
+          },
+        },
+        _count: {
+          select: {
+            consultations: true,
+            files: true,
           },
         },
       },
@@ -41,7 +58,7 @@ export async function GET(request: NextRequest) {
 
     return successResponse(
       transformedProfessionals,
-      'Profissionais ativos listados com sucesso'
+      'Profissionais listados com sucesso'
     )
   } catch (error) {
     return handleApiError(error)
@@ -56,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, crm, phone, address, specialtyIds, clinicId } = body
+    const { name, crm, phone, address, notes, specialtyIds, clinicId } = body
 
     if (!name) {
       throw new ValidationError('Nome é obrigatório')
@@ -73,6 +90,7 @@ export async function POST(request: NextRequest) {
         crm: crm || null,
         phone: phone || null,
         address: address || null,
+        notes: notes || null,
         clinicId: clinicId || null,
         specialties: {
           create: specialtyIds.map((specialtyId: string) => ({
