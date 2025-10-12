@@ -29,6 +29,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Generate Prisma client
 RUN npx prisma generate
 
+# Build Next.js with a dummy DATABASE_URL (Prisma requires it but won't connect during build)
+ENV DATABASE_URL="mysql://user:password@localhost:3306/medlog"
 RUN npm run build
 
 # Production image, copy all the files and run next
