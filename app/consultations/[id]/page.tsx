@@ -230,7 +230,7 @@ export default function ConsultationDetailsPage() {
                     <p className="text-sm text-gray-500">{formatFileSize(file.size)}</p>
                   </div>
                   <a
-                    href={`/api/files/${file.filename}`}
+                    href={`/api/files/${file.path}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:text-blue-500"
