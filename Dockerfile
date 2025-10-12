@@ -69,6 +69,8 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+# Default upload directory (can be overridden via docker-compose/runtime)
+ENV FILES_PATH=/app/data/uploads
 
 # Entrypoint script para rodar migrations antes de subir o server
 ENV MEDLOG_VERSION=0.1.0

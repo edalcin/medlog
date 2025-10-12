@@ -11,6 +11,7 @@ services:
       - "3000:3000"
     environment:
       # Database
+      - DATABASE_URL=mysql://${DB_USER:-medlog_user}:${DB_PASSWORD}@${DB_HOST:-mariadb}:${DB_PORT:-3306}/${DB_NAME:-medlog}
       - DB_HOST=${DB_HOST:-mariadb}
       - DB_PORT=${DB_PORT:-3306}
       - DB_NAME=${DB_NAME:-medlog}
