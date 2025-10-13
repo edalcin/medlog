@@ -26,7 +26,7 @@ export function Navigation() {
       <nav className="bg-white shadow-sm border-b">
         <div className="container mx-auto px-4">
           <div className="flex justify-between items-center h-16">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/dashboard" className="flex items-center space-x-2">
               <Image
                 src="/doctor-icon.png"
                 alt="MedLog"
@@ -48,7 +48,7 @@ export function Navigation() {
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href={session ? "/dashboard" : "/"} className="flex items-center space-x-2">
               <Image
                 src="/doctor-icon.png"
                 alt="MedLog"
