@@ -10,6 +10,7 @@ export function Navigation() {
   const pathname = usePathname()
 
   const navigation = [
+    { name: 'Dashboard', href: '/dashboard' },
     { name: 'Consultas', href: '/consultations' },
     { name: 'Profissionais', href: '/professionals' },
     { name: 'Clínicas', href: '/clinics' },
