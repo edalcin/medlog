@@ -297,14 +297,15 @@ export default function ProfessionalsPage() {
                       <SortIcon field="files" />
                     </div>
                   </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredAndSortedProfessionals.map((professional) => (
-                  <tr key={professional.id} className="hover:bg-gray-50">
+                  <tr
+                    key={professional.id}
+                    onClick={() => router.push(`/professionals/${professional.id}`)}
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{professional.name}</div>
                     </td>
@@ -339,14 +340,6 @@ export default function ProfessionalsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <div className="text-sm text-gray-900">{professional._count.files}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link
-                        href={`/professionals/${professional.id}`}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Ver detalhes
-                      </Link>
                     </td>
                   </tr>
                 ))}
