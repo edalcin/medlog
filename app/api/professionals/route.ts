@@ -33,6 +33,12 @@ export async function GET(request: NextRequest) {
             specialty: true,
           },
         },
+        clinic: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         phones: {
           orderBy: {
             createdAt: 'asc',

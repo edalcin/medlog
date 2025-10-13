@@ -15,11 +15,17 @@ interface Specialty {
   name: string
 }
 
+interface Clinic {
+  id: string
+  name: string
+}
+
 interface Professional {
   id: string
   name: string
   specialties: Specialty[]
   crm: string | null
+  clinic: Clinic | null
 }
 
 interface FileCategory {
@@ -270,7 +276,7 @@ export default function NewConsultationPage() {
               {professionals.map((professional) => (
                 <option key={professional.id} value={professional.id}>
                   {professional.name} - {professional.specialties.map(s => s.name).join(', ')}
-                  {professional.crm && ` (CRM: ${professional.crm})`}
+                  {professional.clinic && ` (${professional.clinic.name})`}
                 </option>
               ))}
             </select>
