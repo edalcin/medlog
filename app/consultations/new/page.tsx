@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
+import AssociateFilesModal from '../../../components/AssociateFilesModal'
 
 const MDEditor = dynamic(
   () => import('@uiw/react-md-editor'),
@@ -56,6 +57,8 @@ export default function NewConsultationPage() {
     notes: '',
   })
   const [selectedFiles, setSelectedFiles] = useState<FileWithCategory[]>([])
+  const [isAssociateModalOpen, setIsAssociateModalOpen] = useState(false)
+  const [associatedFileIds, setAssociatedFileIds] = useState<number[]>([])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -149,12 +152,34 @@ export default function NewConsultationPage() {
         }
       }
 
+      // Associate existing files if any
+      if (associatedFileIds.length > 0) {
+        const associateResponse = await fetch('/api/files/associate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            consultationId,
+            fileIds: associatedFileIds,
+          }),
+        })
+
+        if (!associateResponse.ok) {
+          console.error('Erro ao associar arquivos existentes')
+        }
+      }
+
       router.push('/consultations')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleAssociateFiles = async (fileIds: number[]) => {
+    setAssociatedFileIds(prev => [...prev, ...fileIds])
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -325,29 +350,47 @@ export default function NewConsultationPage() {
           </div>
 
           <div>
-            <label htmlFor="files" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="files" className="block text-sm font-medium text-gray-700 mb-2">
               Documentos e Imagens
             </label>
-            <div className="mt-1">
-              <input
-                type="file"
-                id="files"
-                name="files"
-                multiple
-                accept=".pdf,.png,.jpg,.jpeg"
-                onChange={handleFileChange}
-                className="block w-full text-sm text-gray-500
-                  file:mr-4 file:py-2 file:px-4
-                  file:rounded-md file:border-0
-                  file:text-sm file:font-medium
-                  file:bg-blue-50 file:text-blue-700
-                  hover:file:bg-blue-100
-                  cursor-pointer"
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Anexe receitas, laudos, exames (PDF, PNG, JPG - máx. 10MB por arquivo)
-              </p>
+
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <input
+                  type="file"
+                  id="files"
+                  name="files"
+                  multiple
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={handleFileChange}
+                  className="block w-full text-sm text-gray-500
+                    file:mr-4 file:py-2 file:px-4
+                    file:rounded-md file:border-0
+                    file:text-sm file:font-medium
+                    file:bg-blue-50 file:text-blue-700
+                    hover:file:bg-blue-100
+                    cursor-pointer"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAssociateModalOpen(true)}
+                className="px-4 py-2 bg-green-50 text-green-700 rounded-md hover:bg-green-100 text-sm font-medium whitespace-nowrap"
+              >
+                Associar Arquivos
+              </button>
             </div>
+
+            <p className="mt-2 text-sm text-gray-500">
+              Anexe novos arquivos (PDF, PNG, JPG - máx. 10MB) ou associe arquivos já enviados
+            </p>
+
+            {associatedFileIds.length > 0 && (
+              <p className="mt-2 text-sm text-green-600">
+                {associatedFileIds.length} arquivo(s) será(ão) associado(s) após salvar a consulta
+              </p>
+            )}
 
             {selectedFiles.length > 0 && (
               <div className="mt-4 space-y-2">
@@ -473,6 +516,12 @@ export default function NewConsultationPage() {
           </div>
         </form>
       </div>
+
+      <AssociateFilesModal
+        isOpen={isAssociateModalOpen}
+        onClose={() => setIsAssociateModalOpen(false)}
+        onAssociate={handleAssociateFiles}
+      />
     </div>
   )
 }
