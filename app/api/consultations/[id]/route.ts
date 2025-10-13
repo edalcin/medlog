@@ -35,6 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
           select: {
             id: true,
             filename: true,
+            customName: true,
             path: true,
             mimeType: true,
             size: true,
