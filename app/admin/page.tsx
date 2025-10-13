@@ -1325,10 +1325,18 @@ export default function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                           <a
+                            href={`/professionals/${professional.id}/edit`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-600 hover:text-indigo-900 mr-4"
+                          >
+                            Editar
+                          </a>
+                          <a
                             href={`/professionals/${professional.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-indigo-600 hover:text-indigo-900"
+                            className="text-gray-600 hover:text-gray-900"
                           >
                             Ver detalhes
                           </a>
