@@ -248,28 +248,33 @@ export default function DashboardPage() {
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Evolução Mensal (Últimos 12 Meses)</h2>
           {stats.byMonth.length > 0 ? (
-            <div className="space-y-2">
-              <div className="flex items-end justify-between h-48 gap-1">
+            <div className="space-y-4">
+              <div className="flex items-end justify-between h-48 gap-1 pb-12">
                 {stats.byMonth.slice(-12).map((item, index) => {
                   const percentage = (item.count / getMaxValue(stats.byMonth)) * 100
                   return (
-                    <div key={index} className="flex-1 flex flex-col items-center justify-end group">
-                      <div className="relative w-full">
+                    <div key={index} className="flex-1 flex flex-col items-center">
+                      <div className="relative w-full flex flex-col items-center justify-end h-full">
+                        <span className="text-xs font-semibold text-indigo-700 mb-1">
+                          {item.count}
+                        </span>
                         <div
                           className="w-full bg-indigo-600 rounded-t hover:bg-indigo-700 transition-all duration-300"
-                          style={{ height: `${percentage * 1.5}px`, minHeight: '20px' }}
-                        >
-                          <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-gray-800 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                            {item.count}
-                          </div>
-                        </div>
+                          style={{ height: `${percentage * 1.3}px`, minHeight: '20px' }}
+                        />
                       </div>
-                      <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-top-left w-12">
-                        {formatMonth(item.month)}
-                      </span>
                     </div>
                   )
                 })}
+              </div>
+              <div className="flex justify-between gap-1">
+                {stats.byMonth.slice(-12).map((item, index) => (
+                  <div key={index} className="flex-1 text-center">
+                    <span className="text-xs text-gray-500 inline-block transform -rotate-45 origin-center whitespace-nowrap">
+                      {formatMonth(item.month)}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
