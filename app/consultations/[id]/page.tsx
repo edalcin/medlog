@@ -34,7 +34,8 @@ interface Consultation {
   date: string
   proposito: string | null
   notes: string | null
-  professional: Professional
+  type: 'CONSULTATION' | 'EVENT'
+  professional: Professional | null
   files: File[]
 }
 
@@ -147,10 +148,12 @@ export default function ConsultationDetailsPage() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <Link href="/consultations" className="text-blue-600 hover:text-blue-500 mb-4 inline-block">
-          &larr; Voltar para Consultas
+          &larr; Voltar para Consultas e Eventos
         </Link>
         <div className="flex justify-between items-start">
-          <h1 className="text-3xl font-bold text-gray-900">Detalhes da Consulta</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Detalhes {consultation.type === 'CONSULTATION' ? 'da Consulta' : 'do Evento'}
+          </h1>
           <div className="flex gap-2">
             <Link
               href={`/consultations/${id}/edit`}
@@ -173,32 +176,49 @@ export default function ConsultationDetailsPage() {
       <div className="bg-white shadow rounded-lg p-6 mb-6">
         <div className="space-y-4">
           <div>
-            <span className="text-gray-600">Data da Consulta: </span>
+            <span className="text-gray-600">Tipo: </span>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+              consultation.type === 'CONSULTATION'
+                ? 'bg-blue-100 text-blue-800'
+                : 'bg-purple-100 text-purple-800'
+            }`}>
+              {consultation.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}
+            </span>
+          </div>
+
+          <div>
+            <span className="text-gray-600">Data: </span>
             <span className="font-medium text-gray-900">{formatDate(consultation.date)}</span>
           </div>
 
-          <div>
-            <span className="text-gray-600">Profissional: </span>
-            <span className="font-medium text-gray-900">{consultation.professional.name}</span>
-            {consultation.professional.crm && (
-              <span className="text-gray-600"> • CRM: {consultation.professional.crm}</span>
-            )}
-          </div>
+          {consultation.professional && (
+            <>
+              <div>
+                <span className="text-gray-600">Profissional: </span>
+                <span className="font-medium text-gray-900">{consultation.professional.name}</span>
+                {consultation.professional.crm && (
+                  <span className="text-gray-600"> • CRM: {consultation.professional.crm}</span>
+                )}
+              </div>
 
-          <div>
-            <span className="text-gray-600">Especialidades: </span>
-            {consultation.professional.specialties?.map((specialty, index) => (
-              <span key={specialty.id}>
-                <span className="font-medium text-gray-900">{specialty.name}</span>
-                {index < consultation.professional.specialties.length - 1 && ', '}
-              </span>
-            ))}
-          </div>
+              <div>
+                <span className="text-gray-600">Especialidades: </span>
+                {consultation.professional.specialties?.map((specialty, index) => (
+                  <span key={specialty.id}>
+                    <span className="font-medium text-gray-900">{specialty.name}</span>
+                    {index < consultation.professional.specialties.length - 1 && ', '}
+                  </span>
+                ))}
+              </div>
+            </>
+          )}
 
           {consultation.proposito && (
             <div>
-              <span className="text-gray-600">Propósito da Consulta: </span>
-              <span className="font-medium text-gray-900">{consultation.proposito}</span>
+              <span className="text-gray-600">
+                {consultation.type === 'CONSULTATION' ? 'Propósito da Consulta' : 'Título do Evento'}:
+              </span>
+              <span className="font-medium text-gray-900"> {consultation.proposito}</span>
             </div>
           )}
 
