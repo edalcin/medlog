@@ -206,7 +206,7 @@ export default function ConsultationDetailsPage() {
                 {consultation.professional.specialties?.map((specialty, index) => (
                   <span key={specialty.id}>
                     <span className="font-medium text-gray-900">{specialty.name}</span>
-                    {index < consultation.professional.specialties.length - 1 && ', '}
+                    {consultation.professional && index < consultation.professional.specialties.length - 1 && ', '}
                   </span>
                 ))}
               </div>

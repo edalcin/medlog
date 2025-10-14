@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
       professional: consultation.professional ? {
         id: consultation.professional.id,
         name: consultation.professional.name,
-        specialties: consultation.professional.specialties.map((ps) => ps.specialty),
+        specialties: consultation.professional.specialties.map((ps: { specialty: { id: string; name: string } }) => ps.specialty),
       } : null,
     }))
 
@@ -186,7 +186,7 @@ export async function POST(request: NextRequest) {
         professionalId: type === 'CONSULTATION' ? professionalId : null,
       },
       include: {
-        professional: type === 'CONSULTATION' ? {
+        professional: {
           select: {
             id: true,
             name: true,
@@ -196,18 +196,18 @@ export async function POST(request: NextRequest) {
               },
             },
           },
-        } : undefined,
+        },
       },
     })
 
-    // Transform to include specialty names (only if consultation)
-    const transformedConsultation = type === 'CONSULTATION' ? {
+    // Transform to include specialty names (only if consultation has professional)
+    const transformedConsultation = consultation.professional ? {
       ...consultation,
-      professional: consultation.professional ? {
+      professional: {
         id: consultation.professional.id,
         name: consultation.professional.name,
-        specialties: consultation.professional.specialties.map((ps) => ps.specialty),
-      } : null,
+        specialties: consultation.professional.specialties.map((ps: { specialty: { id: string; name: string } }) => ps.specialty),
+      },
     } : consultation
 
     const message = type === 'CONSULTATION'

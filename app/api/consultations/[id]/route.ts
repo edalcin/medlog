@@ -65,7 +65,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       ...consultation,
       professional: consultation.professional ? {
         ...consultation.professional,
-        specialties: consultation.professional.specialties.map((ps) => ps.specialty),
+        specialties: consultation.professional.specialties.map((ps: { specialty: { id: string; name: string } }) => ps.specialty),
       } : null,
     }
 
@@ -154,7 +154,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         professionalId: type === 'CONSULTATION' ? professionalId : null,
       },
       include: {
-        professional: type === 'CONSULTATION' ? {
+        professional: {
           select: {
             id: true,
             name: true,
@@ -164,7 +164,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
               },
             },
           },
-        } : undefined,
+        },
         files: {
           select: {
             id: true,
@@ -178,11 +178,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     })
 
     // Transform to flatten specialties (only if consultation)
-    const transformedConsultation = type === 'CONSULTATION' && consultation.professional ? {
+    const transformedConsultation = consultation.professional ? {
       ...consultation,
       professional: {
         ...consultation.professional,
-        specialties: consultation.professional.specialties.map((ps) => ps.specialty),
+        specialties: consultation.professional.specialties.map((ps: { specialty: { id: string; name: string } }) => ps.specialty),
       },
     } : consultation
 

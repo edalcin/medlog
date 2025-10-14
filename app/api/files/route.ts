@@ -62,10 +62,10 @@ export async function GET(request: NextRequest) {
     // Transform to include specialty names
     const transformedFiles = files.map(file => ({
       ...file,
-      professional: {
+      professional: file.professional ? {
         ...file.professional,
         specialties: file.professional.specialties.map(ps => ps.specialty),
-      },
+      } : null,
     }))
 
     const result = {

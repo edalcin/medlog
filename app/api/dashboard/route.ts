@@ -133,26 +133,32 @@ export async function GET(request: NextRequest) {
     })
 
     const professionalStats = await Promise.all(
-      consultationsByProfessional
-        .filter((item: { professionalId: string | null; _count: number }) => item.professionalId !== null)
-        .map(async (item: { professionalId: string; _count: number }) => {
-          const professional = await prisma.professional.findUnique({
-            where: { id: item.professionalId },
-            select: {
-              name: true,
-              specialties: {
-                include: {
-                  specialty: true,
-                },
-              },
-            },
-          })
+      consultationsByProfessional.map(async (item) => {
+        if (!item.professionalId) {
           return {
-            name: professional?.name || 'Desconhecido',
-            specialty: professional?.specialties[0]?.specialty.name || '',
+            name: 'Desconhecido',
+            specialty: '',
             count: item._count,
           }
+        }
+
+        const professional = await prisma.professional.findUnique({
+          where: { id: item.professionalId },
+          select: {
+            name: true,
+            specialties: {
+              include: {
+                specialty: true,
+              },
+            },
+          },
         })
+        return {
+          name: professional?.name || 'Desconhecido',
+          specialty: professional?.specialties[0]?.specialty.name || '',
+          count: item._count,
+        }
+      })
     )
 
     // Consultas por mês (últimos 12 meses)
