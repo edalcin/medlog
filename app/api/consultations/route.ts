@@ -98,11 +98,11 @@ export async function GET(request: NextRequest) {
     // Transform to include specialty names
     const transformedConsultations = consultations.map((consultation) => ({
       ...consultation,
-      professional: {
+      professional: consultation.professional ? {
         id: consultation.professional.id,
         name: consultation.professional.name,
         specialties: consultation.professional.specialties.map((ps) => ps.specialty),
-      },
+      } : null,
     }))
 
     const result = {

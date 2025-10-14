@@ -63,10 +63,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     // Transform to flatten specialties
     const transformedConsultation = {
       ...consultation,
-      professional: {
+      professional: consultation.professional ? {
         ...consultation.professional,
         specialties: consultation.professional.specialties.map((ps) => ps.specialty),
-      },
+      } : null,
     }
 
     return successResponse(transformedConsultation, 'Consulta encontrada com sucesso')
