@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
     // Total de profissionais únicos
     const uniqueProfessionals = await prisma.consultation.groupBy({
       by: ['professionalId'],
-      where: { userId },
+      where: {
+        userId,
+        professionalId: { not: null }, // Only count consultations with professionals
+      },
       _count: true,
     })
 
@@ -51,40 +54,47 @@ export async function GET(request: NextRequest) {
     })
 
     const specialtyStats = consultationsBySpecialty.reduce((acc: Record<string, { name: string; count: number }>, consultation) => {
-      consultation.professional.specialties.forEach((ps: { specialty: { name: string } }) => {
-        const specialtyName = ps.specialty.name
-        if (!acc[specialtyName]) {
-          acc[specialtyName] = {
-            name: specialtyName,
-            count: 0,
+      if (consultation.professional) {
+        consultation.professional.specialties.forEach((ps: { specialty: { name: string } }) => {
+          const specialtyName = ps.specialty.name
+          if (!acc[specialtyName]) {
+            acc[specialtyName] = {
+              name: specialtyName,
+              count: 0,
+            }
           }
-        }
-        acc[specialtyName].count++
-      })
+          acc[specialtyName].count++
+        })
+      }
       return acc
     }, {})
 
     // Consultas por clínica
     const consultationsByClinic = await prisma.consultation.groupBy({
       by: ['professionalId'],
-      where: { userId },
+      where: {
+        userId,
+        professionalId: { not: null }, // Only include consultations with professionals
+      },
       _count: true,
     })
 
     const clinicStats: any = {}
     for (const item of consultationsByClinic) {
-      const professional = await prisma.professional.findUnique({
-        where: { id: item.professionalId },
-        include: { clinic: true },
-      })
-      if (professional?.clinic) {
-        if (!clinicStats[professional.clinic.name]) {
-          clinicStats[professional.clinic.name] = {
-            name: professional.clinic.name,
-            count: 0,
+      if (item.professionalId) {
+        const professional = await prisma.professional.findUnique({
+          where: { id: item.professionalId },
+          include: { clinic: true },
+        })
+        if (professional?.clinic) {
+          if (!clinicStats[professional.clinic.name]) {
+            clinicStats[professional.clinic.name] = {
+              name: professional.clinic.name,
+              count: 0,
+            }
           }
+          clinicStats[professional.clinic.name].count += item._count
         }
-        clinicStats[professional.clinic.name].count += item._count
       }
     }
 
@@ -109,7 +119,10 @@ export async function GET(request: NextRequest) {
     // Consultas por profissional (top 10)
     const consultationsByProfessional = await prisma.consultation.groupBy({
       by: ['professionalId'],
-      where: { userId },
+      where: {
+        userId,
+        professionalId: { not: null }, // Only include consultations with professionals
+      },
       _count: true,
       orderBy: {
         _count: {
@@ -120,24 +133,26 @@ export async function GET(request: NextRequest) {
     })
 
     const professionalStats = await Promise.all(
-      consultationsByProfessional.map(async (item: { professionalId: string; _count: number }) => {
-        const professional = await prisma.professional.findUnique({
-          where: { id: item.professionalId },
-          select: {
-            name: true,
-            specialties: {
-              include: {
-                specialty: true,
+      consultationsByProfessional
+        .filter((item: { professionalId: string | null; _count: number }) => item.professionalId !== null)
+        .map(async (item: { professionalId: string; _count: number }) => {
+          const professional = await prisma.professional.findUnique({
+            where: { id: item.professionalId },
+            select: {
+              name: true,
+              specialties: {
+                include: {
+                  specialty: true,
+                },
               },
             },
-          },
+          })
+          return {
+            name: professional?.name || 'Desconhecido',
+            specialty: professional?.specialties[0]?.specialty.name || '',
+            count: item._count,
+          }
         })
-        return {
-          name: professional?.name || 'Desconhecido',
-          specialty: professional?.specialties[0]?.specialty.name || '',
-          count: item._count,
-        }
-      })
     )
 
     // Consultas por mês (últimos 12 meses)
@@ -185,11 +200,12 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const recentFormatted = recentConsultationsList.map((c: { id: string; date: Date; professional: { name: string; specialties: Array<{ specialty: { name: string } }> } }) => ({
+    const recentFormatted = recentConsultationsList.map((c: { id: string; date: Date; type: string; professional: { name: string; specialties: Array<{ specialty: { name: string } }> } | null }) => ({
       id: c.id,
       date: c.date,
-      professionalName: c.professional.name,
-      specialty: c.professional.specialties[0]?.specialty.name || '',
+      type: c.type,
+      professionalName: c.professional?.name || '-',
+      specialty: c.professional?.specialties[0]?.specialty.name || '-',
     }))
 
     return successResponse(
