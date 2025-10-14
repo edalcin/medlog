@@ -38,7 +38,7 @@ interface FileRecord {
     id: string
     name: string
     specialties: Specialty[]
-  }
+  } | null
   category?: {
     id: string
     name: string
@@ -58,7 +58,7 @@ interface Consultation {
     id: string
     name: string
     specialties: Specialty[]
-  }
+  } | null
   files: Array<{
     id: string
     filename: string
@@ -776,7 +776,7 @@ export default function AdminPage() {
     }
     if (fileFilters.professional) {
       filtered = filtered.filter(f =>
-        f.professional.id === fileFilters.professional
+        f.professional?.id === fileFilters.professional
       )
     }
     if (fileFilters.date) {
@@ -798,7 +798,7 @@ export default function AdminPage() {
           comparison = (a.category?.name || '').localeCompare(b.category?.name || '')
           break
         case 'professional':
-          comparison = a.professional.name.localeCompare(b.professional.name)
+          comparison = (a.professional?.name || '').localeCompare(b.professional?.name || '')
           break
         case 'date':
           comparison = new Date(a.consultation.date).getTime() - new Date(b.consultation.date).getTime()
@@ -1035,10 +1035,16 @@ export default function AdminPage() {
                         <div className="text-sm text-gray-500">{consultation.user.email}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{consultation.professional.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {consultation.professional.specialties.map(s => s.name).join(', ')}
-                        </div>
+                        {consultation.professional ? (
+                          <>
+                            <div className="text-sm text-gray-900">{consultation.professional.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {consultation.professional.specialties.map(s => s.name).join(', ')}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-500 italic">-</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {consultation.files.length} arquivo(s)
@@ -1911,10 +1917,16 @@ export default function AdminPage() {
                         <div className="text-sm text-gray-500">{file.consultation.user.email}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{file.professional.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {file.professional.specialties.map(s => s.name).join(', ')}
-                        </div>
+                        {file.professional ? (
+                          <>
+                            <div className="text-sm text-gray-900">{file.professional.name}</div>
+                            <div className="text-sm text-gray-500">
+                              {file.professional.specialties.map(s => s.name).join(', ')}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-sm text-gray-500 italic">-</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
