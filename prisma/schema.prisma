@@ -90,12 +90,12 @@ model File {
   mimeType       String
   size           Int
   consultationId String
-  professionalId String
+  professionalId String?
   uploadedAt     DateTime      @default(now())
   categoryId     String?
   category       FileCategory? @relation(fields: [categoryId], references: [id])
   consultation   Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
-  professional   Professional  @relation(fields: [professionalId], references: [id])
+  professional   Professional? @relation(fields: [professionalId], references: [id])
 
   @@index([categoryId], map: "files_categoryId_fkey")
   @@index([consultationId], map: "files_consultationId_fkey")

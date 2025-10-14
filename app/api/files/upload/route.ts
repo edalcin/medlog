@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         mimeType: uploadedFile.mimeType,
         size: uploadedFile.size,
         consultationId,
-        professionalId: consultation.professionalId,
+        professionalId: consultation.professionalId || null,
         categoryId: finalCategoryId || null,
       },
     })
