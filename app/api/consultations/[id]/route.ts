@@ -83,11 +83,26 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const body = await request.json()
-    const { date, professionalId, proposito, notes } = body
+    const { date, professionalId, proposito, notes, type = 'CONSULTATION' } = body
+
+    // Validate type
+    if (type !== 'CONSULTATION' && type !== 'EVENT') {
+      throw new ValidationError('Tipo deve ser CONSULTATION ou EVENT')
+    }
 
     // Validate required fields
-    if (!date || !professionalId) {
-      throw new ValidationError('Data e profissional são obrigatórios')
+    if (!date) {
+      throw new ValidationError('Data é obrigatória')
+    }
+
+    // For consultations, professional is required
+    if (type === 'CONSULTATION' && !professionalId) {
+      throw new ValidationError('Profissional é obrigatório para consultas')
+    }
+
+    // For events, professional must not be provided
+    if (type === 'EVENT' && professionalId) {
+      throw new ValidationError('Eventos não devem ter profissional associado')
     }
 
     // Validate date format and ensure it's not in the future
@@ -97,7 +112,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       throw new ValidationError('Data inválida')
     }
     if (consultationDate > now) {
-      throw new ValidationError('Data da consulta não pode ser no futuro')
+      throw new ValidationError('Data da consulta ou evento não pode ser no futuro')
     }
 
     // Check if consultation exists and user owns it
@@ -114,16 +129,18 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       return errorResponse('Não autorizado', 403)
     }
 
-    // Check if professional exists and is active
-    const professional = await prisma.professional.findFirst({
-      where: {
-        id: professionalId,
-        isActive: true,
-      },
-    })
+    // Check if professional exists and is active (only for consultations)
+    if (type === 'CONSULTATION') {
+      const professional = await prisma.professional.findFirst({
+        where: {
+          id: professionalId,
+          isActive: true,
+        },
+      })
 
-    if (!professional) {
-      throw new NotFoundError('Profissional')
+      if (!professional) {
+        throw new NotFoundError('Profissional')
+      }
     }
 
     // Update consultation
@@ -133,10 +150,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         date: consultationDate,
         proposito: proposito || null,
         notes: notes || null,
-        professionalId,
+        type,
+        professionalId: type === 'CONSULTATION' ? professionalId : null,
       },
       include: {
-        professional: {
+        professional: type === 'CONSULTATION' ? {
           select: {
             id: true,
             name: true,
@@ -146,7 +164,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
               },
             },
           },
-        },
+        } : undefined,
         files: {
           select: {
             id: true,
@@ -159,18 +177,22 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       },
     })
 
-    // Transform to flatten specialties
-    const transformedConsultation = {
+    // Transform to flatten specialties (only if consultation)
+    const transformedConsultation = type === 'CONSULTATION' && consultation.professional ? {
       ...consultation,
       professional: {
         ...consultation.professional,
         specialties: consultation.professional.specialties.map((ps) => ps.specialty),
       },
-    }
+    } : consultation
+
+    const message = type === 'CONSULTATION'
+      ? 'Consulta atualizada com sucesso'
+      : 'Evento atualizado com sucesso'
 
     return successResponse(
       transformedConsultation,
-      'Consulta atualizada com sucesso'
+      message
     )
   } catch (error) {
     return handleApiError(error)

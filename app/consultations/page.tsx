@@ -21,7 +21,8 @@ interface Consultation {
   date: string
   proposito: string | null
   notes: string | null
-  professional: Professional
+  type: 'CONSULTATION' | 'EVENT'
+  professional: Professional | null
   user?: {
     id: string
     name: string
@@ -52,6 +53,7 @@ export default function ConsultationsPage() {
   const [specialtyFilter, setSpecialtyFilter] = useState<string>('')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
+  const [typeFilter, setTypeFilter] = useState<string>('')
 
   // Sorting
   const [sortColumn, setSortColumn] = useState<'date' | 'professional' | 'specialties'>('date')
@@ -121,6 +123,11 @@ export default function ConsultationsPage() {
   const getFilteredAndSortedConsultations = () => {
     let filtered = [...consultations]
 
+    // Apply type filter
+    if (typeFilter) {
+      filtered = filtered.filter(c => c.type === typeFilter)
+    }
+
     // Apply year filter
     if (yearFilter) {
       filtered = filtered.filter(c => {
@@ -143,15 +150,15 @@ export default function ConsultationsPage() {
       })
     }
 
-    // Apply professional filter
+    // Apply professional filter (only for consultations)
     if (professionalFilter) {
-      filtered = filtered.filter(c => c.professional.id === professionalFilter)
+      filtered = filtered.filter(c => c.professional?.id === professionalFilter)
     }
 
-    // Apply specialty filter
+    // Apply specialty filter (only for consultations)
     if (specialtyFilter) {
       filtered = filtered.filter(c =>
-        c.professional.specialties.some(s => s.id === specialtyFilter)
+        c.professional?.specialties.some(s => s.id === specialtyFilter)
       )
     }
 
@@ -164,11 +171,13 @@ export default function ConsultationsPage() {
           comparison = new Date(a.date).getTime() - new Date(b.date).getTime()
           break
         case 'professional':
-          comparison = a.professional.name.localeCompare(b.professional.name)
+          const aName = a.professional?.name || ''
+          const bName = b.professional?.name || ''
+          comparison = aName.localeCompare(bName)
           break
         case 'specialties':
-          const aSpec = a.professional.specialties.map(s => s.name).join(', ')
-          const bSpec = b.professional.specialties.map(s => s.name).join(', ')
+          const aSpec = a.professional?.specialties.map(s => s.name).join(', ') || ''
+          const bSpec = b.professional?.specialties.map(s => s.name).join(', ') || ''
           comparison = aSpec.localeCompare(bSpec)
           break
       }
@@ -220,12 +229,12 @@ export default function ConsultationsPage() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Minhas Consultas</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Consultas e Eventos</h1>
         <Link
           href="/consultations/new"
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
         >
-          Nova Consulta
+          Nova Consulta ou Evento
         </Link>
       </div>
 
@@ -238,7 +247,23 @@ export default function ConsultationsPage() {
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-6 mb-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Filtros</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div>
+            <label htmlFor="type-filter" className="block text-sm font-medium text-gray-700 mb-1">
+              Tipo
+            </label>
+            <select
+              id="type-filter"
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="CONSULTATION">Consultas</option>
+              <option value="EVENT">Eventos</option>
+            </select>
+          </div>
+
           <div>
             <label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-1">
               Ano
@@ -318,10 +343,11 @@ export default function ConsultationsPage() {
         </div>
 
         {/* Clear filters button */}
-        {(yearFilter || startDate || endDate || professionalFilter || specialtyFilter) && (
+        {(typeFilter || yearFilter || startDate || endDate || professionalFilter || specialtyFilter) && (
           <div className="mt-4">
             <button
               onClick={() => {
+                setTypeFilter('')
                 setYearFilter('')
                 setStartDate('')
                 setEndDate('')
@@ -336,7 +362,7 @@ export default function ConsultationsPage() {
         )}
 
         <div className="mt-4 text-sm text-gray-600">
-          Mostrando {filteredConsultations.length} de {consultations.length} consulta{consultations.length !== 1 ? 's' : ''}
+          Mostrando {filteredConsultations.length} de {consultations.length} registro{consultations.length !== 1 ? 's' : ''}
         </div>
       </div>
 
@@ -345,9 +371,9 @@ export default function ConsultationsPage() {
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma consulta</h3>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhum registro</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Comece registrando sua primeira consulta médica.
+            Comece registrando sua primeira consulta ou evento de saúde.
           </p>
           <div className="mt-6">
             <Link
@@ -357,19 +383,22 @@ export default function ConsultationsPage() {
               <svg className="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              Nova Consulta
+              Nova Consulta ou Evento
             </Link>
           </div>
         </div>
       ) : filteredConsultations.length === 0 ? (
         <div className="text-center py-12 bg-white shadow rounded-lg">
-          <p className="text-gray-500">Nenhuma consulta corresponde aos filtros selecionados.</p>
+          <p className="text-gray-500">Nenhum registro corresponde aos filtros selecionados.</p>
         </div>
       ) : (
         <div className="bg-white shadow overflow-x-auto rounded-lg">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Tipo
+                </th>
                 <th
                   scope="col"
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -412,7 +441,7 @@ export default function ConsultationsPage() {
                   </div>
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Propósito
+                  Propósito / Evento
                 </th>
                 <th scope="col" className="relative px-6 py-3">
                   <span className="sr-only">Ações</span>
@@ -422,6 +451,15 @@ export default function ConsultationsPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredConsultations.map((consultation) => (
                 <tr key={consultation.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      consultation.type === 'CONSULTATION'
+                        ? 'bg-blue-100 text-blue-800'
+                        : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {consultation.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {formatDate(consultation.date)}
                   </td>
@@ -431,18 +469,18 @@ export default function ConsultationsPage() {
                     </td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {consultation.professional.name}
+                    {consultation.professional?.name || '-'}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     <div className="flex flex-wrap gap-1">
-                      {consultation.professional.specialties.map((specialty) => (
+                      {consultation.professional?.specialties.map((specialty) => (
                         <span
                           key={specialty.id}
                           className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800"
                         >
                           {specialty.name}
                         </span>
-                      ))}
+                      )) || '-'}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">

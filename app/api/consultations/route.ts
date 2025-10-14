@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     const professionalId = searchParams.get('professionalId')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
+    const type = searchParams.get('type')
 
     // Build where clause
     const where: any = {}
@@ -35,6 +36,10 @@ export async function GET(request: NextRequest) {
 
     if (professionalId) {
       where.professionalId = professionalId
+    }
+
+    if (type && (type === 'CONSULTATION' || type === 'EVENT')) {
+      where.type = type
     }
 
     if (startDate || endDate) {
@@ -124,11 +129,26 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { date, professionalId, proposito, notes } = body
+    const { date, professionalId, proposito, notes, type = 'CONSULTATION' } = body
+
+    // Validate type
+    if (type !== 'CONSULTATION' && type !== 'EVENT') {
+      throw new ValidationError('Tipo deve ser CONSULTATION ou EVENT')
+    }
 
     // Validate required fields
-    if (!date || !professionalId) {
-      throw new ValidationError('Data e profissional são obrigatórios')
+    if (!date) {
+      throw new ValidationError('Data é obrigatória')
+    }
+
+    // For consultations, professional is required
+    if (type === 'CONSULTATION' && !professionalId) {
+      throw new ValidationError('Profissional é obrigatório para consultas')
+    }
+
+    // For events, professional must not be provided
+    if (type === 'EVENT' && professionalId) {
+      throw new ValidationError('Eventos não devem ter profissional associado')
     }
 
     // Validate date format and ensure it's not in the future
@@ -138,32 +158,35 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Data inválida')
     }
     if (consultationDate > now) {
-      throw new ValidationError('Data da consulta não pode ser no futuro')
+      throw new ValidationError('Data da consulta ou evento não pode ser no futuro')
     }
 
-    // Check if professional exists and is active
-    const professional = await prisma.professional.findFirst({
-      where: {
-        id: professionalId,
-        isActive: true,
-      },
-    })
+    // Check if professional exists and is active (only for consultations)
+    if (type === 'CONSULTATION') {
+      const professional = await prisma.professional.findFirst({
+        where: {
+          id: professionalId,
+          isActive: true,
+        },
+      })
 
-    if (!professional) {
-      throw new NotFoundError('Profissional')
+      if (!professional) {
+        throw new NotFoundError('Profissional')
+      }
     }
 
-    // Create consultation
+    // Create consultation or event
     const consultation = await prisma.consultation.create({
       data: {
         date: consultationDate,
         proposito: proposito || null,
         notes: notes || null,
+        type,
         userId: session.user.id,
-        professionalId,
+        professionalId: type === 'CONSULTATION' ? professionalId : null,
       },
       include: {
-        professional: {
+        professional: type === 'CONSULTATION' ? {
           select: {
             id: true,
             name: true,
@@ -173,23 +196,27 @@ export async function POST(request: NextRequest) {
               },
             },
           },
-        },
+        } : undefined,
       },
     })
 
-    // Transform to include specialty names
-    const transformedConsultation = {
+    // Transform to include specialty names (only if consultation)
+    const transformedConsultation = type === 'CONSULTATION' ? {
       ...consultation,
-      professional: {
+      professional: consultation.professional ? {
         id: consultation.professional.id,
         name: consultation.professional.name,
         specialties: consultation.professional.specialties.map((ps) => ps.specialty),
-      },
-    }
+      } : null,
+    } : consultation
+
+    const message = type === 'CONSULTATION'
+      ? 'Consulta registrada com sucesso'
+      : 'Evento registrado com sucesso'
 
     return successResponse(
       transformedConsultation,
-      'Consulta registrada com sucesso',
+      message,
       201
     )
   } catch (error) {

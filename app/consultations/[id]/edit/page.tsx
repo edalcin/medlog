@@ -56,7 +56,8 @@ interface Consultation {
   date: string
   proposito: string | null
   notes: string | null
-  professionalId: string
+  professionalId: string | null
+  type: 'CONSULTATION' | 'EVENT'
   files: ExistingFile[]
 }
 
@@ -78,6 +79,7 @@ export default function EditConsultationPage() {
     professionalId: '',
     proposito: '',
     notes: '',
+    type: 'CONSULTATION' as 'CONSULTATION' | 'EVENT',
   })
 
   // File management states
@@ -111,9 +113,10 @@ export default function EditConsultationPage() {
 
       setFormData({
         date: formattedDate,
-        professionalId: consultationData.professionalId,
+        professionalId: consultationData.professionalId || '',
         proposito: consultationData.proposito || '',
         notes: consultationData.notes || '',
+        type: consultationData.type || 'CONSULTATION',
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
@@ -366,9 +369,9 @@ export default function EditConsultationPage() {
         <Link href={`/consultations/${id}`} className="text-blue-600 hover:text-blue-500 mb-4 inline-block">
           &larr; Voltar para Detalhes
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Editar Consulta</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Editar Consulta ou Evento</h1>
         <p className="mt-2 text-gray-600">
-          Atualize os dados da consulta médica.
+          Atualize os dados da consulta médica ou evento de saúde.
         </p>
       </div>
 
@@ -381,8 +384,38 @@ export default function EditConsultationPage() {
           )}
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Tipo de Registro *
+            </label>
+            <div className="flex gap-6">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="type"
+                  value="CONSULTATION"
+                  checked={formData.type === 'CONSULTATION'}
+                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as 'CONSULTATION' | 'EVENT', professionalId: e.target.value === 'EVENT' ? '' : prev.professionalId }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm text-gray-700">Consulta</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="type"
+                  value="EVENT"
+                  checked={formData.type === 'EVENT'}
+                  onChange={(e) => setFormData(prev => ({ ...prev, type: e.target.value as 'CONSULTATION' | 'EVENT', professionalId: '' }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <span className="ml-2 text-sm text-gray-700">Evento</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
             <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-              Data da Consulta *
+              Data da Consulta ou Evento *
             </label>
             <input
               type="date"
@@ -396,32 +429,34 @@ export default function EditConsultationPage() {
             />
           </div>
 
-          <div>
-            <label htmlFor="professionalId" className="block text-sm font-medium text-gray-700">
-              Profissional de Saúde *
-            </label>
-            <select
-              id="professionalId"
-              name="professionalId"
-              required
-              value={formData.professionalId}
-              onChange={handleInputChange}
-              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-            >
-              <option value="">Selecione um profissional</option>
-              {professionals.map((professional) => (
-                <option key={professional.id} value={professional.id}>
-                  {professional.name} - {professional.specialties.map(s => s.name).join(', ')}
-                  {professional.crm && ` (CRM: ${professional.crm})`}
-                  {!professional.isActive && ' [INATIVO]'}
-                </option>
-              ))}
-            </select>
-          </div>
+          {formData.type === 'CONSULTATION' && (
+            <div>
+              <label htmlFor="professionalId" className="block text-sm font-medium text-gray-700">
+                Profissional de Saúde *
+              </label>
+              <select
+                id="professionalId"
+                name="professionalId"
+                required={formData.type === 'CONSULTATION'}
+                value={formData.professionalId}
+                onChange={handleInputChange}
+                className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value="">Selecione um profissional</option>
+                {professionals.map((professional) => (
+                  <option key={professional.id} value={professional.id}>
+                    {professional.name} - {professional.specialties.map(s => s.name).join(', ')}
+                    {professional.crm && ` (CRM: ${professional.crm})`}
+                    {!professional.isActive && ' [INATIVO]'}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label htmlFor="proposito" className="block text-sm font-medium text-gray-700">
-              Propósito da Consulta
+              {formData.type === 'CONSULTATION' ? 'Propósito da Consulta' : 'Título do Evento'}
             </label>
             <input
               type="text"
@@ -429,7 +464,9 @@ export default function EditConsultationPage() {
               name="proposito"
               value={formData.proposito}
               onChange={handleInputChange}
-              placeholder="Ex: Consulta de rotina, Retorno, Exame, etc."
+              placeholder={formData.type === 'CONSULTATION'
+                ? "Ex: Consulta de rotina, Retorno, Exame, etc."
+                : "Ex: Febre alta, Teste COVID positivo, etc."}
               className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
             />
           </div>
