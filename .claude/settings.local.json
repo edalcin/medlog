@@ -39,7 +39,9 @@
       "Bash(git -C \"H:\\git\\medlog\" diff --stat)",
       "Bash(git -C \"H:\\git\\medlog\" log --oneline -5)",
       "Bash(git -C \"H:\\git\\medlog\" add -A)",
-      "Bash(git -C \"H:\\git\\medlog\" commit -m \"$(cat <<''EOF''\nfeat: Separar Consultas e Episódios no Dashboard e corrigir carregamento de arquivos\n\n- Implementar contagem separada de Consultas e Episódios no dashboard\n- Adicionar card \"Total de Episódios\" ao lado de \"Total de Consultas\"\n- Criar card \"Episódios Recentes\" abaixo de \"Consultas Recentes\"\n- Adicionar filtros por tipo (CONSULTATION/EVENT) nas rotas de consultas\n- Corrigir carregamento incompleto de arquivos no painel administrativo (limite 1000)\n- Separar dados por tipo: EVENT para episódios, CONSULTATION para consultas\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git -C \"H:\\git\\medlog\" commit -m \"$(cat <<''EOF''\nfeat: Separar Consultas e Episódios no Dashboard e corrigir carregamento de arquivos\n\n- Implementar contagem separada de Consultas e Episódios no dashboard\n- Adicionar card \"Total de Episódios\" ao lado de \"Total de Consultas\"\n- Criar card \"Episódios Recentes\" abaixo de \"Consultas Recentes\"\n- Adicionar filtros por tipo (CONSULTATION/EVENT) nas rotas de consultas\n- Corrigir carregamento incompleto de arquivos no painel administrativo (limite 1000)\n- Separar dados por tipo: EVENT para episódios, CONSULTATION para consultas\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git -C \"H:\\git\\medlog\" push origin main)",
+      "Bash(git -C \"H:\\git\\medlog\" checkout app/consultations/page.tsx)"
     ],
     "deny": [],
     "ask": []
