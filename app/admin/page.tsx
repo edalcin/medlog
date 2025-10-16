@@ -200,7 +200,7 @@ export default function AdminPage() {
   const fetchFiles = async () => {
     try {
       setFilesLoading(true)
-      const response = await fetch('/api/files')
+      const response = await fetch('/api/files?limit=1000')
       if (!response.ok) {
         throw new Error('Erro ao carregar arquivos')
       }

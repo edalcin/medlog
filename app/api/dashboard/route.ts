@@ -15,7 +15,12 @@ export async function GET(request: NextRequest) {
 
     // Total de consultas
     const totalConsultations = await prisma.consultation.count({
-      where: { userId },
+      where: { userId, type: 'CONSULTATION' },
+    })
+
+    // Total de episódios
+    const totalEpisodes = await prisma.consultation.count({
+      where: { userId, type: 'EVENT' },
     })
 
     // Total de profissionais únicos
@@ -206,7 +211,7 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const recentFormatted = recentConsultationsList.map((c: { id: string; date: Date; type: string; professional: { name: string; specialties: Array<{ specialty: { name: string } }> } | null }) => ({
+    const recentFormatted = recentConsultationsList.map((c: { id: string; date: Date; type: string; proposito?: string | null; professional: { name: string; specialties: Array<{ specialty: { name: string } }> } | null }) => ({
       id: c.id,
       date: c.date,
       type: c.type,
@@ -214,10 +219,24 @@ export async function GET(request: NextRequest) {
       specialty: c.professional?.specialties[0]?.specialty.name || '-',
     }))
 
+    // Episódios recentes
+    const recentEpisodesList = await prisma.consultation.findMany({
+      where: { userId, type: 'EVENT' },
+      take: 5,
+      orderBy: { date: 'desc' },
+    })
+
+    const recentEpisodesFormatted = recentEpisodesList.map((e: { id: string; date: Date; proposito?: string | null }) => ({
+      id: e.id,
+      date: e.date,
+      title: e.proposito || 'Sem título',
+    }))
+
     return successResponse(
       {
         summary: {
           totalConsultations,
+          totalEpisodes,
           totalProfessionals: uniqueProfessionals.length,
           totalFiles,
         },
@@ -227,6 +246,7 @@ export async function GET(request: NextRequest) {
         byProfessional: professionalStats,
         byMonth: Object.values(monthStats).sort((a: any, b: any) => a.month.localeCompare(b.month)),
         recentConsultations: recentFormatted,
+        recentEpisodes: recentEpisodesFormatted,
       },
       'Estatísticas carregadas com sucesso'
     )

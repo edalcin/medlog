@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 
 interface Specialty {
@@ -41,6 +41,7 @@ interface Consultation {
 export default function ConsultationsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [consultations, setConsultations] = useState<Consultation[]>([])
   const [professionals, setProfessionals] = useState<Professional[]>([])
   const [specialties, setSpecialties] = useState<Specialty[]>([])
@@ -64,6 +65,14 @@ export default function ConsultationsPage() {
       router.push('/')
     }
   }, [status, router])
+
+  // Apply type filter from query params
+  useEffect(() => {
+    const typeParam = searchParams.get('type')
+    if (typeParam === 'CONSULTATION' || typeParam === 'EVENT') {
+      setTypeFilter(typeParam)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (session) {

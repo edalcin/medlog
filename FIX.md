@@ -27,4 +27,36 @@
 
 * Separar Consulta e Evento no Dashboard
 
+* Relatório de Consultas:
+
+  * pulldown de profissional mostra o nome e "-". Deve mostrar o "nome - especialidade"
+
+  
+  
+  
+  
+    Consultas Afetadas:
+  
+    1. Consulta: 11/07/2023 - Dra. Maria Fernanda B. Bueno da Silveira (Cardiologista)
+  
+      - URL: https://medlog.dalc.in/consultations/d958593f-e8d8-4572-b177-efb6e2d38e42
+      - Arquivos faltando:
+          - 20230712_atestado_cardiologista.pdf
+        - 20230706_laudo_teste_ergometrico.pdf
+    2. Consulta: 06/07/2023 - Dra. Suzan Tabasnik (Otorrinolaringologista)
+  
+      - URL: https://medlog.dalc.in/consultations/c1f87340-bbdc-4739-9f6b-b91b041e4473
+      - Arquivo faltando:
+          - 20230707_receita_otorrino.pdf
+    3. Consulta: 03/12/2024 - Dra. Juliana Quintanilha G. Avilés (Dermatologista)
+  
+      - URL: https://medlog.dalc.in/consultations/91208dea-42e4-49b2-a15f-c27472d091ae
+      - Arquivo faltando:
+          - 20241204encaminhajulianadermato.pdf
+    4. Consulta: 03/07/2024 - Dr. Rodrigo Kaz (Ortopedista)
+  
+      - URL: https://medlog.dalc.in/consultations/24931529-15d9-473e-b041-07d1d9d613f5
+      - Arquivo faltando:
+          - 20240618_ressonancia_joelho.pdf ← Este é o que você mencionou!
+  
   
