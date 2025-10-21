@@ -110,7 +110,7 @@ export default function EditFilePage() {
     setError(null)
 
     try {
-      const response = await fetch(`/api/files/edit/${fileId}`, {
+      const response = await fetch(`/api/files/${fileId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,9 +152,12 @@ export default function EditFilePage() {
         throw new Error(data.error || 'Erro ao deletar')
       }
 
+      // Close modal and redirect
+      setShowDeleteConfirm(false)
       router.push('/files')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      setShowDeleteConfirm(false)
       setSubmitting(false)
     }
   }
