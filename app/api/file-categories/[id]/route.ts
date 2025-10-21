@@ -86,8 +86,9 @@ export async function DELETE(
     })
 
     if (inUse) {
+      const userName = inUse.consultation?.user.name || 'Desconhecido'
       return errorResponse(
-        `Esta categoria não pode ser excluída pois está associada a arquivos do usuário: ${inUse.consultation.user.name}`,
+        `Esta categoria não pode ser excluída pois está associada a arquivos: ${userName}`,
         400
       )
     }

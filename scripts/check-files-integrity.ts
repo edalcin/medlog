@@ -50,16 +50,18 @@ async function checkFilesIntegrity() {
         customName: file.customName,
         path: file.path,
         consultationId: file.consultationId,
-        consultationDate: file.consultation.date,
-        user: file.consultation.user.name,
+        consultationDate: file.consultation?.date,
+        user: file.consultation?.user.name || 'Desconhecido',
         uploadedAt: file.uploadedAt,
         category: file.category?.name || 'Sem categoria',
       })
       console.log(`❌ FALTANDO: ${file.customName || file.filename}`)
       console.log(`   Path: ${file.path}`)
       console.log(`   ID: ${file.id}`)
-      console.log(`   Consulta: ${file.consultationId} (${new Date(file.consultation.date).toLocaleDateString('pt-BR')})`)
-      console.log(`   Usuário: ${file.consultation.user.name}`)
+      if (file.consultation) {
+        console.log(`   Consulta: ${file.consultationId} (${new Date(file.consultation.date).toLocaleDateString('pt-BR')})`)
+        console.log(`   Usuário: ${file.consultation.user.name}`)
+      }
       console.log(`   Categoria: ${file.category?.name || 'Sem categoria'}`)
       console.log(`   Upload: ${new Date(file.uploadedAt).toLocaleDateString('pt-BR')}`)
       console.log('')

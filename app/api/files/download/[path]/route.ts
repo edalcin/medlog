@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../../../../lib/auth/config'
-import { handleApiError } from '../../../../lib/responses'
-import { NotFoundError, ForbiddenError } from '../../../../lib/errors'
-import { getFullFilePath } from '../../../../lib/upload'
+import { authOptions } from '../../../../../lib/auth/config'
+import { handleApiError } from '../../../../../lib/responses'
+import { NotFoundError, ForbiddenError } from '../../../../../lib/errors'
+import { getFullFilePath } from '../../../../../lib/upload'
 import { readFile } from 'fs/promises'
 
 const prisma = new PrismaClient()
@@ -39,8 +39,8 @@ export async function GET(
       throw new NotFoundError('Arquivo')
     }
 
-    // Check if user owns the consultation or is admin
-    if (file.consultation.userId !== session.user.id && session.user.role !== 'ADMIN') {
+    // Check if user owns the file or is admin
+    if (file.userId !== session.user.id && session.user.role !== 'ADMIN') {
       throw new ForbiddenError('Acesso negado ao arquivo')
     }
 

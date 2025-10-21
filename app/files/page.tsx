@@ -333,7 +333,7 @@ export default function FilesPage() {
                       <div className="flex-shrink-0">
                         {file.mimeType.startsWith('image/') ? (
                           <img
-                            src={`/api/files/${file.path}`}
+                            src={`/api/files/download/${file.path}`}
                             alt={file.customName || file.filename}
                             className="h-10 w-10 rounded object-cover"
                           />
@@ -412,7 +412,7 @@ export default function FilesPage() {
                 <div className="flex justify-center">
                   {selectedFile.mimeType.startsWith('image/') ? (
                     <img
-                      src={`/api/files/${selectedFile.path}`}
+                      src={`/api/files/download/${selectedFile.path}`}
                       alt={selectedFile.customName || selectedFile.filename}
                       className="max-h-60 rounded"
                     />
@@ -515,7 +515,7 @@ export default function FilesPage() {
                     Editar
                   </Link>
                   <a
-                    href={`/api/files/${selectedFile.path}`}
+                    href={`/api/files/download/${selectedFile.path}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"

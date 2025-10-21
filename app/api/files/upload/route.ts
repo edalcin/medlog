@@ -12,6 +12,14 @@ import { saveUploadedFile } from '../../../../lib/upload'
 
 const prisma = new PrismaClient()
 
+// Helper to calculate file hash
+async function calculateFileHash(file: File): Promise<string> {
+  const arrayBuffer = await file.arrayBuffer()
+  const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -21,47 +29,84 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const consultationId = formData.get('consultationId') as string
+    const consultationId = formData.get('consultationId') as string | undefined
+    const professionalId = formData.get('professionalId') as string | undefined
     const customName = formData.get('customName') as string | null
     const categoryId = formData.get('categoryId') as string | null
-    const newCategoryName = formData.get('newCategoryName') as string | null
+    const clientHash = formData.get('hash') as string | null
 
     if (!file) {
       throw new ValidationError('Arquivo é obrigatório')
     }
 
-    if (!consultationId) {
-      throw new ValidationError('ID da consulta é obrigatório')
+    // Arquivo deve estar associado a consulta OU profissional
+    if (!consultationId && !professionalId) {
+      throw new ValidationError('Associe o arquivo a uma consulta ou profissional')
     }
 
-    // Verify consultation exists and belongs to user (or user is admin)
-    const consultation = await prisma.consultation.findFirst({
+    // Calculate server-side hash for verification
+    const fileHash = await calculateFileHash(file)
+
+    // Verify hash matches what client calculated
+    if (clientHash && clientHash !== fileHash) {
+      return errorResponse('Hash do arquivo não corresponde. Tente novamente.', 400)
+    }
+
+    // Check if file already exists (duplicate detection)
+    const existingFile = await prisma.file.findFirst({
       where: {
-        id: consultationId,
-        ...(session.user.role !== 'ADMIN' ? { userId: session.user.id } : {}),
+        hash: fileHash,
+        userId: session.user.id,
       },
-      include: {
-        professional: true,
+      select: {
+        id: true,
+        filename: true,
+        customName: true,
       },
     })
 
-    if (!consultation) {
-      throw new NotFoundError('Consulta')
+    if (existingFile) {
+      return errorResponse(
+        `Arquivo duplicado! Um arquivo idêntico já existe: "${existingFile.customName || existingFile.filename}"`,
+        409
+      )
     }
 
-    // Save file
-    const uploadedFile = await saveUploadedFile(file)
-
-    // Handle category creation if needed
-    let finalCategoryId = categoryId
-    if (newCategoryName) {
-      const newCategory = await prisma.fileCategory.create({
-        data: {
-          name: newCategoryName,
+    // Verify consultation exists and belongs to user (or user is admin)
+    let consultation = null
+    if (consultationId) {
+      consultation = await prisma.consultation.findFirst({
+        where: {
+          id: consultationId,
+          ...(session.user.role !== 'ADMIN' ? { userId: session.user.id } : {}),
+        },
+        include: {
+          professional: true,
         },
       })
-      finalCategoryId = newCategory.id
+
+      if (!consultation) {
+        throw new NotFoundError('Consulta')
+      }
     }
+
+    // Verify professional exists and belongs to user (or user is admin)
+    let professional = null
+    if (professionalId) {
+      professional = await prisma.professional.findFirst({
+        where: {
+          id: professionalId,
+          ...(session.user.role !== 'ADMIN' ? { userId: session.user.id } : {}),
+        },
+      })
+
+      if (!professional) {
+        throw new NotFoundError('Profissional')
+      }
+    }
+
+    // Save file to disk
+    const uploadedFile = await saveUploadedFile(file)
 
     // Create file record in database
     const fileRecord = await prisma.file.create({
@@ -71,9 +116,11 @@ export async function POST(request: NextRequest) {
         path: uploadedFile.path,
         mimeType: uploadedFile.mimeType,
         size: uploadedFile.size,
-        consultationId,
-        professionalId: consultation.professionalId || null,
-        categoryId: finalCategoryId || null,
+        hash: fileHash,
+        consultationId: consultationId || null,
+        // If associated with consultation, also associate with its professional
+        professionalId: consultation?.professionalId || professionalId || null,
+        categoryId: categoryId || null,
         userId: session.user.id,
       },
     })

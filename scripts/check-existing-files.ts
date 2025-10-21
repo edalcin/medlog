@@ -32,13 +32,17 @@ async function checkExistingFiles() {
       console.log(`   ID do Arquivo: ${file.id}`)
       console.log(`   Path: ${file.path}`)
       console.log(`   Consulta ID: ${file.consultationId}`)
-      console.log(`   Data da Consulta: ${new Date(file.consultation.date).toLocaleDateString('pt-BR')}`)
-      console.log(`   Usuário: ${file.consultation.user.name} (${file.consultation.user.email})`)
-      console.log(`   Profissional: ${file.consultation.professional?.name || 'N/A'}`)
+      if (file.consultation) {
+        console.log(`   Data da Consulta: ${new Date(file.consultation.date).toLocaleDateString('pt-BR')}`)
+        console.log(`   Usuário: ${file.consultation.user.name} (${file.consultation.user.email})`)
+        console.log(`   Profissional: ${file.consultation.professional?.name || 'N/A'}`)
+      }
       console.log(`   Categoria: ${file.category?.name || 'Sem categoria'}`)
       console.log(`   Upload: ${new Date(file.uploadedAt).toLocaleDateString('pt-BR')}`)
-      console.log(`   URL Consulta: https://medlog.dalc.in/consultations/${file.consultationId}`)
-      console.log(`   URL Arquivo: https://medlog.dalc.in/api/files/${file.path}`)
+      if (file.consultationId) {
+        console.log(`   URL Consulta: https://medlog.dalc.in/consultations/${file.consultationId}`)
+      }
+      console.log(`   URL Arquivo: https://medlog.dalc.in/api/files/download/${file.path}`)
       console.log('')
     } else {
       console.log(`❌ Arquivo não encontrado no banco: ${path}\n`)
