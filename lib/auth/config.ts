@@ -4,6 +4,9 @@ import { prisma } from '../prisma/client'
 import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
+  // NextAuth automatically uses NEXTAUTH_URL from environment
+  // In production with Docker: uses the URL from environment variable
+  // In development: defaults to http://localhost:3000 (from .env.local)
   session: { strategy: 'jwt' },
   providers: [
     CredentialsProvider({
