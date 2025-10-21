@@ -73,13 +73,12 @@ export async function GET(request: NextRequest) {
       specialties: professional.specialties.map((ps) => ps.specialty),
     }))
 
-    if (transformedProfessionals.length === 0) {
-      throw new NotFoundError('Profissionais')
-    }
-
+    // Return empty array if no professionals found instead of throwing error
     return successResponse(
       transformedProfessionals,
-      'Profissionais listados com sucesso'
+      transformedProfessionals.length === 0
+        ? 'Nenhum profissional encontrado'
+        : 'Profissionais listados com sucesso'
     )
   } catch (error) {
     return handleApiError(error)

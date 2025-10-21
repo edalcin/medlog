@@ -55,8 +55,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
     try {
         const session = await getServerSession(authOptions)
-        if (session?.user?.role !== 'ADMIN') {
-            return errorResponse('Não autorizado', 403)
+        if (!session?.user?.id) {
+            return errorResponse('Não autorizado', 401)
         }
 
         const body = await request.json()
@@ -68,6 +68,30 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
         if (!specialtyIds || !Array.isArray(specialtyIds) || specialtyIds.length === 0) {
             throw new ValidationError('Selecione pelo menos uma especialidade')
+        }
+
+        // Build where clause: if not admin, filter by userId
+        const professionalWhereClause = session.user.role === 'ADMIN'
+            ? { id: params.id }
+            : { id: params.id, userId: session.user.id }
+
+        // Verify professional exists and user has access
+        const existingProfessional = await prisma.professional.findUnique({
+            where: professionalWhereClause as any,
+        })
+
+        if (!existingProfessional) {
+            throw new NotFoundError('Profissional')
+        }
+
+        // If user is not admin and trying to change clinicId, verify clinic belongs to user
+        if (session.user.role !== 'ADMIN' && clinicId) {
+            const clinic = await prisma.clinic.findUnique({
+                where: { id: clinicId, userId: session.user.id } as any,
+            })
+            if (!clinic) {
+                throw new NotFoundError('Clínica')
+            }
         }
 
         // Update professional and replace specialties
