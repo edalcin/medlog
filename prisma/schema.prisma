@@ -95,13 +95,14 @@ model File {
   path           String
   mimeType       String
   size           Int
-  consultationId String
-  professionalId String?
+  hash           String?       // For duplicate detection
+  consultationId String?       // Optional: can be associated with a consultation
+  professionalId String?       // Optional: can be associated with a professional
   userId         String?
   uploadedAt     DateTime      @default(now())
   categoryId     String?
   category       FileCategory? @relation(fields: [categoryId], references: [id])
-  consultation   Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  consultation   Consultation? @relation(fields: [consultationId], references: [id], onDelete: Cascade)
   professional   Professional? @relation(fields: [professionalId], references: [id])
   user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
