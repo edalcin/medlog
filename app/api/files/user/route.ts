@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    const limit = parseInt(searchParams.get('limit') || '10000')
 
     // Build where clause
     const whereClause: any = {}
@@ -67,17 +67,7 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
-    const result = {
-      data: files,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    }
-
-    return successResponse(result.data, 'Arquivos listados com sucesso')
+    return successResponse(files, 'Arquivos listados com sucesso')
   } catch (error) {
     return handleApiError(error)
   }
