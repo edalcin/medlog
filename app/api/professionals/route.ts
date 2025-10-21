@@ -20,9 +20,12 @@ export async function GET(request: NextRequest) {
     // Build where clause based on filter
     const whereClause: any = {}
 
-    // If user is not admin, filter by userId
+    // If user is not admin, show only professionalsthey created (or admins without userId)
     if (session.user.role !== 'ADMIN') {
-      whereClause.userId = session.user.id
+      whereClause.OR = [
+        { userId: session.user.id },
+        { userId: null }
+      ]
     }
 
     if (statusFilter === 'active') {

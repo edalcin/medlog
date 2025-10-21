@@ -14,10 +14,13 @@ export async function GET() {
       return errorResponse('Não autorizado', 401)
     }
 
-    // Build where clause: if not admin, filter by userId
+    // Build where clause: if not admin, show clinics they created (or admins without userId)
     const whereClause: any = {}
     if (session.user.role !== 'ADMIN') {
-      whereClause.userId = session.user.id
+      whereClause.OR = [
+        { userId: session.user.id },
+        { userId: null }
+      ]
     }
 
     const clinics = await prisma.clinic.findMany({
