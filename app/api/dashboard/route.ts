@@ -12,22 +12,27 @@ export async function GET(request: NextRequest) {
     }
 
     const userId = session.user.id
+    const isAdmin = session.user.role === 'ADMIN'
+
+    // Build where clause based on user role
+    const whereClause = isAdmin ? {} : { userId }
+    const consultationWhereClause = isAdmin ? {} : { userId }
 
     // Total de consultas
     const totalConsultations = await prisma.consultation.count({
-      where: { userId, type: 'CONSULTATION' },
+      where: { ...consultationWhereClause, type: 'CONSULTATION' },
     })
 
     // Total de episódios
     const totalEpisodes = await prisma.consultation.count({
-      where: { userId, type: 'EVENT' },
+      where: { ...consultationWhereClause, type: 'EVENT' },
     })
 
     // Total de profissionais únicos
     const uniqueProfessionals = await prisma.consultation.groupBy({
       by: ['professionalId'],
       where: {
-        userId,
+        ...consultationWhereClause,
         professionalId: { not: null }, // Only count consultations with professionals
       },
       _count: true,
@@ -35,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     // Total de arquivos
     const totalFiles = await prisma.file.count({
-      where: {
+      where: isAdmin ? {} : {
         consultation: {
           userId,
         },
@@ -44,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     // Consultas por especialidade
     const consultationsBySpecialty = await prisma.consultation.findMany({
-      where: { userId },
+      where: consultationWhereClause,
       include: {
         professional: {
           include: {
@@ -78,7 +83,7 @@ export async function GET(request: NextRequest) {
     const consultationsByClinic = await prisma.consultation.groupBy({
       by: ['professionalId'],
       where: {
-        userId,
+        ...consultationWhereClause,
         professionalId: { not: null }, // Only include consultations with professionals
       },
       _count: true,
@@ -105,7 +110,7 @@ export async function GET(request: NextRequest) {
 
     // Consultas por ano
     const consultationsByYear = await prisma.consultation.findMany({
-      where: { userId },
+      where: consultationWhereClause,
       select: { date: true },
     })
 
@@ -125,7 +130,7 @@ export async function GET(request: NextRequest) {
     const consultationsByProfessional = await prisma.consultation.groupBy({
       by: ['professionalId'],
       where: {
-        userId,
+        ...consultationWhereClause,
         professionalId: { not: null }, // Only include consultations with professionals
       },
       _count: true,
@@ -172,7 +177,7 @@ export async function GET(request: NextRequest) {
 
     const recentConsultations = await prisma.consultation.findMany({
       where: {
-        userId,
+        ...consultationWhereClause,
         date: {
           gte: twelveMonthsAgo,
         },
@@ -195,7 +200,7 @@ export async function GET(request: NextRequest) {
 
     // Consultas recentes
     const recentConsultationsList = await prisma.consultation.findMany({
-      where: { userId },
+      where: consultationWhereClause,
       take: 5,
       orderBy: { date: 'desc' },
       include: {
@@ -221,7 +226,7 @@ export async function GET(request: NextRequest) {
 
     // Episódios recentes
     const recentEpisodesList = await prisma.consultation.findMany({
-      where: { userId, type: 'EVENT' },
+      where: { ...consultationWhereClause, type: 'EVENT' },
       take: 5,
       orderBy: { date: 'desc' },
     })

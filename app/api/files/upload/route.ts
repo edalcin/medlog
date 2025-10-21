@@ -34,11 +34,11 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('ID da consulta é obrigatório')
     }
 
-    // Verify consultation exists and belongs to user
+    // Verify consultation exists and belongs to user (or user is admin)
     const consultation = await prisma.consultation.findFirst({
       where: {
         id: consultationId,
-        userId: session.user.id,
+        ...(session.user.role !== 'ADMIN' ? { userId: session.user.id } : {}),
       },
       include: {
         professional: true,

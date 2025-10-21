@@ -39,8 +39,8 @@ export async function GET(
       throw new NotFoundError('Arquivo')
     }
 
-    // Check if user owns the consultation
-    if (file.consultation.userId !== session.user.id) {
+    // Check if user owns the consultation or is admin
+    if (file.consultation.userId !== session.user.id && session.user.role !== 'ADMIN') {
       throw new ForbiddenError('Acesso negado ao arquivo')
     }
 
