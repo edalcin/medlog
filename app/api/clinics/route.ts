@@ -10,11 +10,18 @@ const prisma = new PrismaClient()
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return errorResponse('Não autorizado', 401)
     }
 
+    // Build where clause: if not admin, filter by userId
+    const whereClause: any = {}
+    if (session.user.role !== 'ADMIN') {
+      whereClause.userId = session.user.id
+    }
+
     const clinics = await prisma.clinic.findMany({
+      where: whereClause,
       orderBy: {
         name: 'asc',
       },
@@ -41,7 +48,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return errorResponse('Não autorizado', 401)
     }
 
@@ -52,9 +59,13 @@ export async function POST(request: NextRequest) {
       throw new ValidationError('Nome da clínica é obrigatório')
     }
 
-    // Check if clinic already exists
+    // Check if clinic already exists for this user (or for admin, check globally)
+    const whereUnique = session.user.role === 'ADMIN'
+      ? { name: name.trim() }
+      : { name_userId: { name: name.trim(), userId: session.user.id } }
+
     const existing = await prisma.clinic.findUnique({
-      where: { name: name.trim() },
+      where: whereUnique as any,
     })
 
     if (existing) {
@@ -65,6 +76,7 @@ export async function POST(request: NextRequest) {
       data: {
         name: name.trim(),
         address: address?.trim() || null,
+        userId: session.user.role === 'ADMIN' ? null : session.user.id,
       },
       include: {
         phones: true,

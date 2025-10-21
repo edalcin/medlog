@@ -14,10 +14,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return errorResponse('Não autorizado', 401)
     }
 
+    // Build where clause: if not admin, filter by userId
+    const whereClause = session.user.role === 'ADMIN'
+      ? { id: params.id }
+      : { id: params.id, userId: session.user.id }
+
     const professional = await prisma.professional.findUnique({
-      where: {
-        id: params.id,
-      },
+      where: whereClause as any,
       include: {
         specialties: {
           include: {

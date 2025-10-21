@@ -39,11 +39,14 @@ export async function POST(request: NextRequest) {
       return errorResponse('Você não tem permissão para associar arquivos a esta consulta', 403)
     }
 
+    // For non-admins, also verify files belong to the user
+    const whereClause = session.user.role === 'ADMIN'
+      ? { id: { in: fileIds } }
+      : { id: { in: fileIds }, userId: session.user.id }
+
     // Update files to associate them with the consultation
     const updatedFiles = await prisma.file.updateMany({
-      where: {
-        id: { in: fileIds },
-      },
+      where: whereClause,
       data: {
         consultationId: consultationId,
         professionalId: consultation.professionalId,

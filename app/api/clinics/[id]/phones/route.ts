@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '../../../../../lib/auth/config'
 import { successResponse, handleApiError, errorResponse } from '../../../../../lib/responses'
-import { ValidationError } from '../../../../../lib/errors'
+import { ValidationError, NotFoundError } from '../../../../../lib/errors'
 
 const prisma = new PrismaClient()
 
@@ -13,7 +13,7 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return errorResponse('Não autorizado', 401)
     }
 
@@ -23,6 +23,20 @@ export async function POST(
 
     if (!number || typeof number !== 'string' || number.trim().length === 0) {
       throw new ValidationError('Número de telefone é obrigatório')
+    }
+
+    // Build where clause: if not admin, filter by userId
+    const clinicWhereClause = session.user.role === 'ADMIN'
+      ? { id }
+      : { id, userId: session.user.id }
+
+    // Verify clinic exists and user has access
+    const clinic = await prisma.clinic.findUnique({
+      where: clinicWhereClause as any,
+    })
+
+    if (!clinic) {
+      throw new NotFoundError('Clínica')
     }
 
     const phone = await prisma.phone.create({

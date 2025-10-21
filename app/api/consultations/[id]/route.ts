@@ -131,11 +131,12 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     // Check if professional exists and is active (only for consultations)
     if (type === 'CONSULTATION') {
+      const professionalWhere = session.user.role === 'ADMIN'
+        ? { id: professionalId, isActive: true }
+        : { id: professionalId, isActive: true, userId: session.user.id }
+
       const professional = await prisma.professional.findFirst({
-        where: {
-          id: professionalId,
-          isActive: true,
-        },
+        where: professionalWhere,
       })
 
       if (!professional) {

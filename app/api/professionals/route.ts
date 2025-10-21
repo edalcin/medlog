@@ -9,11 +9,22 @@ const prisma = new PrismaClient()
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return errorResponse('Não autorizado', 401)
+    }
+
     const { searchParams } = new URL(request.url)
     const statusFilter = searchParams.get('status') // 'active', 'inactive', 'all'
 
     // Build where clause based on filter
     const whereClause: any = {}
+
+    // If user is not admin, filter by userId
+    if (session.user.role !== 'ADMIN') {
+      whereClause.userId = session.user.id
+    }
+
     if (statusFilter === 'active') {
       whereClause.isActive = true
     } else if (statusFilter === 'inactive') {
@@ -101,6 +112,7 @@ export async function POST(request: NextRequest) {
         address: address || null,
         notes: notes || null,
         clinicId: clinicId || null,
+        userId: session.user.role === 'ADMIN' ? null : session.user.id,
         specialties: {
           create: specialtyIds.map((specialtyId: string) => ({
             specialtyId,

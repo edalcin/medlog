@@ -17,7 +17,7 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.role || session.user.role !== 'ADMIN') {
+    if (!session?.user?.id) {
       return errorResponse('Não autorizado', 401)
     }
 
@@ -25,19 +25,28 @@ export async function PUT(
     const body = await request.json()
     const { customName, consultationId, categoryId } = body
 
-    // Verify file exists
+    // Build where clause: if not admin, filter by userId
+    const fileWhereClause = session.user.role === 'ADMIN'
+      ? { id }
+      : { id, userId: session.user.id }
+
+    // Verify file exists and user has access
     const file = await prisma.file.findUnique({
-      where: { id },
+      where: fileWhereClause as any,
     })
 
     if (!file) {
       throw new NotFoundError('Arquivo')
     }
 
-    // If consultationId is being changed, verify the consultation exists
+    // If consultationId is being changed, verify the consultation exists and user has access
     if (consultationId && consultationId !== file.consultationId) {
+      const consultationWhereClause = session.user.role === 'ADMIN'
+        ? { id: consultationId }
+        : { id: consultationId, userId: session.user.id }
+
       const consultation = await prisma.consultation.findUnique({
-        where: { id: consultationId },
+        where: consultationWhereClause as any,
         include: {
           professional: true,
         },

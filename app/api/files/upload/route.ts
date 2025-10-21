@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
         consultationId,
         professionalId: consultation.professionalId || null,
         categoryId: finalCategoryId || null,
+        userId: session.user.id,
       },
     })
 

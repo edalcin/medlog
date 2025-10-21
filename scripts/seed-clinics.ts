@@ -17,13 +17,13 @@ async function main() {
   console.log('Seeding clinics...')
 
   for (const clinicName of defaultClinics) {
-    const existing = await prisma.clinic.findUnique({
-      where: { name: clinicName },
+    const existing = await prisma.clinic.findFirst({
+      where: { name: clinicName, userId: null },
     })
 
     if (!existing) {
       await prisma.clinic.create({
-        data: { name: clinicName },
+        data: { name: clinicName, userId: null },
       })
       console.log(`✓ Created clinic: ${clinicName}`)
     } else {

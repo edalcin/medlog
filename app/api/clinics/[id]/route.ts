@@ -13,7 +13,7 @@ export async function PUT(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return errorResponse('Não autorizado', 401)
     }
 
@@ -25,21 +25,27 @@ export async function PUT(
       throw new ValidationError('Nome da clínica é obrigatório')
     }
 
+    // Build where clause: if not admin, filter by userId
+    const whereClause = session.user.role === 'ADMIN'
+      ? { id }
+      : { id, userId: session.user.id }
+
     // Check if clinic exists
     const existing = await prisma.clinic.findUnique({
-      where: { id },
+      where: whereClause as any,
     })
 
     if (!existing) {
       throw new NotFoundError('Clínica')
     }
 
-    // Check if another clinic with same name exists
+    // Check if another clinic with same name exists (respect user isolation for non-admins)
+    const duplicateWhere = session.user.role === 'ADMIN'
+      ? { name: name.trim(), NOT: { id } }
+      : { name: name.trim(), NOT: { id }, userId: session.user.id }
+
     const duplicate = await prisma.clinic.findFirst({
-      where: {
-        name: name.trim(),
-        NOT: { id },
-      },
+      where: duplicateWhere,
     })
 
     if (duplicate) {
@@ -69,11 +75,25 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session) {
+    if (!session?.user?.id) {
       return errorResponse('Não autorizado', 401)
     }
 
     const { id } = params
+
+    // Build where clause: if not admin, filter by userId
+    const clinicWhereClause = session.user.role === 'ADMIN'
+      ? { id }
+      : { id, userId: session.user.id }
+
+    // Check if clinic exists and user has access
+    const clinic = await prisma.clinic.findUnique({
+      where: clinicWhereClause as any,
+    })
+
+    if (!clinic) {
+      throw new NotFoundError('Clínica')
+    }
 
     // Check if clinic is in use
     const inUse = await prisma.professional.findFirst({

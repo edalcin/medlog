@@ -20,6 +20,11 @@ export async function GET(request: NextRequest) {
     // Build where clause
     const where: any = {}
 
+    // If user is not admin, filter by userId
+    if (session.user.role !== 'ADMIN') {
+      where.userId = session.user.id
+    }
+
     // If search is provided, search by customName or filename
     if (search) {
       where.OR = [

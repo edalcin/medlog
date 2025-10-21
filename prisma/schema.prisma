@@ -17,6 +17,9 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   consultations Consultation[]
+  professionals Professional[]
+  clinics       Clinic[]
+  files         File[]
 
   @@map("users")
 }
@@ -28,6 +31,7 @@ model Professional {
   address       String?
   notes         String?                 @db.Text
   isActive      Boolean                 @default(true)
+  userId        String?
   createdAt     DateTime                @default(now())
   updatedAt     DateTime                @updatedAt
   clinicId      String?
@@ -36,8 +40,10 @@ model Professional {
   specialties   ProfessionalSpecialty[]
   phones        Phone[]
   clinic        Clinic?                 @relation(fields: [clinicId], references: [id])
+  user          User?                   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([clinicId], map: "professionals_clinicId_fkey")
+  @@index([userId], map: "professionals_userId_fkey")
   @@map("professionals")
 }
 
@@ -91,15 +97,18 @@ model File {
   size           Int
   consultationId String
   professionalId String?
+  userId         String?
   uploadedAt     DateTime      @default(now())
   categoryId     String?
   category       FileCategory? @relation(fields: [categoryId], references: [id])
   consultation   Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
   professional   Professional? @relation(fields: [professionalId], references: [id])
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([categoryId], map: "files_categoryId_fkey")
   @@index([consultationId], map: "files_consultationId_fkey")
   @@index([professionalId], map: "files_professionalId_fkey")
+  @@index([userId], map: "files_userId_fkey")
   @@map("files")
 }
 
@@ -114,12 +123,17 @@ model FileCategory {
 
 model Clinic {
   id            String         @id @default(uuid())
-  name          String         @unique
+  name          String
   address       String?
+  userId        String?
   createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
   professionals Professional[]
   phones        Phone[]
+  user          User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([name, userId], map: "clinics_name_userId_unique")
+  @@index([userId], map: "clinics_userId_fkey")
   @@map("clinics")
 }
 
