@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: {
-        uploadedAt: 'desc',
+        uploadedAt: 'asc',
       },
       skip: (page - 1) * limit,
       take: limit,

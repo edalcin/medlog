@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
         mimeType: uploadedFile.mimeType,
         size: uploadedFile.size,
         hash: fileHash,
+        thumbnailPath: uploadedFile.thumbnailPath || null,
         consultationId: consultationId || null,
         // If associated with consultation, also associate with its professional
         professionalId: consultation?.professionalId || professionalId || null,

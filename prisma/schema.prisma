@@ -96,6 +96,7 @@ model File {
   mimeType       String
   size           Int
   hash           String?       // For duplicate detection
+  thumbnailPath  String?       // Path to PDF thumbnail image
   consultationId String?       // Optional: can be associated with a consultation
   professionalId String?       // Optional: can be associated with a professional
   userId         String?

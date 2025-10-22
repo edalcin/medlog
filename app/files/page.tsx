@@ -14,6 +14,7 @@ interface FileWithAssociations {
   size: number
   uploadedAt: string
   categoryId: string | null
+  thumbnailPath?: string | null
   category?: {
     id: string
     name: string
@@ -51,7 +52,7 @@ export default function FilesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('date')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
   // Modal state
   const [selectedFile, setSelectedFile] = useState<FileWithAssociations | null>(null)
@@ -368,6 +369,12 @@ export default function FilesPage() {
                             alt={file.customName || file.filename}
                             className="h-10 w-10 rounded object-cover"
                           />
+                        ) : file.mimeType === 'application/pdf' && file.thumbnailPath ? (
+                          <img
+                            src={`/api/files/download/${file.thumbnailPath}`}
+                            alt={file.customName || file.filename}
+                            className="h-10 w-10 rounded object-cover"
+                          />
                         ) : (
                           <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center">
                             <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -444,6 +451,12 @@ export default function FilesPage() {
                   {selectedFile.mimeType.startsWith('image/') ? (
                     <img
                       src={`/api/files/download/${selectedFile.path}`}
+                      alt={selectedFile.customName || selectedFile.filename}
+                      className="max-h-60 rounded"
+                    />
+                  ) : selectedFile.mimeType === 'application/pdf' && selectedFile.thumbnailPath ? (
+                    <img
+                      src={`/api/files/download/${selectedFile.thumbnailPath}`}
                       alt={selectedFile.customName || selectedFile.filename}
                       className="max-h-60 rounded"
                     />
