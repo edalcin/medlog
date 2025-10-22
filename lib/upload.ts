@@ -1,7 +1,6 @@
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import { convert } from 'pdf2pic'
 
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
@@ -12,37 +11,6 @@ export interface UploadedFile {
   mimeType: string
   size: number
   thumbnailPath?: string
-}
-
-async function generatePdfThumbnail(filePath: string): Promise<string | undefined> {
-  try {
-    const uuid = randomUUID()
-    const thumbnailFilename = `${uuid}.png`
-    const thumbnailPath = join(THUMBNAILS_DIR, thumbnailFilename)
-
-    // Create thumbnails directory if it doesn't exist
-    await mkdir(THUMBNAILS_DIR, { recursive: true })
-
-    // Convert PDF first page to PNG (max 200x200)
-    const options = {
-      density: 100,
-      savename: uuid,
-      savedir: THUMBNAILS_DIR,
-      format: 'png',
-      width: 200,
-      height: 200,
-    }
-
-    await convert({
-      filePath: filePath,
-      ...options,
-    })
-
-    return thumbnailFilename
-  } catch (error) {
-    console.error('Error generating PDF thumbnail:', error)
-    return undefined
-  }
 }
 
 export async function saveUploadedFile(
@@ -74,18 +42,11 @@ export async function saveUploadedFile(
   const buffer = Buffer.from(bytes)
   await writeFile(filePath, buffer)
 
-  // Generate thumbnail for PDFs
-  let thumbnailPath: string | undefined = undefined
-  if (file.type === 'application/pdf') {
-    thumbnailPath = await generatePdfThumbnail(filePath)
-  }
-
   return {
     filename: file.name,
     path: uniqueFilename,
     mimeType: file.type,
     size: file.size,
-    thumbnailPath,
   }
 }
 
