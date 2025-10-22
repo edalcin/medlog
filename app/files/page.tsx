@@ -539,6 +539,14 @@ export default function FilesPage() {
 
                 {/* Actions */}
                 <div className="border-t pt-4 flex gap-2">
+                  <a
+                    href={`/api/files/download/${selectedFile.path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+                  >
+                    Visualizar
+                  </a>
                   <Link
                     href={`/files/${selectedFile.id}/edit`}
                     className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -547,8 +555,7 @@ export default function FilesPage() {
                   </Link>
                   <a
                     href={`/api/files/download/${selectedFile.path}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    download={selectedFile.customName || selectedFile.filename}
                     className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
                   >
                     Baixar
