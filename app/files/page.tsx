@@ -416,7 +416,7 @@ export default function FilesPage() {
                           />
                         ) : file.mimeType === 'application/pdf' && file.thumbnailPath ? (
                           <img
-                            src={`/api/files/download/${file.thumbnailPath}`}
+                            src={`/api/files/thumbnail/${file.thumbnailPath}`}
                             alt={file.customName || file.filename}
                             className="h-10 w-10 rounded object-cover"
                           />
@@ -501,7 +501,7 @@ export default function FilesPage() {
                     />
                   ) : selectedFile.mimeType === 'application/pdf' && selectedFile.thumbnailPath ? (
                     <img
-                      src={`/api/files/download/${selectedFile.thumbnailPath}`}
+                      src={`/api/files/thumbnail/${selectedFile.thumbnailPath}`}
                       alt={selectedFile.customName || selectedFile.filename}
                       className="max-h-60 rounded"
                     />
