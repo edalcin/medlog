@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
 Script para gerar thumbnails de PDFs já existentes no MedLog.
-Execute na pasta /mnt/user/Storage/appsdata/medlog/ do Unraid.
+Execute na pasta /mnt/user/Storage/appsdata/medlog/ do Unraid ou Windows.
 
 Requisitos:
   pip install pdf2image pillow pymysql
 
 Uso:
   python3 generate_pdf_thumbnails.py
+
+ou especifique o caminho da pasta:
+  python3 generate_pdf_thumbnails.py /caminho/para/medlog
 """
 
 import os
@@ -18,18 +21,24 @@ import uuid
 from pdf2image import convert_from_path
 from datetime import datetime
 
+# Determinar diretório base
+if len(sys.argv) > 1:
+    BASE_DIR = sys.argv[1]
+else:
+    BASE_DIR = os.getcwd()
+
 # Configurações
-UPLOADS_DIR = "./uploads"
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 THUMBNAILS_DIR = os.path.join(UPLOADS_DIR, "thumbnails")
 THUMBNAIL_SIZE = (200, 200)
 
 # Configuração do banco de dados - ATUALIZE COM SUAS CREDENCIAIS
 DB_CONFIG = {
-    'host': 'localhost',  # Mude se necessário
+    'host': '192.168.1.10',  # Mude se necessário
     'user': 'medlog',
-    'password': '',  # Adicione a senha do banco
+    'password': 'medlog',  # Adicione a senha do banco
     'database': 'medlog',
-    'port': 3306,
+    'port': 3333,
 }
 
 def setup_directories():
@@ -119,13 +128,26 @@ def main():
     print("=" * 60)
     print()
 
+    print(f"📁 Diretório base: {os.path.abspath(BASE_DIR)}")
+    print(f"📁 Diretório de uploads: {os.path.abspath(UPLOADS_DIR)}")
+    print()
+
     # Verificar se estamos no diretório correto
     if not os.path.exists(UPLOADS_DIR):
         print(f"✗ Diretório '{UPLOADS_DIR}' não encontrado!")
-        print(f"  Execute este script em: /mnt/user/Storage/appsdata/medlog/")
+        print()
+        print("Use uma das opções:")
+        print("  1. Execute na pasta raiz do MedLog:")
+        print("     cd /mnt/user/Storage/appsdata/medlog")
+        print("     python3 scripts/generate_pdf_thumbnails.py")
+        print()
+        print("  2. Ou especifique o caminho:")
+        print("     python3 scripts/generate_pdf_thumbnails.py /mnt/user/Storage/appsdata/medlog")
+        print()
+        print("  3. Ou no Windows:")
+        print('     python scripts\\generate_pdf_thumbnails.py "S:\\appsdata\\medlog"')
         sys.exit(1)
 
-    print(f"📁 Diretório de uploads: {os.path.abspath(UPLOADS_DIR)}")
     print()
 
     # Criar diretórios
