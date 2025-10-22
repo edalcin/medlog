@@ -21,14 +21,12 @@ import uuid
 from pdf2image import convert_from_path
 from datetime import datetime
 
-# Determinar diretório base
+# Determinar diretório de uploads
 if len(sys.argv) > 1:
-    BASE_DIR = sys.argv[1]
+    UPLOADS_DIR = sys.argv[1]
 else:
-    BASE_DIR = os.getcwd()
+    UPLOADS_DIR = os.getcwd()
 
-# Configurações
-UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
 THUMBNAILS_DIR = os.path.join(UPLOADS_DIR, "thumbnails")
 THUMBNAIL_SIZE = (200, 200)
 
@@ -128,25 +126,9 @@ def main():
     print("=" * 60)
     print()
 
-    print(f"📁 Diretório base: {os.path.abspath(BASE_DIR)}")
-    print(f"📁 Diretório de uploads: {os.path.abspath(UPLOADS_DIR)}")
+    print(f"📁 Diretório de PDFs: {os.path.abspath(UPLOADS_DIR)}")
+    print(f"📁 Diretório de thumbnails: {os.path.abspath(THUMBNAILS_DIR)}")
     print()
-
-    # Verificar se estamos no diretório correto
-    if not os.path.exists(UPLOADS_DIR):
-        print(f"✗ Diretório '{UPLOADS_DIR}' não encontrado!")
-        print()
-        print("Use uma das opções:")
-        print("  1. Execute na pasta raiz do MedLog:")
-        print("     cd /mnt/user/Storage/appsdata/medlog")
-        print("     python3 scripts/generate_pdf_thumbnails.py")
-        print()
-        print("  2. Ou especifique o caminho:")
-        print("     python3 scripts/generate_pdf_thumbnails.py /mnt/user/Storage/appsdata/medlog")
-        print()
-        print("  3. Ou no Windows:")
-        print('     python scripts\\generate_pdf_thumbnails.py "S:\\appsdata\\medlog"')
-        sys.exit(1)
 
     print()
 
