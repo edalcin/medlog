@@ -51,6 +51,8 @@ export default function FilesPage() {
   // Filter and sort state
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedProfessional, setSelectedProfessional] = useState('')
+  const [professionals, setProfessionals] = useState<Array<{ id: string; name: string }>>([])
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
@@ -70,12 +72,13 @@ export default function FilesPage() {
     if (session) {
       fetchFiles()
       fetchCategories()
+      fetchProfessionals()
     }
   }, [session])
 
   useEffect(() => {
     applyFiltersAndSort()
-  }, [files, searchTerm, selectedCategory, sortBy, sortOrder])
+  }, [files, searchTerm, selectedCategory, selectedProfessional, sortBy, sortOrder])
 
   const fetchFiles = async () => {
     try {
@@ -105,6 +108,23 @@ export default function FilesPage() {
     }
   }
 
+  const fetchProfessionals = async () => {
+    try {
+      const response = await fetch('/api/professionals')
+      if (response.ok) {
+        const data = await response.json()
+        // Filtrar apenas profissionais ativos
+        const activeProfs = (data.data || []).filter((p: any) => p.isActive).map((p: any) => ({
+          id: p.id,
+          name: p.name
+        }))
+        setProfessionals(activeProfs)
+      }
+    } catch (err) {
+      console.error('Erro ao carregar profissionais:', err)
+    }
+  }
+
   const applyFiltersAndSort = () => {
     let filtered = [...files]
 
@@ -118,6 +138,11 @@ export default function FilesPage() {
     // Apply category filter
     if (selectedCategory) {
       filtered = filtered.filter(f => f.categoryId === selectedCategory)
+    }
+
+    // Apply professional filter
+    if (selectedProfessional) {
+      filtered = filtered.filter(f => f.professional?.id === selectedProfessional)
     }
 
     // Apply sorting
@@ -238,7 +263,7 @@ export default function FilesPage() {
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
           <div>
             <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
               Buscar
@@ -267,6 +292,25 @@ export default function FilesPage() {
               {categories.map((cat) => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="professional" className="block text-sm font-medium text-gray-700 mb-1">
+              Profissional
+            </label>
+            <select
+              id="professional"
+              value={selectedProfessional}
+              onChange={(e) => setSelectedProfessional(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">Todos</option>
+              {professionals.map((prof) => (
+                <option key={prof.id} value={prof.id}>
+                  {prof.name}
                 </option>
               ))}
             </select>
@@ -304,11 +348,12 @@ export default function FilesPage() {
           </div>
         </div>
 
-        {(searchTerm || selectedCategory) && (
+        {(searchTerm || selectedCategory || selectedProfessional) && (
           <button
             onClick={() => {
               setSearchTerm('')
               setSelectedCategory('')
+              setSelectedProfessional('')
             }}
             className="text-sm text-blue-600 hover:text-blue-800"
           >
