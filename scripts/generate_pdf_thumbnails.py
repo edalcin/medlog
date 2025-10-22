@@ -16,10 +16,22 @@ ou especifique o caminho da pasta:
 import os
 import sys
 from pathlib import Path
+from io import BytesIO
 import pymysql
 import uuid
-from pdf2image import convert_from_path
 from datetime import datetime
+
+try:
+    from pdf2image import convert_from_path
+    HAS_PDF2IMAGE = True
+except ImportError:
+    HAS_PDF2IMAGE = False
+
+try:
+    import fitz  # PyMuPDF
+    HAS_PYMUPDF = True
+except ImportError:
+    HAS_PYMUPDF = False
 
 # Determinar diretório de uploads
 if len(sys.argv) > 1:
@@ -73,36 +85,89 @@ def get_pdfs_without_thumbnails(conn):
     cursor.close()
     return results
 
-def generate_thumbnail(pdf_path):
-    """
-    Gera thumbnail da primeira página do PDF.
-    Retorna o caminho relativo do thumbnail ou None se falhar.
-    """
+def generate_thumbnail_with_pymupdf(pdf_path):
+    """Gera thumbnail usando PyMuPDF (sem dependência de poppler)."""
     try:
+        from PIL import Image
+
         if not os.path.exists(pdf_path):
-            print(f"  ✗ Arquivo não encontrado: {pdf_path}")
             return None
 
-        # Converter primeira página do PDF para imagem
+        doc = fitz.open(pdf_path)
+        if len(doc) == 0:
+            return None
+
+        # Renderizar primeira página em alta resolução
+        page = doc[0]
+        pix = page.get_pixmap(matrix=fitz.Matrix(1, 1), alpha=False)
+
+        # Converter para imagem PIL
+        img_data = pix.tobytes("ppm")
+        image = Image.open(BytesIO(img_data))
+
+        # Redimensionar
+        image.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
+
+        # Salvar
+        thumbnail_filename = f"{uuid.uuid4()}.png"
+        thumbnail_path = os.path.join(THUMBNAILS_DIR, thumbnail_filename)
+        image.save(thumbnail_path, "PNG")
+
+        doc.close()
+        return thumbnail_filename
+
+    except Exception as e:
+        print(f"  ✗ Erro PyMuPDF: {e}")
+        return None
+
+def generate_thumbnail_with_pdf2image(pdf_path):
+    """Gera thumbnail usando pdf2image (requer poppler)."""
+    try:
+        from PIL import Image
+
+        if not os.path.exists(pdf_path):
+            return None
+
         images = convert_from_path(pdf_path, first_page=1, last_page=1, dpi=100)
 
         if not images:
-            print(f"  ✗ Falha ao converter PDF: {pdf_path}")
             return None
 
         image = images[0]
-
-        # Redimensionar para 200x200
         image.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
 
-        # Salvar como PNG
         thumbnail_filename = f"{uuid.uuid4()}.png"
         thumbnail_path = os.path.join(THUMBNAILS_DIR, thumbnail_filename)
-
         image.save(thumbnail_path, "PNG")
-        print(f"  ✓ Thumbnail gerado: {thumbnail_filename}")
 
         return thumbnail_filename
+
+    except Exception as e:
+        print(f"  ✗ Erro pdf2image: {e}")
+        return None
+
+def generate_thumbnail(pdf_path):
+    """
+    Gera thumbnail da primeira página do PDF.
+    Tenta PyMuPDF primeiro, depois pdf2image.
+    """
+    try:
+        # Tentar PyMuPDF primeiro (não precisa poppler)
+        if HAS_PYMUPDF:
+            result = generate_thumbnail_with_pymupdf(pdf_path)
+            if result:
+                print(f"  ✓ Thumbnail gerado: {result}")
+                return result
+
+        # Fallback para pdf2image
+        if HAS_PDF2IMAGE:
+            result = generate_thumbnail_with_pdf2image(pdf_path)
+            if result:
+                print(f"  ✓ Thumbnail gerado: {result}")
+                return result
+
+        print(f"  ✗ Nenhuma biblioteca disponível para converter PDF")
+        return None
 
     except Exception as e:
         print(f"  ✗ Erro ao gerar thumbnail: {e}")

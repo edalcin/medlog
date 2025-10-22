@@ -14,12 +14,14 @@ Execute os seguintes comandos **antes de rodar o script**:
 
 ```bash
 # Instalar dependências Python necessárias
-pip install pdf2image pillow pymysql
+pip install PyMuPDF pillow pymysql
 
-# Para que pdf2image funcione, também é necessário:
-# (geralmente já vem instalado no Unraid)
-# apt-get install poppler-utils
+# Alternativo (se PyMuPDF não funcionar):
+# pip install pdf2image pillow pymysql
+# (Requer poppler-utils instalado no sistema)
 ```
+
+**Recomendado:** Use `PyMuPDF` (fitz) - funciona em Windows sem dependências extras!
 
 ## ⚙️ Configuração
 
