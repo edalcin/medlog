@@ -51,7 +51,8 @@
       "Read(//h/**)",
       "Bash(grep:*)",
       "Bash(npm run recover:backup:*)",
-      "Read(//s/appsdata/medlog/thumbnails/**)"
+      "Read(//s/appsdata/medlog/thumbnails/**)",
+      "Bash(npm run restore:filenames:*)"
     ],
     "deny": [],
     "ask": []

@@ -17,6 +17,7 @@
     "clean:missing": "ts-node --transpile-only scripts/clean-missing-files.ts",
     "sync:disk": "ts-node --transpile-only scripts/sync-disk-files-to-db.ts",
     "recover:backup": "ts-node --transpile-only scripts/recover-from-backup-v2.ts",
+    "restore:filenames": "ts-node --transpile-only scripts/restore-original-filenames.ts",
     "check:duplicates": "ts-node --transpile-only scripts/check-duplicates.ts",
     "remove:duplicates": "ts-node --transpile-only scripts/remove-duplicate-files.ts",
     "prisma:migrate:dev": "prisma migrate dev",
