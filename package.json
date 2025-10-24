@@ -11,6 +11,7 @@
     "migrate:phones": "ts-node --transpile-only scripts/migrate-phones.ts",
     "check:files": "ts-node --transpile-only scripts/check-files-integrity.ts",
     "check:files:integrity": "ts-node --transpile-only scripts/check-files-integrity.ts",
+    "check:thumbnails": "ts-node --transpile-only scripts/check-thumbnails.ts",
     "clean:orphan-files": "ts-node --transpile-only scripts/clean-orphan-file-records.ts",
     "backfill:hashes": "ts-node --transpile-only scripts/backfill-all-file-hashes.ts",
     "clean:missing": "ts-node --transpile-only scripts/clean-missing-files.ts",
