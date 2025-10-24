@@ -12,7 +12,8 @@
     "check:files": "ts-node --transpile-only scripts/check-files-integrity.ts",
     "check:files:integrity": "ts-node --transpile-only scripts/check-files-integrity.ts",
     "clean:orphan-files": "ts-node --transpile-only scripts/clean-orphan-file-records.ts",
-    "backfill:hashes": "ts-node --transpile-only scripts/backfill-file-hashes.ts",
+    "backfill:hashes": "ts-node --transpile-only scripts/backfill-all-file-hashes.ts",
+    "clean:missing": "ts-node --transpile-only scripts/clean-missing-files.ts",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate"
