@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getServerSession } from 'next-auth'
+import { join } from 'path'
+import { createReadStream } from 'fs'
+import crypto from 'crypto'
 import { authOptions } from '../../../../lib/auth/config'
 import {
   successResponse,
@@ -11,13 +14,26 @@ import { ValidationError, NotFoundError } from '../../../../lib/errors'
 import { saveUploadedFile } from '../../../../lib/upload'
 
 const prisma = new PrismaClient()
+const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 
-// Helper to calculate file hash
+// Helper to calculate file hash from File object
 async function calculateFileHash(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer()
   const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+// Helper to calculate file hash from disk
+async function calculateFileHashFromDisk(filePath: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256')
+    const stream = createReadStream(filePath)
+
+    stream.on('error', (err) => reject(err))
+    stream.on('data', (chunk) => hash.update(chunk))
+    stream.on('end', () => resolve(hash.digest('hex')))
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -53,7 +69,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if file already exists (duplicate detection)
-    const existingFile = await prisma.file.findFirst({
+    // Try to find by hash first (fast path for files with hash)
+    let existingFile = await prisma.file.findFirst({
       where: {
         hash: fileHash,
         userId: session.user.id,
@@ -64,6 +81,45 @@ export async function POST(request: NextRequest) {
         customName: true,
       },
     })
+
+    // If not found by hash, check if there are files with NULL hash that might be duplicates
+    // This handles legacy files uploaded before hash implementation
+    if (!existingFile) {
+      const filesWithoutHash = await prisma.file.findMany({
+        where: {
+          hash: null,
+          userId: session.user.id,
+        },
+        select: {
+          id: true,
+          path: true,
+          filename: true,
+          customName: true,
+        },
+      })
+
+      // Check each file without hash by calculating its hash and comparing
+      for (const legacyFile of filesWithoutHash) {
+        try {
+          const fullPath = join(UPLOAD_DIR, legacyFile.path)
+          const legacyFileHash = await calculateFileHashFromDisk(fullPath)
+
+          if (legacyFileHash === fileHash) {
+            // Found a duplicate! Update its hash and reject the upload
+            await prisma.file.update({
+              where: { id: legacyFile.id },
+              data: { hash: fileHash },
+            })
+
+            existingFile = legacyFile
+            break
+          }
+        } catch (err) {
+          // File not found on disk, skip it
+          continue
+        }
+      }
+    }
 
     if (existingFile) {
       return errorResponse(
