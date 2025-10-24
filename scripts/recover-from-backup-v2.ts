@@ -19,6 +19,7 @@ interface BackupFileRecord {
   userId?: string
   customName?: string
   uploadedAt: string
+  thumbnailPath?: string
 }
 
 async function calculateFileHash(filePath: string): Promise<string> {
@@ -95,6 +96,7 @@ async function parseBackupSQL(backupPath: string): Promise<BackupFileRecord[]> {
       categoryId: categoryId && categoryId !== 'NULL' ? categoryId : undefined,
       customName: customName && customName !== 'NULL' ? customName : undefined,
       userId: userId && userId !== 'NULL' ? userId : undefined,
+      thumbnailPath: thumbnailPath && thumbnailPath !== 'NULL' ? thumbnailPath : undefined,
     }
 
     // Only include files that have a consultation ID
@@ -174,6 +176,7 @@ async function recoverFromBackup() {
                   professionalId: backupRecord.professionalId,
                   categoryId: backupRecord.categoryId,
                   userId: backupRecord.userId,
+                  thumbnailPath: backupRecord.thumbnailPath,
                 },
               })
 
@@ -210,6 +213,7 @@ async function recoverFromBackup() {
                   categoryId: backupRecord.categoryId,
                   userId: backupRecord.userId,
                   customName: backupRecord.customName,
+                  thumbnailPath: backupRecord.thumbnailPath,
                 },
               })
 
@@ -243,6 +247,7 @@ async function recoverFromBackup() {
                     categoryId: backupRecord.categoryId,
                     userId: backupRecord.userId,
                     hash,
+                    thumbnailPath: backupRecord.thumbnailPath,
                   },
                 })
                 recovered++

@@ -50,7 +50,8 @@
       "Bash(npx prisma migrate:*)",
       "Read(//h/**)",
       "Bash(grep:*)",
-      "Bash(npm run recover:backup:*)"
+      "Bash(npm run recover:backup:*)",
+      "Read(//s/appsdata/medlog/thumbnails/**)"
     ],
     "deny": [],
     "ask": []
