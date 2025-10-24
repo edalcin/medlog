@@ -47,7 +47,10 @@
       "Bash(git -C \"H:\\git\\medlog\" show --stat c03da3c:app/files/)",
       "Bash(gh run view:*)",
       "Bash(dir:*)",
-      "Bash(npx prisma migrate:*)"
+      "Bash(npx prisma migrate:*)",
+      "Read(//h/**)",
+      "Bash(grep:*)",
+      "Bash(npm run recover:backup:*)"
     ],
     "deny": [],
     "ask": []
