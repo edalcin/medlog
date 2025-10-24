@@ -14,6 +14,9 @@
     "clean:orphan-files": "ts-node --transpile-only scripts/clean-orphan-file-records.ts",
     "backfill:hashes": "ts-node --transpile-only scripts/backfill-all-file-hashes.ts",
     "clean:missing": "ts-node --transpile-only scripts/clean-missing-files.ts",
+    "sync:disk": "ts-node --transpile-only scripts/sync-disk-files-to-db.ts",
+    "check:duplicates": "ts-node --transpile-only scripts/check-duplicates.ts",
+    "remove:duplicates": "ts-node --transpile-only scripts/remove-duplicate-files.ts",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate"
