@@ -1,3 +1,0 @@
-Para rodar no console do UNRAID:
-
-curl -sSL https://raw.githubusercontent.com/edalcin/medlog/main/unraid-setup.sh | bash

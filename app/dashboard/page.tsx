@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface DashboardStats {
@@ -39,18 +38,15 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
-  const router = useRouter()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin?callbackUrl=/dashboard')
-    } else if (session) {
+    if (session) {
       fetchStats()
     }
-  }, [status, session, router])
+  }, [session])
 
   const fetchStats = async () => {
     try {
