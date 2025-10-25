@@ -75,6 +75,7 @@ model Consultation {
   proposito      String?
   notes          String?             @db.Text
   type           ConsultationType    @default(CONSULTATION)
+  rating         Int?                // 1-5 stars, only for CONSULTATION type
   userId         String
   professionalId String?
   createdAt      DateTime            @default(now())

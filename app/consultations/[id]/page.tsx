@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import StarRating from '../../../components/StarRating'
 
 interface File {
   id: string
@@ -35,6 +36,7 @@ interface Consultation {
   proposito: string | null
   notes: string | null
   type: 'CONSULTATION' | 'EVENT'
+  rating: number | null
   professional: Professional | null
   files: File[]
 }
@@ -219,6 +221,18 @@ export default function ConsultationDetailsPage() {
                 {consultation.type === 'CONSULTATION' ? 'Propósito da Consulta' : 'Título do Evento'}:
               </span>
               <span className="font-medium text-gray-900"> {consultation.proposito}</span>
+            </div>
+          )}
+
+          {consultation.type === 'CONSULTATION' && consultation.rating && (
+            <div>
+              <span className="text-gray-600">Avaliação da Consulta: </span>
+              <div className="flex items-center gap-2 mt-2">
+                <StarRating value={consultation.rating} readOnly size="md" />
+                <span className="text-sm text-gray-600">
+                  ({consultation.rating} {consultation.rating === 1 ? 'estrela' : 'estrelas'})
+                </span>
+              </div>
             </div>
           )}
 

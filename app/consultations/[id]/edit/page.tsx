@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import AssociateFilesModal from '../../../../components/AssociateFilesModal'
+import StarRating from '../../../../components/StarRating'
 
 const MDEditor = dynamic(
   () => import('@uiw/react-md-editor'),
@@ -58,6 +59,7 @@ interface Consultation {
   notes: string | null
   professionalId: string | null
   type: 'CONSULTATION' | 'EVENT'
+  rating: number | null
   files: ExistingFile[]
 }
 
@@ -80,6 +82,7 @@ export default function EditConsultationPage() {
     proposito: '',
     notes: '',
     type: 'CONSULTATION' as 'CONSULTATION' | 'EVENT',
+    rating: null as number | null,
   })
 
   // File management states
@@ -117,6 +120,7 @@ export default function EditConsultationPage() {
         proposito: consultationData.proposito || '',
         notes: consultationData.notes || '',
         type: consultationData.type || 'CONSULTATION',
+        rating: consultationData.rating || null,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
@@ -491,6 +495,29 @@ export default function EditConsultationPage() {
               Você pode usar Markdown para formatar o texto (negrito, itálico, listas, etc.)
             </p>
           </div>
+
+          {formData.type === 'CONSULTATION' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Avaliação da Consulta
+              </label>
+              <div className="flex items-center gap-3">
+                <StarRating
+                  value={formData.rating}
+                  onChange={(rating) => setFormData(prev => ({ ...prev, rating }))}
+                  size="lg"
+                />
+                {formData.rating && (
+                  <span className="text-sm text-gray-600">
+                    {formData.rating} {formData.rating === 1 ? 'estrela' : 'estrelas'}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-gray-500">
+                Avalie sua experiência com esta consulta
+              </p>
+            </div>
+          )}
 
           {/* Existing Files Section */}
           {existingFiles.length > 0 && (

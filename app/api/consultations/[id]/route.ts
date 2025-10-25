@@ -83,7 +83,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     const body = await request.json()
-    const { date, professionalId, proposito, notes, type = 'CONSULTATION' } = body
+    const { date, professionalId, proposito, notes, type = 'CONSULTATION', rating } = body
 
     // Validate type
     if (type !== 'CONSULTATION' && type !== 'EVENT') {
@@ -103,6 +103,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     // For events, professional must not be provided
     if (type === 'EVENT' && professionalId) {
       throw new ValidationError('Eventos não devem ter profissional associado')
+    }
+
+    // Validate rating - only for consultations
+    if (type === 'EVENT' && rating) {
+      throw new ValidationError('Eventos não devem ter avaliação')
+    }
+    if (rating && (typeof rating !== 'number' || rating < 1 || rating > 5 || !Number.isInteger(rating))) {
+      throw new ValidationError('Avaliação deve ser um número inteiro entre 1 e 5')
     }
 
     // Validate date format and ensure it's not in the future
@@ -152,6 +160,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         proposito: proposito || null,
         notes: notes || null,
         type,
+        rating: type === 'CONSULTATION' ? (rating || null) : null,
         professionalId: type === 'CONSULTATION' ? professionalId : null,
       },
       include: {
