@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      router.push('/')
+      router.push('/auth/signin?callbackUrl=/dashboard')
     } else if (session) {
       fetchStats()
     }

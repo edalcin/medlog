@@ -7,6 +7,7 @@ export const authOptions: NextAuthOptions = {
   // NextAuth automatically uses NEXTAUTH_URL from environment
   // In production with Docker: uses the URL from environment variable
   // In development: defaults to http://localhost:3000 (from .env.local)
+  trustHost: true, // Important for Docker/reverse proxy environments
   session: { strategy: 'jwt' },
   providers: [
     CredentialsProvider({
@@ -41,6 +42,14 @@ export const authOptions: NextAuthOptions = {
         session.user.name = token.name as string
       }
       return session
+    },
+    async redirect({ url, baseUrl }) {
+      // Permite redirecionamentos para URLs relativas
+      if (url.startsWith('/')) return `${baseUrl}${url}`
+      // Só permite redirecionamentos para o mesmo domínio
+      else if (new URL(url).origin === baseUrl) return url
+      // Fallback para home
+      return baseUrl
     }
   },
   pages: {
