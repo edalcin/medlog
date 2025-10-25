@@ -35,88 +35,31 @@ Projetado especialmente para uso familiar, o sistema permite registrar consultas
 
 ## 🐳 Instalação no Unraid
 
-### Pré-requisitos
+⚠️ **Para instruções detalhadas de instalação no Unraid, veja [UNRAID_SETUP.md](UNRAID_SETUP.md)**
 
-1. **MariaDB** já rodando (pode ser container separado) com base e usuário criados:
-    ```sql
-    CREATE DATABASE medlog CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE USER 'medlog_user'@'%' IDENTIFIED BY 'SUA_SENHA_SEGURA';
-    GRANT ALL PRIVILEGES ON medlog.* TO 'medlog_user'@'%';
-    FLUSH PRIVILEGES;
-    ```
+### Resumo Rápido
 
-2. **Diretório de uploads** criado no Unraid:
-    ```bash
-    mkdir -p /mnt/user/appdata/medlog/uploads
-    chmod 755 /mnt/user/appdata/medlog/uploads
-    ```
+1. **Pré-requisitos:**
+   - MariaDB 11+ já rodando com database e usuário criados
+   - Docker instalado no Unraid
 
-### Configuração do Container
+2. **Configuração:**
+   - Gerar `NEXTAUTH_SECRET`: `openssl rand -base64 32`
+   - Criar arquivo `unraid-setup.sh` no servidor Unraid (veja modelo em UNRAID_SETUP.md)
+   - Executar: `bash unraid-setup.sh`
 
-1. Acesse o Dashboard do Unraid
-2. Vá em: **Docker → Add Container**
-3. Configure os seguintes parâmetros:
+3. **Primeiro acesso:**
+   ```bash
+   docker exec -it medlog npm run seed:admin
+   ```
 
-**Informações Básicas:**
-- **Name:** `medlog`
-- **Repository:** `ghcr.io/edalcin/medlog:latest`
-- **Network:** `bridge` (ou a rede custom que você usa com o banco)
-- **WebUI:** `http://[IP]:[PORT:3000]`
-
-**Portas:**
-- **Port:** Container `3000` → Host `3000` (TCP)
-
-**Volumes:**
-- **Path:** Container `/app/data/uploads` → Host `/mnt/user/appdata/medlog/uploads` (RW)
-
-**Variáveis de Ambiente:**
-
-| Variável | Valor Exemplo | Descrição |
-|----------|---------------|-----------|
-| `DATABASE_URL` | `mysql://medlog_user:SUA_SENHA@192.168.1.50:3306/medlog` | String de conexão completa com o banco |
-| `NEXTAUTH_SECRET` | `(gera com openssl)` | Token para assinatura de sessões JWT |
-| `NEXTAUTH_URL` | `http://192.168.1.100:3000` | URL completa onde o app será acessado |
-| `FILES_PATH` | `/app/data/uploads` | Caminho interno dos uploads (não alterar) |
-
-### Gerando o NEXTAUTH_SECRET
-
-Execute este comando no terminal do Unraid:
-
-```bash
-openssl rand -base64 32
-```
-
-Copie o resultado e use como valor da variável `NEXTAUTH_SECRET`.
-
-### Criar Usuário Administrador
-
-Após o container iniciar pela primeira vez, execute:
-
-```bash
-docker exec -it medlog npm run seed:admin
-```
-
-Será solicitada a senha do administrador. Este será o primeiro usuário do sistema.
-
----
-
-## 🎯 Primeiro Acesso
-
-1. **Acesse o sistema:** `http://SEU_IP:3000`
-
-2. **Faça login:**
-   - Use as credenciais do usuário administrador criado
-   - Email e senha definidos no seed
-
-3. **Comece a usar:**
-   - Cadastre profissionais de saúde
-   - Registre consultas
-   - Faça upload de exames e laudos
+**Note:** O arquivo `unraid-setup.sh` contém dados sensíveis e não deve ser versionado. Mantenha-o apenas localmente no servidor.
 
 ---
 
 ## 📖 Documentação Adicional
 
+- **[Guia de Setup no Unraid](UNRAID_SETUP.md)** - Instruções detalhadas para instalar no Unraid com variáveis de ambiente
 - **[Documentação Técnica](TECHNICAL.md)** - Arquitetura, estrutura do banco de dados e desenvolvimento local
 - **[Instruções para Claude](CLAUDE.md)** - Guia de desenvolvimento para IA
 - **[Especificação Técnica](.specify/inicioDesenv.md)** - Detalhes completos da implementação
