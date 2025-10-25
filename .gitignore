@@ -53,6 +53,7 @@ logs/
 .dockerignore
 
 # Deployment scripts with sensitive data
+unraid-setup.sh
 docker-compose.*.yml
 
 # Temporary files
