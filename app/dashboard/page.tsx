@@ -28,6 +28,13 @@ interface DashboardStats {
     date: string
     title: string
   }>
+  topRatedProfessionals: Array<{
+    id: string
+    name: string
+    specialty: string
+    averageRating: number
+    totalRatings: number
+  }>
 }
 
 export default function DashboardPage() {
@@ -300,7 +307,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Top Profissionais */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Profissionais Mais Consultados</h2>
@@ -323,6 +330,41 @@ export default function DashboardPage() {
             </div>
           ) : (
             <p className="text-gray-500 text-sm">Nenhum dado disponível</p>
+          )}
+        </div>
+
+        {/* Profissionais Melhor Avaliados */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Profissionais Melhor Avaliados</h2>
+          {stats.topRatedProfessionals.length > 0 ? (
+            <div className="space-y-3">
+              {stats.topRatedProfessionals.map((item, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg hover:from-yellow-100 hover:to-yellow-200 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-yellow-400 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                      {index + 1}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                      <p className="text-xs text-gray-600">{item.specialty}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <span className="text-sm font-semibold text-yellow-600">{item.averageRating}</span>
+                      <svg className="w-4 h-4 text-yellow-400 fill-yellow-400" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      {item.totalRatings} {item.totalRatings === 1 ? 'avaliação' : 'avaliações'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm text-center py-8">Nenhuma avaliação registrada</p>
           )}
         </div>
 

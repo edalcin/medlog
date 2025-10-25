@@ -237,6 +237,59 @@ export async function GET(request: NextRequest) {
       title: e.proposito || 'Sem título',
     }))
 
+    // Profissionais mais bem avaliados (apenas consultas com rating)
+    const topRatedProfessionals = await prisma.consultation.findMany({
+      where: {
+        ...consultationWhereClause,
+        type: 'CONSULTATION',
+        rating: { not: null },
+        professionalId: { not: null },
+      },
+      include: {
+        professional: {
+          select: {
+            id: true,
+            name: true,
+            specialties: {
+              include: {
+                specialty: true,
+              },
+            },
+          },
+        },
+      },
+    })
+
+    // Calcular média de avaliação por profissional
+    const professionalRatings: Record<string, { name: string; specialty: string; ratings: number[]; id: string }> = {}
+    topRatedProfessionals.forEach((consultation) => {
+      if (consultation.professional && consultation.rating) {
+        const professionalId = consultation.professional.id
+        if (!professionalRatings[professionalId]) {
+          professionalRatings[professionalId] = {
+            id: professionalId,
+            name: consultation.professional.name,
+            specialty: consultation.professional.specialties[0]?.specialty.name || '',
+            ratings: [],
+          }
+        }
+        professionalRatings[professionalId].ratings.push(consultation.rating)
+      }
+    })
+
+    // Calcular média e ordenar
+    const topRatedStats = Object.values(professionalRatings)
+      .map((prof) => ({
+        id: prof.id,
+        name: prof.name,
+        specialty: prof.specialty,
+        averageRating: Math.round((prof.ratings.reduce((a, b) => a + b, 0) / prof.ratings.length) * 10) / 10,
+        totalRatings: prof.ratings.length,
+      }))
+      .filter((prof) => prof.totalRatings > 0) // Apenas profissionais com avaliações
+      .sort((a, b) => b.averageRating - a.averageRating)
+      .slice(0, 5) // Top 5
+
     return successResponse(
       {
         summary: {
@@ -252,6 +305,7 @@ export async function GET(request: NextRequest) {
         byMonth: Object.values(monthStats).sort((a: any, b: any) => a.month.localeCompare(b.month)),
         recentConsultations: recentFormatted,
         recentEpisodes: recentEpisodesFormatted,
+        topRatedProfessionals: topRatedStats,
       },
       'Estatísticas carregadas com sucesso'
     )
