@@ -100,7 +100,7 @@ export function Navigation() {
                   Olá, {session.user.name}
                 </span>
                 <button
-                  onClick={() => signOut({ callbackUrl: process.env.NEXT_PUBLIC_NEXTAUTH_URL || '/' })}
+                  onClick={() => signOut()}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                 >
                   Sair
