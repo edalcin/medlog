@@ -22,6 +22,7 @@ interface Consultation {
   proposito: string | null
   notes: string | null
   type: 'CONSULTATION' | 'EVENT'
+  rating?: number | null
   professional: Professional | null
   user?: {
     id: string
@@ -57,7 +58,7 @@ function ConsultationsPage() {
   const [typeFilter, setTypeFilter] = useState<string>('')
 
   // Sorting
-  const [sortColumn, setSortColumn] = useState<'date' | 'professional' | 'specialties'>('date')
+  const [sortColumn, setSortColumn] = useState<'date' | 'professional' | 'specialties' | 'rating'>('date')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
@@ -120,7 +121,7 @@ function ConsultationsPage() {
     }
   }
 
-  const handleSortChange = (column: 'date' | 'professional' | 'specialties') => {
+  const handleSortChange = (column: 'date' | 'professional' | 'specialties' | 'rating') => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
     } else {
@@ -188,6 +189,11 @@ function ConsultationsPage() {
           const aSpec = a.professional?.specialties.map(s => s.name).join(', ') || ''
           const bSpec = b.professional?.specialties.map(s => s.name).join(', ') || ''
           comparison = aSpec.localeCompare(bSpec)
+          break
+        case 'rating':
+          const aRating = a.rating || 0
+          const bRating = b.rating || 0
+          comparison = aRating - bRating
           break
       }
 
@@ -449,17 +455,30 @@ function ConsultationsPage() {
                     )}
                   </div>
                 </th>
+                <th
+                  scope="col"
+                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleSortChange('rating')}
+                >
+                  <div className="flex items-center">
+                    Avaliação
+                    {sortColumn === 'rating' && (
+                      <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                    )}
+                  </div>
+                </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Propósito / Evento
-                </th>
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">Ações</span>
                 </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredConsultations.map((consultation) => (
-                <tr key={consultation.id} className="hover:bg-gray-50">
+                <tr
+                  key={consultation.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => router.push(`/consultations/${consultation.id}`)}
+                >
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                       consultation.type === 'CONSULTATION'
@@ -492,21 +511,29 @@ function ConsultationsPage() {
                       )) || '-'}
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {consultation.type === 'CONSULTATION' && consultation.rating ? (
+                      <div className="flex gap-0.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <svg
+                            key={star}
+                            className={`w-4 h-4 ${
+                              star <= consultation.rating!
+                                ? 'text-yellow-400 fill-yellow-400'
+                                : 'text-gray-300'
+                            }`}
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                    ) : (
+                      <span>-</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-500">
                     {consultation.proposito || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {consultation.files.length > 0 && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mr-3">
-                        {consultation.files.length} arquivo{consultation.files.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    <Link
-                      href={`/consultations/${consultation.id}`}
-                      className="text-blue-600 hover:text-blue-900"
-                    >
-                      Ver detalhes
-                    </Link>
                   </td>
                 </tr>
               ))}
