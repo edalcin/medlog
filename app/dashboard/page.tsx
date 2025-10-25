@@ -141,7 +141,7 @@ export default function DashboardPage() {
         <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-orange-100 text-sm font-medium">Total de Episódios</p>
+              <p className="text-orange-100 text-sm font-medium">Total de Eventos</p>
               <p className="text-4xl font-bold mt-2">{stats.summary.totalEpisodes}</p>
             </div>
             <div className="bg-orange-400 bg-opacity-30 rounded-full p-3">
@@ -410,10 +410,10 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Episódios Recentes */}
+        {/* Eventos Recentes */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Episódios Recentes</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Eventos Recentes</h2>
             <Link href="/consultations?type=EVENT" className="text-sm text-orange-600 hover:text-orange-700">
               Ver todos →
             </Link>
@@ -437,7 +437,7 @@ export default function DashboardPage() {
             </div>
           ) : (
             <div className="text-center py-8">
-              <p className="text-gray-500 text-sm mb-4">Nenhum episódio registrado ainda</p>
+              <p className="text-gray-500 text-sm mb-4">Nenhum evento registrado ainda</p>
               <Link
                 href="/consultations/new"
                 className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 text-sm"
@@ -445,7 +445,7 @@ export default function DashboardPage() {
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
-                Novo Episódio
+                Novo Evento
               </Link>
             </div>
           )}
