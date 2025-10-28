@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
 
     // Consultas recentes
     const recentConsultationsList = await prisma.consultation.findMany({
-      where: consultationWhereClause,
+      where: { ...consultationWhereClause, type: 'CONSULTATION' },
       take: 5,
       orderBy: { date: 'desc' },
       include: {
