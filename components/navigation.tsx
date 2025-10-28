@@ -15,7 +15,6 @@ export function Navigation() {
     { name: 'Profissionais', href: '/professionals' },
     { name: 'Clínicas', href: '/clinics' },
     { name: 'Arquivos', href: '/files' },
-    { name: 'Relatórios', href: '/reports' },
   ]
 
   const adminNavigation = [
