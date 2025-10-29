@@ -1,8 +1,8 @@
+'use server'
+
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
-import * as pdfjs from 'pdfjs-dist'
-import { Canvas, createCanvas } from 'canvas'
 
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
@@ -12,9 +12,19 @@ interface ThumbnailGeneratorOptions {
   height?: number
 }
 
+// Dynamic require to load pdfjs at runtime, not build-time
+function requirePdfJs(): any {
+  // eslint-disable-next-line global-require, import/no-dynamic-require
+  return require('pdfjs-dist')
+}
+
 // CanvasFactory for Node.js canvas
+// Uses dynamic require to avoid build-time errors with DOMMatrix
 class NodeCanvasFactory {
   create(width: number, height: number) {
+    // Dynamic require to prevent static analysis of canvas during build
+    // eslint-disable-next-line global-require, import/no-dynamic-require
+    const { createCanvas } = require('canvas')
     const canvas = createCanvas(width, height)
     return {
       canvas,
@@ -22,13 +32,13 @@ class NodeCanvasFactory {
     }
   }
 
-  reset(canvasAndContext: { canvas: Canvas; context: any }) {
+  reset(canvasAndContext: { canvas: any; context: any }) {
     const { canvas } = canvasAndContext
     canvas.width = 0
     canvas.height = 0
   }
 
-  destroy(canvasAndContext: { canvas: Canvas; context: any }) {
+  destroy(canvasAndContext: { canvas: any; context: any }) {
     // No need to explicitly destroy canvas in Node.js
   }
 }
@@ -86,6 +96,9 @@ export async function generatePdfThumbnail(
 
     const width = options.width || 200
     const height = options.height || 200
+
+    // Dynamic require to avoid build-time issues
+    const pdfjs = requirePdfJs()
 
     // Load PDF document
     const doc = await pdfjs.getDocument(filePath).promise
