@@ -2,7 +2,6 @@ import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
 import * as pdfjs from 'pdfjs-dist'
-import { Canvas, createCanvas } from 'canvas'
 
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
@@ -12,9 +11,27 @@ interface ThumbnailGeneratorOptions {
   height?: number
 }
 
+// Check if canvas is available (optional dependency for production)
+let Canvas: any = null
+let createCanvas: any = null
+let canvasAvailable = false
+
+try {
+  const canvasModule = require('canvas')
+  Canvas = canvasModule.Canvas
+  createCanvas = canvasModule.createCanvas
+  canvasAvailable = true
+} catch (error) {
+  // Canvas not available in production - PDF thumbnails will not be generated
+  console.warn('Canvas module not available. PDF thumbnail generation disabled.')
+}
+
 // CanvasFactory for Node.js canvas
 class NodeCanvasFactory {
   create(width: number, height: number) {
+    if (!canvasAvailable || !createCanvas) {
+      throw new Error('Canvas module not available. Cannot generate PDF thumbnails.')
+    }
     const canvas = createCanvas(width, height)
     return {
       canvas,
@@ -22,13 +39,13 @@ class NodeCanvasFactory {
     }
   }
 
-  reset(canvasAndContext: { canvas: Canvas; context: any }) {
+  reset(canvasAndContext: { canvas: any; context: any }) {
     const { canvas } = canvasAndContext
     canvas.width = 0
     canvas.height = 0
   }
 
-  destroy(canvasAndContext: { canvas: Canvas; context: any }) {
+  destroy(canvasAndContext: { canvas: any; context: any }) {
     // No need to explicitly destroy canvas in Node.js
   }
 }
