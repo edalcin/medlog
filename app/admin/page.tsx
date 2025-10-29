@@ -1947,7 +1947,7 @@ export default function AdminPage() {
                   <tr>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleFileSortChange('filename')}
                     >
                       <div className="flex items-center">
@@ -1959,7 +1959,7 @@ export default function AdminPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleFileSortChange('category')}
                     >
                       <div className="flex items-center">
@@ -1971,22 +1971,22 @@ export default function AdminPage() {
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleFileSortChange('date')}
                     >
                       <div className="flex items-center">
-                        Data Consulta
+                        Data
                         {fileSortColumn === 'date' && (
                           <span className="ml-1">{fileSortDirection === 'asc' ? '↑' : '↓'}</span>
                         )}
                       </div>
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th scope="col" className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Usuário
                     </th>
                     <th
                       scope="col"
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                       onClick={() => handleFileSortChange('professional')}
                     >
                       <div className="flex items-center">
@@ -1996,76 +1996,72 @@ export default function AdminPage() {
                         )}
                       </div>
                     </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">Ações</span>
-                    </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-white divide-y divide-gray-200 text-sm">
                   {getFilteredAndSortedFiles().map((file) => (
                     <tr key={file.id} onClick={() => handleFileRowClick(file)} className="hover:bg-gray-50 cursor-pointer">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
+                      <td className="px-3 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-shrink-0 h-8 w-8">
                             {file.mimeType.startsWith('image/') ? (
                               <img
                                 src={`/api/files/${file.path}`}
                                 alt={file.filename}
-                                className="h-10 w-10 rounded object-cover"
+                                className="h-8 w-8 rounded object-cover"
                               />
                             ) : file.thumbnailPath ? (
                               <img
                                 src={`/api/files/thumbnail/${file.thumbnailPath}`}
                                 alt={file.filename}
-                                className="h-10 w-10 rounded object-cover"
+                                className="h-8 w-8 rounded object-cover"
                               />
                             ) : (
-                              <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center">
-                                <svg className="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <div className="h-8 w-8 rounded bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                                 </svg>
                               </div>
                             )}
                           </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">{file.customName || file.filename}</div>
-                            {file.customName && <div className="text-xs text-gray-400">{file.filename}</div>}
-                            <div className="text-sm text-gray-500">{formatFileSize(file.size)}</div>
+                          <div className="min-w-0">
+                            <div className="font-medium text-gray-900 truncate">{file.customName || file.filename}</div>
+                            <div className="text-xs text-gray-500">{formatFileSize(file.size)}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {file.category ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                          <span className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded bg-blue-100 text-blue-800">
                             {file.category.name}
                           </span>
                         ) : (
-                          <span className="text-sm text-gray-400">Sem categoria</span>
+                          <span className="text-xs text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <a
                           href={`/consultations/${file.consultation.id}`}
-                          className="text-sm text-indigo-600 hover:text-indigo-900"
+                          className="text-indigo-600 hover:text-indigo-900"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {formatDate(file.consultation.date)}
                         </a>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{file.consultation.user.name}</div>
-                        <div className="text-sm text-gray-500">{file.consultation.user.email}</div>
+                      <td className="px-3 py-3">
+                        <div className="text-gray-900">{file.consultation.user.name}</div>
+                        <div className="text-xs text-gray-500 truncate">{file.consultation.user.email}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         {file.professional ? (
                           <>
-                            <div className="text-sm text-gray-900">{file.professional.name}</div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-gray-900">{file.professional.name}</div>
+                            <div className="text-xs text-gray-500 line-clamp-1">
                               {file.professional.specialties.map(s => s.name).join(', ')}
                             </div>
                           </>
                         ) : (
-                          <div className="text-sm text-gray-500 italic">-</div>
+                          <div className="text-xs text-gray-500 italic">-</div>
                         )}
                       </td>
                     </tr>
