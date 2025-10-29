@@ -24,6 +24,11 @@ Esta documentação contém informações técnicas detalhadas sobre a arquitetu
 **Database:**
 - MariaDB 11+
 
+**Processamento de Imagens e PDFs:**
+- Sharp (otimização de imagens)
+- pdfjs-dist (processamento de PDFs)
+- canvas (renderização em Node.js)
+
 **Deploy:**
 - Docker (multi-stage build)
 - GitHub Container Registry (ghcr.io)
@@ -227,8 +232,140 @@ ALLOWED_FILE_TYPES=pdf,png,jpg,jpeg  # Tipos permitidos
 - **Tamanho máximo por arquivo:** 10MB (configurável via `MAX_FILE_SIZE`)
 - **Tipos de arquivo aceitos:** PDF, PNG, JPG/JPEG
 - **Quantidade de arquivos:** Ilimitada
-- **Thumbnails:** Gerados automaticamente (200x200px)
+- **Thumbnails:** Gerados automaticamente para imagens (200x200px) e sob demanda para PDFs
 - **Sessões:** Expiram em 7 dias de inatividade
+- **Registros de Login:** Armazenados indefinidamente com índices para performance
+
+---
+
+## 🎯 Novas Funcionalidades (v2.0+)
+
+### 1. Sistema de Registro de Logins
+
+**Painel Administrativo → Aba "Logins"**
+
+Rastreia todos os logins de usuários e administradores:
+
+- **Dados registrados:** Nome, email, role (Admin/Usuário), data e hora
+- **Filtros:** Por email/nome de usuário e intervalo de datas
+- **Ordenação:** Por nome, email ou data/hora do login
+- **Acesso:** Apenas administradores podem visualizar
+
+**API:**
+```
+GET /api/admin/login-logs
+Parâmetros:
+  - userEmail: string (filtro por email/nome)
+  - startDate: ISO-8601 (data inicial)
+  - endDate: ISO-8601 (data final)
+  - limit: number (padrão: 1000)
+  - offset: number (padrão: 0)
+```
+
+**Banco de Dados:**
+```sql
+CREATE TABLE login_logs (
+  id UUID PRIMARY KEY,
+  userId UUID NOT NULL,
+  userName VARCHAR(255),
+  userEmail VARCHAR(255),
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX (userId),
+  INDEX (timestamp)
+);
+```
+
+---
+
+### 2. Gerenciamento Avançado de Arquivos
+
+**Painel Administrativo → Aba "Arquivos"**
+
+Interface melhorada com modal de detalhes:
+
+#### Interface da Tabela
+- Clicar em qualquer linha abre modal com detalhes completos
+- Exibe thumbnail pequeno (8x8px) de cada arquivo
+- Tabela compacta e responsiva sem scroll horizontal
+- Columns: Arquivo | Categoria | Data | Usuário | Profissional
+
+#### Modal de Detalhes
+Ao clicar em um arquivo, exibe:
+
+**Seção de Visualização:**
+- Imagem em tamanho grande (clicável para abrir em nova aba)
+- PDF mostra thumbnail gerado
+- Permite abrir arquivo original no navegador
+
+**Informações Completas:**
+- Nome e nome original (se renomeado)
+- Tamanho do arquivo
+- Tipo MIME
+- Categoria do arquivo
+- Data da consulta associada
+- Usuário que enviou
+- Profissional associado
+- Data/hora de upload
+- Status de thumbnail
+
+**Botões de Ação:**
+- `Visualizar Arquivo` - Abre em nova aba do browser
+- `Gerar Thumbnail` - Gera thumbnail sob demanda (PDFs e imagens)
+- `Editar` - Abre formulário para renomear
+- `Excluir` - Remove arquivo com confirmação
+- `Fechar` - Fecha o modal
+
+---
+
+### 3. Geração de Thumbnails
+
+#### Automática (no upload)
+- **Imagens (PNG, JPG):** Thumbnail gerado automaticamente no upload
+- **PDFs:** Thumbnail gerado sob demanda via botão no painel
+- **Tamanho:** 200x200px
+- **Qualidade:** PNG com compressão otimizada
+- **Fallback seguro:** Upload não falha se geração de thumbnail falhar
+
+#### Sob Demanda
+**API:**
+```
+POST /api/files/generate-thumbnail/[fileId]
+Resposta: { id, thumbnailPath }
+Acesso: Apenas administradores
+```
+
+#### Técnica Implementada
+- **Imagens:** Sharp (biblioteca otimizada de Node.js)
+- **PDFs:** pdfjs-dist + canvas (sem dependência de Python)
+- **Compatibilidade:** Windows, Linux, Docker, Unraid
+- **Renderização PDF:** Primeira página em alta qualidade (DPI 150)
+
+---
+
+### 4. Detalhes Técnicos da Tabela de Arquivos
+
+**Otimizações Implementadas:**
+
+1. **Espaçamento Reduzido:**
+   - Padding horizontal: px-3 (antes px-6)
+   - Padding vertical: py-3 (antes py-4)
+   - Economia de 50% de espaço horizontal
+
+2. **Tratamento de Texto Longo:**
+   - Nome de arquivo: `truncate` (ellipsis)
+   - Email: `truncate` (não quebra linha)
+   - Especialidades: `line-clamp-1` (máximo 1 linha)
+
+3. **Elementos Compactos:**
+   - Thumbnails: 8x8px (antes 10x10px)
+   - Fonte geral: text-sm
+   - Texto secundário: text-xs
+
+4. **Resultado:**
+   - ✅ Tabela cabe totalmente na tela
+   - ✅ Todas as 5 colunas visíveis
+   - ✅ Sem scroll horizontal
 
 ---
 
@@ -254,4 +391,4 @@ Este projeto é para uso pessoal/familiar, mas contribuições são bem-vindas:
 
 ---
 
-**Última atualização: 11 de outubro de 2025**
+**Última atualização: 29 de outubro de 2025**

@@ -24,9 +24,15 @@ Projetado especialmente para uso familiar, o sistema permite registrar consultas
 
 - Registro de consultas médicas com notas em Markdown
 - Upload de documentos (PDF, PNG, JPG até 10MB)
+- **Geração automática de thumbnails** para imagens e PDFs
 - Gestão de profissionais de saúde com múltiplas especialidades
 - Categorização de arquivos (Laudos, Receitas, Pedidos de Exame, etc.)
 - Associação de profissionais a clínicas/hospitais
+- **Painel administrativo avançado:**
+  - Histórico completo de logins de usuários
+  - Gerenciamento de arquivos com modal de detalhes
+  - Visualização de informações completas do arquivo
+  - Geração de thumbnails sob demanda
 - Relatórios e análises do histórico médico
 - Controle de acesso por usuário (uso familiar)
 - Interface responsiva e moderna
@@ -92,4 +98,4 @@ Para questões e suporte:
 
 **Desenvolvido com ❤️ para uso familiar**
 
-**Última atualização: 11 de outubro de 2025**
+**Última atualização: 29 de outubro de 2025**
