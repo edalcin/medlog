@@ -52,7 +52,15 @@
       "Bash(grep:*)",
       "Bash(npm run recover:backup:*)",
       "Read(//s/appsdata/medlog/thumbnails/**)",
-      "Bash(npm run restore:filenames:*)"
+      "Bash(npm run restore:filenames:*)",
+      "Bash(cat:*)",
+      "Bash(git rm:*)",
+      "Bash(openssl rand:*)",
+      "Bash(git -C \"H:\\git\\medlog\" add app/dashboard/page.tsx)",
+      "Bash(git -C \"H:\\git\\medlog\" commit -m \"$(cat <<''EOF''\nfix: Corrigir problema de autenticação no dashboard e limpar arquivos desnecessários\n\nPROBLEMA CORRIGIDO:\n- Usuário era redirecionado para login ao acessar /dashboard mesmo estando autenticado\n- Causa raiz: lógica de redirecionamento redundante no componente do dashboard\n- O middleware já protege a rota, tornando verificação manual desnecessária\n\nCORREÇÕES NO DASHBOARD (app/dashboard/page.tsx):\n- Removida verificação redundante de status ''unauthenticated''\n- Simplificado useEffect para evitar loops de redirecionamento\n- Removidos imports não utilizados (useRouter)\n- O middleware NextAuth já gerencia autenticação de rotas protegidas\n\nLIMPEZA DO REPOSITÓRIO:\nRemovidos 17 arquivos obsoletos para manter apenas documentação essencial:\n\nArquivos de documentação antiga/temporária:\n- ADMIN_TABS_TO_ADD.txt (instruções já implementadas)\n- DICT_TABS_TO_ADD.txt (instruções já implementadas)\n- notas.txt (nota temporária)\n- README_TESTING_START_HERE.txt (guia de testes antigo)\n- FIX.md (lista de correções temporária)\n\nDocumentação de features antigas:\n- DEPLOYMENT.md (informações desatualizadas)\n- DUPLICATE_DETECTION.md (doc de feature específica)\n- IMPLEMENTATION_SUMMARY.md (resumo antigo)\n- QUICK_START_TESTING.md (guia antigo)\n- STATUS_READY_FOR_TESTING.md (status antigo)\n- TESTING.md (doc de testes antiga)\n- UNRAID_SETUP.md (setup movido para README)\n- WORK_COMPLETED.md (histórico antigo)\n- scripts/THUMBNAIL_GENERATION.md (doc de feature específica)\n\nOutros:\n- PRD.md (documento de planejamento antigo)\n- test-file.pdf (arquivo de teste)\n- .github/copilot-instructions.md (não utilizado)\n\nDOCUMENTAÇÃO MANTIDA:\n- README.md (documentação principal)\n- CLAUDE.md (instruções para Claude Code)\n- TECHNICAL.md (documentação técnica detalhada)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git -C \"H:\\git\\medlog\" add lib/auth/config.ts)",
+      "Bash(git -C \"H:\\git\\medlog\" commit -m \"$(cat <<''EOF''\nfix: Remover propriedade trustHost inválida do NextAuth config\n\nPROBLEMA:\n- Build do Docker falhando no GitHub Actions\n- Erro TypeScript: \"trustHost does not exist in type 'AuthOptions'\"\n- Propriedade trustHost não é válida no NextAuthOptions\n\nSOLUÇÃO:\n- Removida propriedade trustHost de lib/auth/config.ts\n- NextAuth já lida automaticamente com proxy reverso via NEXTAUTH_URL\n- Variável de ambiente NEXTAUTH_URL está configurada corretamente\n\nIMPACTO:\n- Build do Docker agora compila sem erros\n- Autenticação continua funcionando normalmente\n- Configuração de proxy reverso já está correta via env vars\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

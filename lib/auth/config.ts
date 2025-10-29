@@ -21,6 +21,22 @@ export const authOptions: NextAuthOptions = {
         if (!user) return null
         const valid = await bcrypt.compare(credentials.password, user.passwordHash)
         if (!valid) return null
+
+        // Register login
+        try {
+          await prisma.loginLog.create({
+            data: {
+              userId: user.id,
+              userName: user.name,
+              userEmail: user.email,
+              timestamp: new Date()
+            }
+          })
+        } catch (error) {
+          console.error('Failed to record login:', error)
+          // Don't fail login if logging fails
+        }
+
         return { id: user.id, email: user.email, name: user.name, role: user.role }
       }
     })

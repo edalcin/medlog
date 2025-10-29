@@ -1,0 +1,23 @@
+# Scripts shell devem sempre usar LF
+*.sh            text eol=lf
+*.bash          text eol=lf
+
+# Markdown
+*.md            text eol=lf
+
+# JSON
+*.json          text eol=lf
+
+# TypeScript/JavaScript
+*.ts            text eol=lf
+*.tsx           text eol=lf
+*.js            text eol=lf
+*.jsx           text eol=lf
+
+# Docker
+Dockerfile      text eol=lf
+docker-compose* text eol=lf
+
+# Git config
+.gitignore      text eol=lf
+.gitattributes  text eol=lf

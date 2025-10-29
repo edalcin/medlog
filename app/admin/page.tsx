@@ -119,6 +119,20 @@ interface ClinicWithCount {
   }
 }
 
+interface LoginLogRecord {
+  id: string
+  userId: string
+  userName: string
+  userEmail: string
+  timestamp: string
+  user: {
+    id: string
+    name: string
+    email: string
+    role: string
+  }
+}
+
 export default function AdminPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -136,10 +150,12 @@ export default function AdminPage() {
   const [specialtiesLoading, setSpecialtiesLoading] = useState(true)
   const [categoriesLoading, setCategoriesLoading] = useState(true)
   const [clinicsLoading, setClinicsLoading] = useState(true)
+  const [loginLogs, setLoginLogs] = useState<LoginLogRecord[]>([])
+  const [loginLogsLoading, setLoginLogsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'logins'>('users')
   const [selectedConsultations, setSelectedConsultations] = useState<Set<string>>(new Set())
   const [selectedProfessionals, setSelectedProfessionals] = useState<Set<string>>(new Set())
   const [professionalFilters, setProfessionalFilters] = useState({ name: '', specialty: '', status: '', clinic: '' })
@@ -159,6 +175,9 @@ export default function AdminPage() {
   const [fileSortColumn, setFileSortColumn] = useState<'filename' | 'category' | 'professional' | 'date'>('date')
   const [fileSortDirection, setFileSortDirection] = useState<'asc' | 'desc'>('desc')
   const [submitting, setSubmitting] = useState(false)
+  const [loginFilters, setLoginFilters] = useState({ userEmail: '', startDate: '', endDate: '' })
+  const [loginSortColumn, setLoginSortColumn] = useState<'name' | 'email' | 'timestamp'>('timestamp')
+  const [loginSortDirection, setLoginSortDirection] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -178,6 +197,7 @@ export default function AdminPage() {
       fetchSpecialties()
       fetchFileCategories()
       fetchClinics()
+      fetchLoginLogs()
     }
   }, [session])
 
@@ -290,6 +310,34 @@ export default function AdminPage() {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
     } finally {
       setClinicsLoading(false)
+    }
+  }
+
+  const fetchLoginLogs = async () => {
+    try {
+      setLoginLogsLoading(true)
+      const params = new URLSearchParams()
+      params.append('limit', '1000')
+      if (loginFilters.userEmail) {
+        params.append('userEmail', loginFilters.userEmail)
+      }
+      if (loginFilters.startDate) {
+        params.append('startDate', loginFilters.startDate)
+      }
+      if (loginFilters.endDate) {
+        params.append('endDate', loginFilters.endDate)
+      }
+
+      const response = await fetch(`/api/admin/login-logs?${params}`)
+      if (!response.ok) {
+        throw new Error('Erro ao carregar logins')
+      }
+      const data = await response.json()
+      setLoginLogs(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro desconhecido')
+    } finally {
+      setLoginLogsLoading(false)
     }
   }
 
@@ -764,6 +812,49 @@ export default function AdminPage() {
     }
   }
 
+  // Login handlers and filters
+  const handleLoginSortChange = (column: 'name' | 'email' | 'timestamp') => {
+    if (loginSortColumn === column) {
+      setLoginSortDirection(loginSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setLoginSortColumn(column)
+      setLoginSortDirection('asc')
+    }
+  }
+
+  const getFilteredAndSortedLogins = () => {
+    let filtered = [...loginLogs]
+
+    // Apply filters
+    if (loginFilters.userEmail) {
+      filtered = filtered.filter(log =>
+        log.userEmail.toLowerCase().includes(loginFilters.userEmail.toLowerCase()) ||
+        log.userName.toLowerCase().includes(loginFilters.userEmail.toLowerCase())
+      )
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      let comparison = 0
+
+      switch (loginSortColumn) {
+        case 'name':
+          comparison = a.userName.localeCompare(b.userName)
+          break
+        case 'email':
+          comparison = a.userEmail.localeCompare(b.userEmail)
+          break
+        case 'timestamp':
+          comparison = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          break
+      }
+
+      return loginSortDirection === 'asc' ? comparison : -comparison
+    })
+
+    return filtered
+  }
+
   // Filter and sort files
   const getFilteredAndSortedFiles = () => {
     let filtered = [...files]
@@ -908,6 +999,16 @@ export default function AdminPage() {
               } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
             >
               Arquivos ({files.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('logins')}
+              className={`${
+                activeTab === 'logins'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Logins ({loginLogs.length})
             </button>
           </nav>
         </div>
@@ -2020,6 +2121,172 @@ export default function AdminPage() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* Logins Tab */}
+      {activeTab === 'logins' && (
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-gray-900">Histórico de Logins</h2>
+            <div className="text-sm text-gray-600">
+              {getFilteredAndSortedLogins().length} de {loginLogs.length} login(s)
+            </div>
+          </div>
+
+          {/* Filters */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label htmlFor="filter-login-email" className="block text-sm font-medium text-gray-700 mb-1">
+                Usuário ou Email
+              </label>
+              <input
+                type="text"
+                id="filter-login-email"
+                value={loginFilters.userEmail}
+                onChange={(e) => {
+                  setLoginFilters(prev => ({ ...prev, userEmail: e.target.value }))
+                }}
+                placeholder="Filtrar por nome ou email"
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="filter-login-start-date" className="block text-sm font-medium text-gray-700 mb-1">
+                Data Inicial
+              </label>
+              <input
+                type="datetime-local"
+                id="filter-login-start-date"
+                value={loginFilters.startDate}
+                onChange={(e) => {
+                  setLoginFilters(prev => ({ ...prev, startDate: e.target.value }))
+                }}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="filter-login-end-date" className="block text-sm font-medium text-gray-700 mb-1">
+                Data Final
+              </label>
+              <input
+                type="datetime-local"
+                id="filter-login-end-date"
+                value={loginFilters.endDate}
+                onChange={(e) => {
+                  setLoginFilters(prev => ({ ...prev, endDate: e.target.value }))
+                }}
+                className="block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Clear filters button */}
+          {(loginFilters.userEmail || loginFilters.startDate || loginFilters.endDate) && (
+            <div className="mb-4">
+              <button
+                onClick={() => setLoginFilters({ userEmail: '', startDate: '', endDate: '' })}
+                className="text-sm text-indigo-600 hover:text-indigo-900"
+              >
+                Limpar filtros
+              </button>
+            </div>
+          )}
+
+          {loginLogsLoading ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Carregando logins...</div>
+            </div>
+          ) : loginLogs.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Nenhum login registrado</div>
+            </div>
+          ) : getFilteredAndSortedLogins().length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-gray-500">Nenhum login corresponde aos filtros selecionados</div>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleLoginSortChange('name')}
+                    >
+                      <div className="flex items-center">
+                        Nome
+                        {loginSortColumn === 'name' && (
+                          <span className="ml-1">{loginSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleLoginSortChange('email')}
+                    >
+                      <div className="flex items-center">
+                        Email
+                        {loginSortColumn === 'email' && (
+                          <span className="ml-1">{loginSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                      onClick={() => handleLoginSortChange('timestamp')}
+                    >
+                      <div className="flex items-center">
+                        Data e Hora do Login
+                        {loginSortColumn === 'timestamp' && (
+                          <span className="ml-1">{loginSortDirection === 'asc' ? '↑' : '↓'}</span>
+                        )}
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getFilteredAndSortedLogins().map((log) => (
+                    <tr key={log.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {log.userName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {log.userEmail}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          log.user.role === 'ADMIN'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {log.user.role === 'ADMIN' ? 'Admin' : 'Usuário'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(log.timestamp).toLocaleString('pt-BR', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit'
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

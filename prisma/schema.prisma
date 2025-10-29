@@ -20,6 +20,7 @@ model User {
   professionals Professional[]
   clinics       Clinic[]
   files         File[]
+  loginLogs     LoginLog[]
 
   @@map("users")
 }
@@ -158,6 +159,19 @@ model Phone {
 enum UserRole {
   ADMIN
   USER
+}
+
+model LoginLog {
+  id        String   @id @default(uuid())
+  userId    String
+  userName  String
+  userEmail String
+  timestamp DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "login_logs_userId_fkey")
+  @@index([timestamp], map: "login_logs_timestamp_index")
+  @@map("login_logs")
 }
 
 enum ConsultationType {
