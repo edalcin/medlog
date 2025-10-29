@@ -1,21 +1,6 @@
-# Use Node.js 20 Alpine 3.19 which includes OpenSSL 1.1 (required by Prisma)
-# Alpine 3.20+ uses OpenSSL 3 which is not compatible with Prisma 5.x
-FROM node:20-alpine3.19 AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-# Also install build dependencies for canvas compilation
-RUN apk add --no-cache \
-  libc6-compat \
-  python3 \
-  make \
-  g++ \
-  cairo-dev \
-  jpeg-dev \
-  pango-dev \
-  giflib-dev \
-  pixman-dev
+# Build stage: Use Debian-based image for building
+# node:20-bookworm already has Python, build tools, and all dependencies needed for canvas
+FROM node:20-bookworm AS deps
 WORKDIR /app
 
 # Install dependencies based on the preferred package manager
@@ -25,8 +10,8 @@ RUN \
   else echo "Lockfile not found." && exit 1; \
   fi
 
-# Rebuild the source code only when needed
-FROM base AS builder
+# Build stage: compile Next.js app
+FROM node:20-bookworm AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -43,22 +28,25 @@ RUN npx prisma generate
 ENV DATABASE_URL="mysql://user:password@localhost:3306/medlog"
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
+# Production image: use Alpine for small size
+# Alpine includes OpenSSL 1.1 which is required by Prisma 5.x
+FROM node:20-alpine3.19 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install runtime dependencies for canvas (without build tools)
+# Install runtime dependencies for canvas
+# These are the shared libraries needed by the compiled canvas binary
 RUN apk add --no-cache \
   su-exec \
   cairo \
   jpeg \
   pango \
   giflib \
-  pixman
+  pixman \
+  libc6-compat
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -74,6 +62,9 @@ RUN chown nextjs:nodejs .next
 # https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy node_modules from builder for runtime
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Create uploads directory with proper permissions
 RUN mkdir -p /app/data/uploads && chown -R nextjs:nodejs /app/data/uploads
