@@ -1,6 +1,8 @@
-import { writeFile, mkdir, readFile } from 'fs/promises'
+import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
+import * as pdfjs from 'pdfjs-dist'
+import { Canvas, createCanvas } from 'canvas'
 
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
@@ -8,6 +10,27 @@ const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
 interface ThumbnailGeneratorOptions {
   width?: number
   height?: number
+}
+
+// CanvasFactory for Node.js canvas
+class NodeCanvasFactory {
+  create(width: number, height: number) {
+    const canvas = createCanvas(width, height)
+    return {
+      canvas,
+      context: canvas.getContext('2d'),
+    }
+  }
+
+  reset(canvasAndContext: { canvas: Canvas; context: any }) {
+    const { canvas } = canvasAndContext
+    canvas.width = 0
+    canvas.height = 0
+  }
+
+  destroy(canvasAndContext: { canvas: Canvas; context: any }) {
+    // No need to explicitly destroy canvas in Node.js
+  }
 }
 
 /**
@@ -49,8 +72,8 @@ export async function generateImageThumbnail(
 }
 
 /**
- * Generates a thumbnail for a PDF file
- * Uses Python script via child_process
+ * Generates a thumbnail for a PDF file using pdfjs-dist
+ * Works cross-platform without Python dependencies
  */
 export async function generatePdfThumbnail(
   filePath: string,
@@ -58,50 +81,48 @@ export async function generatePdfThumbnail(
   options: ThumbnailGeneratorOptions = {}
 ): Promise<string> {
   try {
-    const { exec } = require('child_process')
-    const { promisify } = require('util')
-    const execAsync = promisify(exec)
-
     // Create thumbnails directory if it doesn't exist
     await mkdir(THUMBNAILS_DIR, { recursive: true })
 
     const width = options.width || 200
     const height = options.height || 200
+
+    // Load PDF document
+    const doc = await pdfjs.getDocument(filePath).promise
+
+    if (doc.numPages === 0) {
+      throw new Error('PDF has no pages')
+    }
+
+    // Get first page
+    const page = await doc.getPage(1)
+
+    // Set scale for thumbnail
+    const scale = 1.5
+    const viewport = page.getViewport({ scale })
+
+    // Create canvas factory for Node.js
+    const canvasFactory = new NodeCanvasFactory()
+    const { canvas, context } = canvasFactory.create(viewport.width, viewport.height)
+
+    // Render page to canvas
+    const renderContext: any = {
+      canvasContext: context,
+      viewport: viewport,
+      canvas: canvas,
+    }
+
+    await page.render(renderContext).promise
+
+    // Convert canvas to PNG buffer and save
+    const buffer = canvas.toBuffer('image/png')
+
+    // Save thumbnail
     const thumbnailFilename = `${randomUUID()}.png`
     const thumbnailPath = join(THUMBNAILS_DIR, thumbnailFilename)
+    await writeFile(thumbnailPath, buffer)
 
-    // Use Python with PIL to generate thumbnail from PDF
-    // This requires: pip install pdf2image pillow
-    const pythonScript = `
-import sys
-from pdf2image import convert_from_path
-from PIL import Image
-
-pdf_path = r'${filePath}'
-output_path = r'${thumbnailPath}'
-width = ${width}
-height = ${height}
-
-try:
-    images = convert_from_path(pdf_path, first_page=1, last_page=1, dpi=150)
-    if images:
-        image = images[0]
-        image.thumbnail((width, height), Image.Resampling.LANCZOS)
-        image.save(output_path, 'PNG')
-        print('OK')
-    else:
-        print('ERROR: No images generated')
-except Exception as e:
-    print(f'ERROR: {str(e)}')
-`
-
-    const { stdout, stderr } = await execAsync(`python3 -c "${pythonScript.replace(/"/g, '\\"')}"`)
-
-    if (stdout.includes('OK')) {
-      return thumbnailFilename
-    } else {
-      throw new Error(stderr || 'Failed to generate PDF thumbnail')
-    }
+    return thumbnailFilename
   } catch (error) {
     console.error('Error generating PDF thumbnail:', error)
     throw new Error(`Failed to generate thumbnail for PDF: ${error instanceof Error ? error.message : String(error)}`)
