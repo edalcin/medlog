@@ -1,6 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { randomUUID } from 'crypto'
+import { generateImageThumbnail } from './thumbnail-generator'
 
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
@@ -42,11 +43,24 @@ export async function saveUploadedFile(
   const buffer = Buffer.from(bytes)
   await writeFile(filePath, buffer)
 
+  // Generate thumbnail for images
+  let thumbnailPath: string | undefined
+  if (file.type.startsWith('image/')) {
+    try {
+      thumbnailPath = await generateImageThumbnail(filePath)
+    } catch (error) {
+      console.error('Failed to generate thumbnail for image:', error)
+      // Don't fail the upload if thumbnail generation fails
+      thumbnailPath = undefined
+    }
+  }
+
   return {
     filename: file.name,
     path: uniqueFilename,
     mimeType: file.type,
     size: file.size,
+    thumbnailPath,
   }
 }
 

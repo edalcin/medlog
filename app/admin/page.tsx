@@ -25,6 +25,7 @@ interface FileRecord {
   mimeType: string
   size: number
   uploadedAt: string
+  thumbnailPath?: string | null
   consultation: {
     id: string
     date: string
@@ -171,10 +172,13 @@ export default function AdminPage() {
   // File management states
   const [editingFile, setEditingFile] = useState<FileRecord | null>(null)
   const [isFileEditFormOpen, setIsFileEditFormOpen] = useState(false)
+  const [selectedFileForDetail, setSelectedFileForDetail] = useState<FileRecord | null>(null)
+  const [isFileDetailModalOpen, setIsFileDetailModalOpen] = useState(false)
   const [fileFilters, setFileFilters] = useState({ category: '', professional: '', date: '' })
   const [fileSortColumn, setFileSortColumn] = useState<'filename' | 'category' | 'professional' | 'date'>('date')
   const [fileSortDirection, setFileSortDirection] = useState<'asc' | 'desc'>('desc')
   const [submitting, setSubmitting] = useState(false)
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(false)
   const [loginFilters, setLoginFilters] = useState({ userEmail: '', startDate: '', endDate: '' })
   const [loginSortColumn, setLoginSortColumn] = useState<'name' | 'email' | 'timestamp'>('timestamp')
   const [loginSortDirection, setLoginSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -766,9 +770,37 @@ export default function AdminPage() {
   }
 
   // File management functions
+  const handleFileRowClick = (file: FileRecord) => {
+    setSelectedFileForDetail(file)
+    setIsFileDetailModalOpen(true)
+  }
+
   const handleEditFile = (file: FileRecord) => {
     setEditingFile(file)
     setIsFileEditFormOpen(true)
+  }
+
+  const handleGenerateThumbnail = async (fileId: string) => {
+    setGeneratingThumbnail(true)
+    try {
+      const response = await fetch(`/api/files/generate-thumbnail/${fileId}`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erro ao gerar thumbnail')
+      }
+
+      setError('Thumbnail gerado com sucesso!')
+      setSelectedFileForDetail(null)
+      setIsFileDetailModalOpen(false)
+      fetchFiles()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao gerar thumbnail')
+    } finally {
+      setGeneratingThumbnail(false)
+    }
   }
 
   const handleFileEditSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1971,13 +2003,19 @@ export default function AdminPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {getFilteredAndSortedFiles().map((file) => (
-                    <tr key={file.id}>
+                    <tr key={file.id} onClick={() => handleFileRowClick(file)} className="hover:bg-gray-50 cursor-pointer">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10">
                             {file.mimeType.startsWith('image/') ? (
                               <img
                                 src={`/api/files/${file.path}`}
+                                alt={file.filename}
+                                className="h-10 w-10 rounded object-cover"
+                              />
+                            ) : file.thumbnailPath ? (
+                              <img
+                                src={`/api/files/thumbnail/${file.thumbnailPath}`}
                                 alt={file.filename}
                                 className="h-10 w-10 rounded object-cover"
                               />
@@ -2009,6 +2047,7 @@ export default function AdminPage() {
                         <a
                           href={`/consultations/${file.consultation.id}`}
                           className="text-sm text-indigo-600 hover:text-indigo-900"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {formatDate(file.consultation.date)}
                         </a>
@@ -2029,34 +2068,174 @@ export default function AdminPage() {
                           <div className="text-sm text-gray-500 italic">-</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleEditFile(file)}
-                          className="text-indigo-600 hover:text-indigo-900 mr-4"
-                        >
-                          Editar
-                        </button>
-                        <a
-                          href={`/api/files/${file.path}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-indigo-600 hover:text-indigo-900 mr-4"
-                        >
-                          Ver
-                        </a>
-                        <button
-                          onClick={() => handleDeleteFile(file.path)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Excluir
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* File Detail Modal */}
+      {isFileDetailModalOpen && selectedFileForDetail && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start mb-4">
+              <h2 className="text-2xl font-bold text-gray-900">Detalhes do Arquivo</h2>
+              <button
+                onClick={() => setIsFileDetailModalOpen(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Thumbnail Preview */}
+            <div className="mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Visualização</h3>
+              {selectedFileForDetail.mimeType.startsWith('image/') ? (
+                <img
+                  src={`/api/files/${selectedFileForDetail.path}`}
+                  alt={selectedFileForDetail.filename}
+                  className="max-w-full h-auto rounded-lg border border-gray-200 cursor-pointer hover:opacity-80"
+                  onClick={() => window.open(`/api/files/${selectedFileForDetail.path}`, '_blank')}
+                  title="Clique para abrir em nova aba"
+                />
+              ) : selectedFileForDetail.thumbnailPath ? (
+                <img
+                  src={`/api/files/thumbnail/${selectedFileForDetail.thumbnailPath}`}
+                  alt={selectedFileForDetail.filename}
+                  className="max-w-full h-auto rounded-lg border border-gray-200 cursor-pointer hover:opacity-80"
+                  onClick={() => window.open(`/api/files/${selectedFileForDetail.path}`, '_blank')}
+                  title="Clique para abrir arquivo em nova aba"
+                />
+              ) : (
+                <div className="bg-gray-100 rounded-lg border border-gray-200 p-8 text-center">
+                  <svg className="h-16 w-16 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
+                  <p className="text-gray-600 mt-2">Sem visualização disponível</p>
+                </div>
+              )}
+            </div>
+
+            {/* File Information */}
+            <div className="mb-6 bg-gray-50 rounded-lg p-4">
+              <h3 className="text-lg font-medium text-gray-900 mb-3">Informações</h3>
+              <dl className="space-y-3">
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Nome</dt>
+                  <dd className="text-sm text-gray-900">{selectedFileForDetail.customName || selectedFileForDetail.filename}</dd>
+                </div>
+                {selectedFileForDetail.customName && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Nome Original</dt>
+                    <dd className="text-sm text-gray-900">{selectedFileForDetail.filename}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Tamanho</dt>
+                  <dd className="text-sm text-gray-900">{formatFileSize(selectedFileForDetail.size)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Tipo</dt>
+                  <dd className="text-sm text-gray-900">{selectedFileForDetail.mimeType}</dd>
+                </div>
+                {selectedFileForDetail.category && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Categoria</dt>
+                    <dd className="text-sm text-gray-900">{selectedFileForDetail.category.name}</dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Consulta</dt>
+                  <dd className="text-sm text-gray-900">{formatDate(selectedFileForDetail.consultation.date)}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Usuário</dt>
+                  <dd className="text-sm text-gray-900">
+                    {selectedFileForDetail.consultation.user.name} ({selectedFileForDetail.consultation.user.email})
+                  </dd>
+                </div>
+                {selectedFileForDetail.professional && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Profissional</dt>
+                    <dd className="text-sm text-gray-900">
+                      {selectedFileForDetail.professional.name} - {selectedFileForDetail.professional.specialties.map(s => s.name).join(', ')}
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500">Enviado em</dt>
+                  <dd className="text-sm text-gray-900">
+                    {new Date(selectedFileForDetail.uploadedAt).toLocaleString('pt-BR')}
+                  </dd>
+                </div>
+                {selectedFileForDetail.thumbnailPath && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500">Thumbnail</dt>
+                    <dd className="text-sm text-green-600">✓ Gerado</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  window.open(`/api/files/${selectedFileForDetail.path}`, '_blank')
+                }}
+                className="px-4 py-2 text-indigo-600 hover:text-indigo-900 font-medium"
+              >
+                Visualizar Arquivo
+              </button>
+
+              {(selectedFileForDetail.mimeType === 'application/pdf' || selectedFileForDetail.mimeType.startsWith('image/')) &&
+                !selectedFileForDetail.thumbnailPath && (
+                <button
+                  onClick={() => handleGenerateThumbnail(selectedFileForDetail.id)}
+                  disabled={generatingThumbnail}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                >
+                  {generatingThumbnail ? 'Gerando...' : 'Gerar Thumbnail'}
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setEditingFile(selectedFileForDetail)
+                  setIsFileEditFormOpen(true)
+                  setIsFileDetailModalOpen(false)
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium"
+              >
+                Editar
+              </button>
+
+              <button
+                onClick={() => {
+                  if (confirm(`Tem certeza que deseja excluir "${selectedFileForDetail.customName || selectedFileForDetail.filename}"?`)) {
+                    handleDeleteFile(selectedFileForDetail.path)
+                    setIsFileDetailModalOpen(false)
+                  }
+                }}
+                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium"
+              >
+                Excluir
+              </button>
+
+              <button
+                onClick={() => setIsFileDetailModalOpen(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 font-medium"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
