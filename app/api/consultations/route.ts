@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total count for pagination
+    console.log('[API] Fetching consultations for user:', session.user.id, 'with filters:', where)
     const total = await prisma.consultation.count({ where })
 
     // Get consultations with pagination
