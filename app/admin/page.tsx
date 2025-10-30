@@ -26,7 +26,7 @@ interface FileRecord {
   size: number
   uploadedAt: string
   thumbnailPath?: string | null
-  consultation: {
+  consultation?: {
     id: string
     date: string
     user: {
@@ -34,7 +34,7 @@ interface FileRecord {
       name: string
       email: string
     }
-  }
+  } | null
   professional: {
     id: string
     name: string
@@ -907,6 +907,7 @@ export default function AdminPage() {
     }
     if (fileFilters.date) {
       filtered = filtered.filter(f => {
+        if (!f.consultation?.date) return false
         const fileDate = new Date(f.consultation.date).toISOString().split('T')[0]
         return fileDate === fileFilters.date
       })
@@ -929,7 +930,9 @@ export default function AdminPage() {
           comparison = (a.professional?.name || '').localeCompare(b.professional?.name || '')
           break
         case 'date':
-          comparison = new Date(a.consultation.date).getTime() - new Date(b.consultation.date).getTime()
+          const aDate = a.consultation?.date ? new Date(a.consultation.date).getTime() : 0
+          const bDate = b.consultation?.date ? new Date(b.consultation.date).getTime() : 0
+          comparison = aDate - bDate
           break
       }
 
@@ -2049,17 +2052,27 @@ export default function AdminPage() {
                         )}
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
-                        <a
-                          href={`/consultations/${file.consultation.id}`}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {formatDate(file.consultation.date)}
-                        </a>
+                        {file.consultation ? (
+                          <a
+                            href={`/consultations/${file.consultation.id}`}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {formatDate(file.consultation.date)}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
-                        <div className="text-gray-900">{file.consultation.user.name}</div>
-                        <div className="text-xs text-gray-500 truncate">{file.consultation.user.email}</div>
+                        {file.consultation ? (
+                          <>
+                            <div className="text-gray-900">{file.consultation.user.name}</div>
+                            <div className="text-xs text-gray-500 truncate">{file.consultation.user.email}</div>
+                          </>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         {file.professional ? (
@@ -2162,16 +2175,20 @@ export default function AdminPage() {
                     </dd>
                   </div>
                 )}
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Consulta</dt>
-                  <dd className="text-sm text-gray-900">{formatDate(selectedFileForDetail.consultation.date)}</dd>
-                </div>
-                <div>
-                  <dt className="text-sm font-medium text-gray-500">Usuário</dt>
-                  <dd className="text-sm text-gray-900">
-                    {selectedFileForDetail.consultation.user.name} ({selectedFileForDetail.consultation.user.email})
-                  </dd>
-                </div>
+                {selectedFileForDetail.consultation && (
+                  <>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Consulta</dt>
+                      <dd className="text-sm text-gray-900">{formatDate(selectedFileForDetail.consultation.date)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-sm font-medium text-gray-500">Usuário</dt>
+                      <dd className="text-sm text-gray-900">
+                        {selectedFileForDetail.consultation.user.name} ({selectedFileForDetail.consultation.user.email})
+                      </dd>
+                    </div>
+                  </>
+                )}
                 {selectedFileForDetail.professional && (
                   <div>
                     <dt className="text-sm font-medium text-gray-500">Profissional</dt>
