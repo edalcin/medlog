@@ -7,6 +7,22 @@ import { randomUUID } from 'crypto'
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
 
+// Polyfill Promise.withResolvers for Node.js < 22
+// This is required by pdfjs-dist which uses this ES2024 feature
+// @ts-ignore - Promise.withResolvers is ES2024 feature
+if (typeof Promise.withResolvers === 'undefined') {
+  // @ts-ignore - Promise.withResolvers polyfill
+  Promise.withResolvers = function <T>() {
+    let resolve: (value: T | PromiseLike<T>) => void
+    let reject: (reason?: any) => void
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+    return { promise, resolve: resolve!, reject: reject! }
+  }
+}
+
 // Polyfill DOMMatrix for Node.js canvas
 // This is required because pdfjs-dist expects DOMMatrix to be available globally
 if (typeof globalThis.DOMMatrix === 'undefined') {
