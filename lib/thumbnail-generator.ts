@@ -72,9 +72,16 @@ interface ThumbnailGeneratorOptions {
   height?: number
 }
 
-// Dynamic import to load pdfjs at runtime, not build-time
+// Load pdfjs-dist and configure for Node.js environment
 async function loadPdfJs(): Promise<any> {
-  return import('pdfjs-dist')
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
+
+  // Configure worker for server-side rendering
+  // Use the legacy worker which is compatible with Node.js
+  const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
+  pdfjs.GlobalWorkerOptions.workerSrc = workerPath
+
+  return pdfjs
 }
 
 // CanvasFactory for Node.js canvas
