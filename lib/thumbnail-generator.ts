@@ -7,6 +7,50 @@ import { randomUUID } from 'crypto'
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
 
+// Polyfill DOMMatrix for Node.js canvas
+// This is required because pdfjs-dist expects DOMMatrix to be available globally
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  // @ts-ignore - DOMMatrix polyfill with basic matrix operations
+  globalThis.DOMMatrix = class DOMMatrix {
+    a: number; b: number; c: number; d: number; e: number; f: number;
+
+    constructor(init?: number[] | string) {
+      if (Array.isArray(init)) {
+        this.a = init[0] ?? 1; this.b = init[1] ?? 0;
+        this.c = init[2] ?? 0; this.d = init[3] ?? 1;
+        this.e = init[4] ?? 0; this.f = init[5] ?? 0;
+      } else {
+        this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
+      }
+    }
+
+    scale(scaleX: number, scaleY?: number) {
+      scaleY = scaleY ?? scaleX;
+      this.a *= scaleX; this.b *= scaleY;
+      this.c *= scaleX; this.d *= scaleY;
+      this.e *= scaleX; this.f *= scaleY;
+      return this;
+    }
+
+    translate(tx: number, ty: number) {
+      this.e += this.a * tx + this.c * ty;
+      this.f += this.b * tx + this.d * ty;
+      return this;
+    }
+
+    rotate(angle: number) {
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const { a, b, c, d, e, f } = this;
+      this.a = a * cos + c * sin;
+      this.b = b * cos + d * sin;
+      this.c = c * cos - a * sin;
+      this.d = d * cos - b * sin;
+      return this;
+    }
+  }
+}
+
 interface ThumbnailGeneratorOptions {
   width?: number
   height?: number
