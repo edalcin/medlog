@@ -12,10 +12,9 @@ interface ThumbnailGeneratorOptions {
   height?: number
 }
 
-// Dynamic require to load pdfjs at runtime, not build-time
-function requirePdfJs(): any {
-  // eslint-disable-next-line global-require, import/no-dynamic-require
-  return require('pdfjs-dist')
+// Dynamic import to load pdfjs at runtime, not build-time
+async function loadPdfJs(): Promise<any> {
+  return import('pdfjs-dist')
 }
 
 // CanvasFactory for Node.js canvas
@@ -97,8 +96,8 @@ export async function generatePdfThumbnail(
     const width = options.width || 200
     const height = options.height || 200
 
-    // Dynamic require to avoid build-time issues
-    const pdfjs = requirePdfJs()
+    // Dynamic import to avoid build-time issues
+    const pdfjs = await loadPdfJs()
 
     // Load PDF document
     const doc = await pdfjs.getDocument(filePath).promise

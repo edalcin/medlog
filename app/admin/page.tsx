@@ -2094,10 +2094,10 @@ export default function AdminPage() {
               <h3 className="text-lg font-medium text-gray-900 mb-3">Visualização</h3>
               {selectedFileForDetail.mimeType.startsWith('image/') ? (
                 <img
-                  src={`/api/files/${selectedFileForDetail.path}`}
+                  src={`/api/files/download/${selectedFileForDetail.path}`}
                   alt={selectedFileForDetail.filename}
                   className="max-w-full h-auto rounded-lg border border-gray-200 cursor-pointer hover:opacity-80"
-                  onClick={() => window.open(`/api/files/${selectedFileForDetail.path}`, '_blank')}
+                  onClick={() => window.open(`/api/files/download/${selectedFileForDetail.path}`, '_blank')}
                   title="Clique para abrir em nova aba"
                 />
               ) : selectedFileForDetail.thumbnailPath ? (
@@ -2105,7 +2105,7 @@ export default function AdminPage() {
                   src={`/api/files/thumbnail/${selectedFileForDetail.thumbnailPath}`}
                   alt={selectedFileForDetail.filename}
                   className="max-w-full h-auto rounded-lg border border-gray-200 cursor-pointer hover:opacity-80"
-                  onClick={() => window.open(`/api/files/${selectedFileForDetail.path}`, '_blank')}
+                  onClick={() => window.open(`/api/files/download/${selectedFileForDetail.path}`, '_blank')}
                   title="Clique para abrir arquivo em nova aba"
                 />
               ) : (
@@ -2181,15 +2181,6 @@ export default function AdminPage() {
 
             {/* Actions */}
             <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  window.open(`/api/files/${selectedFileForDetail.path}`, '_blank')
-                }}
-                className="px-4 py-2 text-indigo-600 hover:text-indigo-900 font-medium"
-              >
-                Visualizar Arquivo
-              </button>
-
               {(selectedFileForDetail.mimeType === 'application/pdf' || selectedFileForDetail.mimeType.startsWith('image/')) &&
                 !selectedFileForDetail.thumbnailPath && (
                 <button
