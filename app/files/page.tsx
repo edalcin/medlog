@@ -13,12 +13,13 @@ interface FileWithAssociations {
   mimeType: string
   size: number
   uploadedAt: string
-  categoryId: string | null
   thumbnailPath?: string | null
-  category?: {
-    id: string
-    name: string
-  } | null
+  categories: Array<{
+    category: {
+      id: string
+      name: string
+    }
+  }>
   consultation?: {
     id: string
     date: string
@@ -137,7 +138,7 @@ export default function FilesPage() {
 
     // Apply category filter
     if (selectedCategory) {
-      filtered = filtered.filter(f => f.categoryId === selectedCategory)
+      filtered = filtered.filter(f => f.categories?.some(cat => cat.category?.id === selectedCategory))
     }
 
     // Apply professional filter
@@ -439,10 +440,14 @@ export default function FilesPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    {file.category ? (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {file.category.name}
-                      </span>
+                    {file.categories && file.categories.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {file.categories.map((cat: any, idx: number) => (
+                          <span key={idx} className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            {cat.category?.name || cat.name}
+                          </span>
+                        ))}
+                      </div>
                     ) : (
                       <span className="text-sm text-gray-400">-</span>
                     )}
@@ -525,8 +530,12 @@ export default function FilesPage() {
                     <p className="mt-1 text-sm text-gray-900">{selectedFile.filename}</p>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Categoria</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedFile.category?.name || '-'}</p>
+                    <label className="block text-sm font-medium text-gray-700">Categorias</label>
+                    <p className="mt-1 text-sm text-gray-900">
+                      {selectedFile.categories && selectedFile.categories.length > 0
+                        ? selectedFile.categories.map(cat => cat.category?.name).join(', ')
+                        : '-'}
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Tamanho</label>

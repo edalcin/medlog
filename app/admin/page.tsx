@@ -40,10 +40,12 @@ interface FileRecord {
     name: string
     specialties: Specialty[]
   } | null
-  category?: {
-    id: string
-    name: string
-  }
+  categories: Array<{
+    category: {
+      id: string
+      name: string
+    }
+  }>
 }
 
 interface Consultation {
@@ -894,7 +896,7 @@ export default function AdminPage() {
     // Apply filters
     if (fileFilters.category) {
       filtered = filtered.filter(f =>
-        f.category?.id === fileFilters.category
+        f.categories?.some(cat => cat.category?.id === fileFilters.category)
       )
     }
     if (fileFilters.professional) {
@@ -918,7 +920,9 @@ export default function AdminPage() {
           comparison = (a.customName || a.filename).localeCompare(b.customName || b.filename)
           break
         case 'category':
-          comparison = (a.category?.name || '').localeCompare(b.category?.name || '')
+          const aCatNames = a.categories?.map(c => c.category?.name).join(', ') || ''
+          const bCatNames = b.categories?.map(c => c.category?.name).join(', ') || ''
+          comparison = aCatNames.localeCompare(bCatNames)
           break
         case 'professional':
           comparison = (a.professional?.name || '').localeCompare(b.professional?.name || '')
@@ -2031,10 +2035,14 @@ export default function AdminPage() {
                         </div>
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
-                        {file.category ? (
-                          <span className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded bg-blue-100 text-blue-800">
-                            {file.category.name}
-                          </span>
+                        {file.categories && file.categories.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {file.categories.map((cat: any, idx: number) => (
+                              <span key={idx} className="px-2 py-1 inline-flex text-xs leading-4 font-semibold rounded bg-blue-100 text-blue-800">
+                                {cat.category?.name || cat.name}
+                              </span>
+                            ))}
+                          </div>
                         ) : (
                           <span className="text-xs text-gray-400">-</span>
                         )}
@@ -2140,10 +2148,17 @@ export default function AdminPage() {
                   <dt className="text-sm font-medium text-gray-500">Tipo</dt>
                   <dd className="text-sm text-gray-900">{selectedFileForDetail.mimeType}</dd>
                 </div>
-                {selectedFileForDetail.category && (
+                {selectedFileForDetail.categories && selectedFileForDetail.categories.length > 0 && (
                   <div>
-                    <dt className="text-sm font-medium text-gray-500">Categoria</dt>
-                    <dd className="text-sm text-gray-900">{selectedFileForDetail.category.name}</dd>
+                    <dt className="text-sm font-medium text-gray-500">Categorias</dt>
+                    <dd className="text-sm text-gray-900">
+                      {selectedFileForDetail.categories.map((cat, idx) => (
+                        <span key={idx}>
+                          {cat.category?.name}
+                          {idx < selectedFileForDetail.categories.length - 1 ? ', ' : ''}
+                        </span>
+                      ))}
+                    </dd>
                   </div>
                 )}
                 <div>
@@ -2245,25 +2260,6 @@ export default function AdminPage() {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-500">Nome original: {editingFile.filename}</p>
-              </div>
-
-              <div>
-                <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700">
-                  Categoria
-                </label>
-                <select
-                  id="categoryId"
-                  name="categoryId"
-                  defaultValue={editingFile.category?.id || ''}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                >
-                  <option value="">Selecione uma categoria</option>
-                  {fileCategories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">

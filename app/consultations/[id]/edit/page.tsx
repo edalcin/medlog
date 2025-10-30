@@ -39,10 +39,12 @@ interface ExistingFile {
   mimeType: string
   size: number
   uploadedAt: string
-  category?: {
-    id: string
-    name: string
-  } | null
+  categories: Array<{
+    category: {
+      id: string
+      name: string
+    }
+  }>
 }
 
 interface FileWithCategory {
@@ -564,10 +566,14 @@ export default function EditConsultationPage() {
                             </p>
                             <p className="text-xs text-gray-500">
                               {formatFileSize(file.size)}
-                              {file.category && (
-                                <span className="ml-2 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
-                                  {file.category.name}
-                                </span>
+                              {file.categories && file.categories.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {file.categories.map((cat: any, idx: number) => (
+                                    <span key={idx} className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800">
+                                      {cat.category?.name || cat.name}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                             </p>
                           </div>
