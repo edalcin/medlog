@@ -174,6 +174,7 @@ export default function AdminPage() {
   // File management states
   const [editingFile, setEditingFile] = useState<FileRecord | null>(null)
   const [isFileEditFormOpen, setIsFileEditFormOpen] = useState(false)
+  const [editingFileCategories, setEditingFileCategories] = useState<Set<string>>(new Set())
   const [selectedFileForDetail, setSelectedFileForDetail] = useState<FileRecord | null>(null)
   const [isFileDetailModalOpen, setIsFileDetailModalOpen] = useState(false)
   const [fileFilters, setFileFilters] = useState({ category: '', professional: '', date: '' })
@@ -780,6 +781,9 @@ export default function AdminPage() {
 
   const handleEditFile = (file: FileRecord) => {
     setEditingFile(file)
+    // Initialize with current categories
+    const currentCategoryIds = new Set(file.categories?.map(c => c.category.id) || [])
+    setEditingFileCategories(currentCategoryIds)
     setIsFileEditFormOpen(true)
   }
 
@@ -812,7 +816,10 @@ export default function AdminPage() {
 
     setSubmitting(true)
     const formData = new FormData(event.currentTarget)
-    const fileData = Object.fromEntries(formData.entries())
+    const fileData = {
+      customName: formData.get('customName') as string,
+      categoryIds: Array.from(editingFileCategories),
+    }
 
     try {
       const response = await fetch(`/api/files/edit/${editingFile.id}`, {
@@ -830,6 +837,7 @@ export default function AdminPage() {
 
       setIsFileEditFormOpen(false)
       setEditingFile(null)
+      setEditingFileCategories(new Set())
       fetchFiles()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
@@ -2262,7 +2270,7 @@ export default function AdminPage() {
       {/* File Edit Modal */}
       {isFileEditFormOpen && editingFile && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Editar Arquivo</h3>
             <form onSubmit={handleFileEditSubmit} className="space-y-4">
               <div>
@@ -2280,12 +2288,44 @@ export default function AdminPage() {
                 <p className="mt-1 text-xs text-gray-500">Nome original: {editingFile.filename}</p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Categorias
+                </label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3 bg-gray-50">
+                  {fileCategories.length === 0 ? (
+                    <p className="text-xs text-gray-500">Nenhuma categoria disponível</p>
+                  ) : (
+                    fileCategories.map((category) => (
+                      <label key={category.id} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={editingFileCategories.has(category.id)}
+                          onChange={(e) => {
+                            const newCategories = new Set(editingFileCategories)
+                            if (e.target.checked) {
+                              newCategories.add(category.id)
+                            } else {
+                              newCategories.delete(category.id)
+                            }
+                            setEditingFileCategories(newCategories)
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{category.name}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              </div>
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
                   onClick={() => {
                     setIsFileEditFormOpen(false)
                     setEditingFile(null)
+                    setEditingFileCategories(new Set())
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                 >
