@@ -231,9 +231,10 @@ export default function AdminPage() {
         throw new Error('Erro ao carregar arquivos')
       }
       const data = await response.json()
-      setFiles(data.data.files)
+      setFiles(data.data?.files || [])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro desconhecido')
+      console.error('Fetch files error:', err)
     } finally {
       setFilesLoading(false)
     }

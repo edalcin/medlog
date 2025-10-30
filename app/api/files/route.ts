@@ -61,15 +61,16 @@ export async function GET(request: NextRequest) {
       },
       skip: (page - 1) * limit,
       take: limit,
-    })
+    }) as any[]
 
-    // Transform to include specialty names
+    // Transform to include specialty names and flatten categories
     const transformedFiles = files.map(file => ({
       ...file,
       professional: file.professional ? {
         ...file.professional,
-        specialties: file.professional.specialties.map(ps => ps.specialty),
+        specialties: file.professional.specialties.map((ps: any) => ps.specialty),
       } : null,
+      categories: file.categories || [],
     }))
 
     const result = {
