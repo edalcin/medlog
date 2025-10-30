@@ -42,10 +42,14 @@ export async function GET(request: NextRequest) {
     const files = await prisma.file.findMany({
       where,
       include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
+        categories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         professional: {

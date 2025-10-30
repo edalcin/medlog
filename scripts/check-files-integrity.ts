@@ -23,7 +23,11 @@ async function checkFilesIntegrity() {
           },
         },
       },
-      category: true,
+      categories: {
+        include: {
+          category: true,
+        },
+      },
     },
     orderBy: {
       uploadedAt: 'desc',
@@ -44,6 +48,7 @@ async function checkFilesIntegrity() {
       existingCount++
     } else {
       missingCount++
+      const categoryNames = file.categories.map(c => c.category.name).join(', ') || 'Sem categoria'
       missingFiles.push({
         id: file.id,
         filename: file.filename,
@@ -53,7 +58,7 @@ async function checkFilesIntegrity() {
         consultationDate: file.consultation?.date,
         user: file.consultation?.user.name || 'Desconhecido',
         uploadedAt: file.uploadedAt,
-        category: file.category?.name || 'Sem categoria',
+        categories: categoryNames,
       })
       console.log(`❌ FALTANDO: ${file.customName || file.filename}`)
       console.log(`   Path: ${file.path}`)
@@ -62,7 +67,7 @@ async function checkFilesIntegrity() {
         console.log(`   Consulta: ${file.consultationId} (${new Date(file.consultation.date).toLocaleDateString('pt-BR')})`)
         console.log(`   Usuário: ${file.consultation.user.name}`)
       }
-      console.log(`   Categoria: ${file.category?.name || 'Sem categoria'}`)
+      console.log(`   Categorias: ${categoryNames}`)
       console.log(`   Upload: ${new Date(file.uploadedAt).toLocaleDateString('pt-BR')}`)
       console.log('')
     }

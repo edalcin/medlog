@@ -23,10 +23,14 @@ export async function GET(
     const file = await prisma.file.findUnique({
       where: { id: fileId },
       include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
+        categories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         consultation: {
@@ -78,7 +82,7 @@ export async function PUT(
 
     const fileId = params.id
     const body = await request.json()
-    const { customName, categoryId, professionalId } = body
+    const { customName, professionalId } = body
 
     // Find file and check ownership
     const file = await prisma.file.findUnique({
@@ -121,14 +125,17 @@ export async function PUT(
       where: { id: fileId },
       data: {
         customName: customName || null,
-        categoryId: categoryId || null,
         professionalId: professionalId || file.consultation?.professionalId || null,
       },
       include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
+        categories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         consultation: {

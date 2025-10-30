@@ -174,7 +174,6 @@ async function recoverFromBackup() {
                   hash,
                   consultationId: backupRecord.consultationId,
                   professionalId: backupRecord.professionalId,
-                  categoryId: backupRecord.categoryId,
                   userId: backupRecord.userId,
                   thumbnailPath: backupRecord.thumbnailPath,
                 },
@@ -210,7 +209,6 @@ async function recoverFromBackup() {
                   hash,
                   consultationId: backupRecord.consultationId,
                   professionalId: backupRecord.professionalId,
-                  categoryId: backupRecord.categoryId,
                   userId: backupRecord.userId,
                   customName: backupRecord.customName,
                   thumbnailPath: backupRecord.thumbnailPath,
@@ -244,7 +242,6 @@ async function recoverFromBackup() {
                   data: {
                     consultationId: backupRecord.consultationId,
                     professionalId: backupRecord.professionalId,
-                    categoryId: backupRecord.categoryId,
                     userId: backupRecord.userId,
                     hash,
                     thumbnailPath: backupRecord.thumbnailPath,

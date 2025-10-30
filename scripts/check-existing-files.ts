@@ -23,7 +23,11 @@ async function checkExistingFiles() {
             professional: { select: { name: true } }
           }
         },
-        category: true
+        categories: {
+          include: {
+            category: true
+          }
+        }
       }
     })
 
@@ -37,7 +41,8 @@ async function checkExistingFiles() {
         console.log(`   Usuário: ${file.consultation.user.name} (${file.consultation.user.email})`)
         console.log(`   Profissional: ${file.consultation.professional?.name || 'N/A'}`)
       }
-      console.log(`   Categoria: ${file.category?.name || 'Sem categoria'}`)
+      const categoryNames = file.categories.map(c => c.category.name).join(', ') || 'Sem categoria'
+      console.log(`   Categorias: ${categoryNames}`)
       console.log(`   Upload: ${new Date(file.uploadedAt).toLocaleDateString('pt-BR')}`)
       if (file.consultationId) {
         console.log(`   URL Consulta: https://medlog.dalc.in/consultations/${file.consultationId}`)

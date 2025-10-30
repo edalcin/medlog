@@ -40,10 +40,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
             mimeType: true,
             size: true,
             uploadedAt: true,
-            category: {
-              select: {
-                id: true,
-                name: true,
+            categories: {
+              include: {
+                category: {
+                  select: {
+                    id: true,
+                    name: true,
+                  },
+                },
               },
             },
           },

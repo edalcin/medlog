@@ -27,7 +27,11 @@ async function checkEdalcinFiles() {
       userId: user.id,
     },
     include: {
-      category: true,
+      categories: {
+        include: {
+          category: true,
+        },
+      },
       consultation: {
         select: {
           id: true,
@@ -50,7 +54,8 @@ async function checkEdalcinFiles() {
     files.forEach((f, idx) => {
       console.log(`\n  ${idx + 1}. ${f.customName || f.filename}`)
       console.log(`     ID: ${f.id}`)
-      console.log(`     Categoria: ${f.category?.name || '-'}`)
+      const categoryNames = f.categories.map(c => c.category.name).join(', ') || '-'
+      console.log(`     Categorias: ${categoryNames}`)
       if (f.consultation) {
         console.log(`     Consulta: ${new Date(f.consultation.date).toLocaleDateString('pt-BR')}`)
       }

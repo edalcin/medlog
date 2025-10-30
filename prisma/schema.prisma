@@ -92,25 +92,23 @@ model Consultation {
 }
 
 model File {
-  id             String        @id @default(uuid())
+  id             String              @id @default(uuid())
   filename       String
   customName     String?
   path           String
   mimeType       String
   size           Int
-  hash           String?       // For duplicate detection
-  thumbnailPath  String?       // Path to PDF thumbnail image
-  consultationId String?       // Optional: can be associated with a consultation
-  professionalId String?       // Optional: can be associated with a professional
+  hash           String?             // For duplicate detection
+  thumbnailPath  String?             // Path to PDF thumbnail image
+  consultationId String?             // Optional: can be associated with a consultation
+  professionalId String?             // Optional: can be associated with a professional
   userId         String?
-  uploadedAt     DateTime      @default(now())
-  categoryId     String?
-  category       FileCategory? @relation(fields: [categoryId], references: [id])
-  consultation   Consultation? @relation(fields: [consultationId], references: [id], onDelete: Cascade)
-  professional   Professional? @relation(fields: [professionalId], references: [id])
-  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  uploadedAt     DateTime            @default(now())
+  categories     FileFileCategory[]
+  consultation   Consultation?       @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  professional   Professional?       @relation(fields: [professionalId], references: [id])
+  user           User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([categoryId], map: "files_categoryId_fkey")
   @@index([consultationId], map: "files_consultationId_fkey")
   @@index([professionalId], map: "files_professionalId_fkey")
   @@index([userId], map: "files_userId_fkey")
@@ -118,12 +116,25 @@ model File {
 }
 
 model FileCategory {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  createdAt DateTime @default(now())
-  files     File[]
+  id        String              @id @default(uuid())
+  name      String              @unique
+  createdAt DateTime            @default(now())
+  files     FileFileCategory[]
 
   @@map("file_categories")
+}
+
+model FileFileCategory {
+  id         String       @id @default(uuid())
+  fileId     String
+  categoryId String
+  createdAt  DateTime     @default(now())
+  file       File         @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  category   FileCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, categoryId])
+  @@index([categoryId], map: "file_file_categories_categoryId_fkey")
+  @@map("file_file_categories")
 }
 
 model Clinic {

@@ -37,7 +37,11 @@ async function cleanOrphanFileRecords() {
           },
         },
       },
-      category: true,
+      categories: {
+        include: {
+          category: true,
+        },
+      },
     },
   })
 
@@ -67,7 +71,8 @@ async function cleanOrphanFileRecords() {
     console.log(`   Path: ${file.path}`)
     console.log(`   Consulta: ${new Date(file.consultation.date).toLocaleDateString('pt-BR')}`)
     console.log(`   Usuário: ${file.consultation.user.name}`)
-    console.log(`   Categoria: ${file.category?.name || 'Sem categoria'}`)
+    const categoryNames = file.categories.map((c: any) => c.category.name).join(', ') || 'Sem categoria'
+    console.log(`   Categorias: ${categoryNames}`)
     console.log('')
   })
 

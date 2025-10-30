@@ -48,7 +48,7 @@ interface ExistingFile {
 interface FileWithCategory {
   file: File
   customName: string
-  categoryId: string
+  categoryIds: string[]
   newCategoryName: string
 }
 
@@ -194,10 +194,16 @@ export default function EditConsultationPage() {
             fileFormData.append('customName', fileWithCat.customName)
           }
 
-          if (fileWithCat.categoryId === 'new' && fileWithCat.newCategoryName) {
+          // Add all selected categories
+          if (fileWithCat.categoryIds.length > 0) {
+            fileWithCat.categoryIds.forEach(catId => {
+              fileFormData.append('categoryIds', catId)
+            })
+          }
+
+          // Add new category if specified
+          if (fileWithCat.newCategoryName) {
             fileFormData.append('newCategoryName', fileWithCat.newCategoryName)
-          } else if (fileWithCat.categoryId && fileWithCat.categoryId !== 'new') {
-            fileFormData.append('categoryId', fileWithCat.categoryId)
           }
 
           const fileResponse = await fetch('/api/files/upload', {
@@ -259,7 +265,7 @@ export default function EditConsultationPage() {
       const newFiles = filesArray.map(file => ({
         file,
         customName: file.name,
-        categoryId: '',
+        categoryIds: [],
         newCategoryName: '',
       }))
       setSelectedFiles(prev => [...prev, ...newFiles])
@@ -270,10 +276,16 @@ export default function EditConsultationPage() {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  const updateFileCategory = (index: number, categoryId: string) => {
-    setSelectedFiles(prev => prev.map((item, i) =>
-      i === index ? { ...item, categoryId, newCategoryName: '' } : item
-    ))
+  const toggleFileCategory = (index: number, categoryId: string) => {
+    setSelectedFiles(prev => prev.map((item, i) => {
+      if (i === index) {
+        const newCategoryIds = item.categoryIds.includes(categoryId)
+          ? item.categoryIds.filter(id => id !== categoryId)
+          : [...item.categoryIds, categoryId]
+        return { ...item, categoryIds: newCategoryIds, newCategoryName: '' }
+      }
+      return item
+    }))
   }
 
   const updateFileNewCategory = (index: number, newCategoryName: string) => {
@@ -311,7 +323,6 @@ export default function EditConsultationPage() {
         },
         body: JSON.stringify({
           customName: editingFile.customName,
-          categoryId: editingFile.category?.id || null,
         }),
       })
 
@@ -701,41 +712,48 @@ export default function EditConsultationPage() {
                       />
                     </div>
 
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label htmlFor={`category-${index}`} className="block text-xs font-medium text-gray-600 mb-1">
-                          Categoria
-                        </label>
-                        <select
-                          id={`category-${index}`}
-                          value={fileWithCat.categoryId}
-                          onChange={(e) => updateFileCategory(index, e.target.value)}
-                          className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                        >
-                          <option value="">Sem categoria</option>
-                          {categories.map((cat) => (
-                            <option key={cat.id} value={cat.id}>
-                              {cat.name}
-                            </option>
-                          ))}
-                          <option value="new">+ Nova categoria</option>
-                        </select>
-                      </div>
-                      {fileWithCat.categoryId === 'new' && (
-                        <div className="flex-1">
-                          <label htmlFor={`newCategory-${index}`} className="block text-xs font-medium text-gray-600 mb-1">
-                            Nome da categoria
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-2">
+                        Categorias
+                      </label>
+                      <div className="space-y-2 border border-gray-300 rounded-md p-2 max-h-40 overflow-y-auto">
+                        {categories.map((cat) => (
+                          <label key={cat.id} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={fileWithCat.categoryIds.includes(cat.id)}
+                              onChange={() => toggleFileCategory(index, cat.id)}
+                              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">{cat.name}</span>
                           </label>
+                        ))}
+                      </div>
+                      <div className="mt-2">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`newCat-${index}`}
+                            checked={fileWithCat.newCategoryName !== ''}
+                            onChange={(e) => {
+                              if (!e.target.checked) {
+                                updateFileNewCategory(index, '')
+                              }
+                            }}
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="text-sm text-blue-600 font-medium">+ Nova categoria</span>
+                        </label>
+                        {fileWithCat.newCategoryName !== '' && (
                           <input
                             type="text"
-                            id={`newCategory-${index}`}
                             value={fileWithCat.newCategoryName}
                             onChange={(e) => updateFileNewCategory(index, e.target.value)}
                             placeholder="Nome da nova categoria"
-                            className="block w-full text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                            className="block w-full mt-2 text-sm border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                           />
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -783,31 +801,6 @@ export default function EditConsultationPage() {
                   className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-500">Nome original: {editingFile.filename}</p>
-              </div>
-
-              <div>
-                <label htmlFor="edit-category" className="block text-sm font-medium text-gray-700">
-                  Categoria
-                </label>
-                <select
-                  id="edit-category"
-                  value={editingFile.category?.id || ''}
-                  onChange={(e) => {
-                    const selectedCategory = categories.find(c => c.id === e.target.value)
-                    setEditingFile({
-                      ...editingFile,
-                      category: selectedCategory ? { id: selectedCategory.id, name: selectedCategory.name } : null
-                    })
-                  }}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                >
-                  <option value="">Sem categoria</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">

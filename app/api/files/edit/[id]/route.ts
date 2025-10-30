@@ -23,7 +23,7 @@ export async function PUT(
 
     const { id } = params
     const body = await request.json()
-    const { customName, consultationId, categoryId } = body
+    const { customName, consultationId, categoryIds } = body
 
     // Build where clause: if not admin, filter by userId
     const fileWhereClause = session.user.role === 'ADMIN'
@@ -63,7 +63,6 @@ export async function PUT(
           customName: customName || null,
           consultationId,
           professionalId: consultation.professionalId,
-          categoryId: categoryId || null,
         },
         include: {
           consultation: {
@@ -88,24 +87,39 @@ export async function PUT(
               },
             },
           },
-          category: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
         },
       })
+
+      // Handle category updates if provided
+      if (categoryIds && categoryIds.length >= 0) {
+        // Remove all existing category associations
+        await prisma.fileFileCategory.deleteMany({
+          where: { fileId: id },
+        })
+
+        // Add new category associations
+        if (categoryIds.length > 0) {
+          for (const catId of categoryIds) {
+            await prisma.fileFileCategory.create({
+              data: {
+                fileId: id,
+                categoryId: catId,
+              },
+            }).catch(() => {
+              // Ignore duplicate associations
+            })
+          }
+        }
+      }
 
       return successResponse(updatedFile, 'Arquivo atualizado com sucesso')
     }
 
-    // If only updating customName or categoryId
+    // If only updating customName or categories
     const updatedFile = await prisma.file.update({
       where: { id },
       data: {
         customName: customName || null,
-        categoryId: categoryId || null,
       },
       include: {
         consultation: {
@@ -130,14 +144,40 @@ export async function PUT(
             },
           },
         },
-        category: {
-          select: {
-            id: true,
-            name: true,
+        categories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
     })
+
+    // Handle category updates if provided
+    if (categoryIds && categoryIds.length >= 0) {
+      // Remove all existing category associations
+      await prisma.fileFileCategory.deleteMany({
+        where: { fileId: id },
+      })
+
+      // Add new category associations
+      if (categoryIds.length > 0) {
+        for (const catId of categoryIds) {
+          await prisma.fileFileCategory.create({
+            data: {
+              fileId: id,
+              categoryId: catId,
+            },
+          }).catch(() => {
+            // Ignore duplicate associations
+          })
+        }
+      }
+    }
 
     return successResponse(updatedFile, 'Arquivo atualizado com sucesso')
   } catch (error) {

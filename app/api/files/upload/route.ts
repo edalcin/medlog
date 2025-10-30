@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
     const consultationId = formData.get('consultationId') as string | undefined
     const professionalId = formData.get('professionalId') as string | undefined
     const customName = formData.get('customName') as string | null
-    const categoryId = formData.get('categoryId') as string | null
+    const categoryIds = formData.getAll('categoryIds') as string[]
+    const newCategoryName = formData.get('newCategoryName') as string | null
     const clientHash = formData.get('hash') as string | null
 
     if (!file) {
@@ -177,10 +178,46 @@ export async function POST(request: NextRequest) {
         consultationId: consultationId || null,
         // If associated with consultation, also associate with its professional
         professionalId: consultation?.professionalId || professionalId || null,
-        categoryId: categoryId || null,
         userId: session.user.id,
       },
     })
+
+    // Handle category associations
+    const categoriesToAssociate: string[] = [...categoryIds]
+
+    // Create new category if specified
+    if (newCategoryName) {
+      try {
+        const newCategory = await prisma.fileCategory.create({
+          data: {
+            name: newCategoryName,
+          },
+        })
+        categoriesToAssociate.push(newCategory.id)
+      } catch (error) {
+        // Category might already exist (unique constraint)
+        const existingCategory = await prisma.fileCategory.findUnique({
+          where: { name: newCategoryName },
+        })
+        if (existingCategory) {
+          categoriesToAssociate.push(existingCategory.id)
+        }
+      }
+    }
+
+    // Associate file with categories
+    if (categoriesToAssociate.length > 0) {
+      for (const catId of categoriesToAssociate) {
+        await prisma.fileFileCategory.create({
+          data: {
+            fileId: fileRecord.id,
+            categoryId: catId,
+          },
+        }).catch(() => {
+          // Ignore duplicate associations
+        })
+      }
+    }
 
     return successResponse(
       {

@@ -45,10 +45,14 @@ export async function GET(request: NextRequest) {
             },
           },
         },
-        category: {
-          select: {
-            id: true,
-            name: true,
+        categories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
