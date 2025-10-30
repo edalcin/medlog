@@ -21,6 +21,7 @@
     "check:duplicates": "ts-node --transpile-only scripts/check-duplicates.ts",
     "remove:duplicates": "ts-node --transpile-only scripts/remove-duplicate-files.ts",
     "generate:thumbnails": "ts-node --transpile-only scripts/generate-missing-thumbnails.ts",
+    "migrate:categories": "ts-node --transpile-only scripts/migrate-old-files-to-categories.ts",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:generate": "prisma generate"
