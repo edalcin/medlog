@@ -54,6 +54,7 @@ logs/
 
 # Deployment scripts with sensitive data
 unraid-setup.sh
+unraid-update.sh
 docker-compose.*.yml
 
 # Temporary files

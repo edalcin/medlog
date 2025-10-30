@@ -1,0 +1,89 @@
+#!/bin/bash
+# Script para atualizar o MedLog no Unraid
+# Execute este script no terminal do Unraid para atualizar para a versão mais recente
+
+# IMPORTANTE: Antes de usar, copie este arquivo para unraid-update.sh
+# e edite as variáveis de ambiente com suas configurações:
+#   cp unraid-update.sh.template unraid-update.sh
+#   nano unraid-update.sh
+
+set -e
+
+echo "======================================"
+echo "MedLog - Atualização no Unraid"
+echo "======================================"
+echo ""
+
+# Verificar se container existe
+if ! docker ps -a | grep -q medlog; then
+  echo "❌ Container 'medlog' não encontrado!"
+  echo "Execute o script unraid-setup.sh primeiro para fazer a instalação inicial."
+  exit 1
+fi
+
+echo "[1/5] Parando container..."
+docker stop medlog
+echo "✓ Container parado"
+echo ""
+
+echo "[2/5] Removendo container antigo..."
+docker rm medlog
+echo "✓ Container removido"
+echo ""
+
+echo "[3/5] Baixando nova versão da imagem..."
+docker pull ghcr.io/edalcin/medlog:latest
+echo "✓ Imagem atualizada"
+echo ""
+
+echo "[4/5] Recriando container..."
+docker create \
+  --name='medlog' \
+  --net='bridge' \
+  --pids-limit 2048 \
+  -e TZ="America/Sao_Paulo" \
+  -e HOST_OS="Unraid" \
+  -e HOST_HOSTNAME="SeuServidor" \
+  -e HOST_CONTAINERNAME="medlog" \
+  -e 'DATABASE_URL'='mysql://usuario:senha@ip:porta/database' \
+  -e 'NEXTAUTH_SECRET'='SEU_SECRET_AQUI_USE_openssl_rand_-base64_32' \
+  -e 'NEXTAUTH_URL'='https://seu-dominio.com' \
+  -e 'FILES_PATH'='/app/data/uploads' \
+  -l net.unraid.docker.managed=dockerman \
+  -l net.unraid.docker.webui='https://seu-dominio.com' \
+  -l net.unraid.docker.icon='http://dalcinweb.s3-website-us-east-1.amazonaws.com/github/icones/doctor.png' \
+  -p '3123:3000/tcp' \
+  -v '/mnt/user/Storage/appsdata/medlog/':'/app/data/uploads':'rw' \
+  'ghcr.io/edalcin/medlog:latest'
+echo "✓ Container recriado"
+echo ""
+
+echo "[5/5] Iniciando container..."
+docker start medlog
+echo "✓ Container iniciado"
+echo ""
+
+# Aguardar alguns segundos
+echo "Aguardando aplicação inicializar e aplicar migrações..."
+sleep 10
+echo ""
+
+# Mostrar logs
+echo "======================================"
+echo "Últimas linhas do log:"
+echo "======================================"
+docker logs --tail 30 medlog
+echo ""
+
+echo "======================================"
+echo "✓ Atualização concluída!"
+echo "======================================"
+echo ""
+echo "Acesse: https://seu-dominio.com"
+echo ""
+echo "Para verificar se as migrações foram aplicadas:"
+echo "  docker logs medlog | grep -i migration"
+echo ""
+echo "Para ver logs em tempo real:"
+echo "  docker logs -f medlog"
+echo ""
