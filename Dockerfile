@@ -37,8 +37,9 @@ ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install runtime dependencies for canvas
-# These are the shared libraries needed by the compiled canvas binary
+# Install runtime dependencies for canvas and PDF thumbnail generation
+# Canvas: cairo, jpeg, pango, giflib, pixman (shared libraries for canvas binary)
+# PDF: poppler-utils (pdftoppm command for PDF to PNG conversion)
 RUN apk add --no-cache \
   su-exec \
   cairo \
@@ -46,7 +47,8 @@ RUN apk add --no-cache \
   pango \
   giflib \
   pixman \
-  libc6-compat
+  libc6-compat \
+  poppler-utils
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

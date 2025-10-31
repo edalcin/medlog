@@ -118,7 +118,18 @@ export async function generatePdfThumbnail(
     }
   } catch (error) {
     console.error('Error generating PDF thumbnail:', error)
-    throw new Error(`Failed to generate thumbnail for PDF: ${error instanceof Error ? error.message : String(error)}`)
+
+    // Check if pdftoppm is not found
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (errorMsg.includes('ENOENT') || errorMsg.includes('pdftoppm')) {
+      throw new Error(
+        'PDF thumbnail generation failed: pdftoppm not found. ' +
+        'Please ensure poppler-utils is installed in your Docker image. ' +
+        'Add this to your Dockerfile: RUN apt-get update && apt-get install -y poppler-utils'
+      )
+    }
+
+    throw new Error(`Failed to generate thumbnail for PDF: ${errorMsg}`)
   }
 }
 
