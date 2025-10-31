@@ -7,109 +7,9 @@ import { randomUUID } from 'crypto'
 const UPLOAD_DIR = process.env.FILES_PATH || './uploads'
 const THUMBNAILS_DIR = join(UPLOAD_DIR, 'thumbnails')
 
-// Polyfill Promise.withResolvers for Node.js < 22
-// This is required by pdfjs-dist which uses this ES2024 feature
-// @ts-ignore - Promise.withResolvers is ES2024 feature
-if (typeof Promise.withResolvers === 'undefined') {
-  // @ts-ignore - Promise.withResolvers polyfill
-  Promise.withResolvers = function <T>() {
-    let resolve: (value: T | PromiseLike<T>) => void
-    let reject: (reason?: any) => void
-    const promise = new Promise<T>((res, rej) => {
-      resolve = res
-      reject = rej
-    })
-    return { promise, resolve: resolve!, reject: reject! }
-  }
-}
-
-// Polyfill DOMMatrix for Node.js canvas
-// This is required because pdfjs-dist expects DOMMatrix to be available globally
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  // @ts-ignore - DOMMatrix polyfill with basic matrix operations
-  globalThis.DOMMatrix = class DOMMatrix {
-    a: number; b: number; c: number; d: number; e: number; f: number;
-
-    constructor(init?: number[] | string) {
-      if (Array.isArray(init)) {
-        this.a = init[0] ?? 1; this.b = init[1] ?? 0;
-        this.c = init[2] ?? 0; this.d = init[3] ?? 1;
-        this.e = init[4] ?? 0; this.f = init[5] ?? 0;
-      } else {
-        this.a = 1; this.b = 0; this.c = 0; this.d = 1; this.e = 0; this.f = 0;
-      }
-    }
-
-    scale(scaleX: number, scaleY?: number) {
-      scaleY = scaleY ?? scaleX;
-      this.a *= scaleX; this.b *= scaleY;
-      this.c *= scaleX; this.d *= scaleY;
-      this.e *= scaleX; this.f *= scaleY;
-      return this;
-    }
-
-    translate(tx: number, ty: number) {
-      this.e += this.a * tx + this.c * ty;
-      this.f += this.b * tx + this.d * ty;
-      return this;
-    }
-
-    rotate(angle: number) {
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const { a, b, c, d, e, f } = this;
-      this.a = a * cos + c * sin;
-      this.b = b * cos + d * sin;
-      this.c = c * cos - a * sin;
-      this.d = d * cos - b * sin;
-      return this;
-    }
-  }
-}
-
 interface ThumbnailGeneratorOptions {
   width?: number
   height?: number
-}
-
-// Load pdfjs-dist for PDF processing
-async function loadPdfJs(): Promise<any> {
-  console.log(`[PDF Thumbnail] Loading pdfjs-dist...`)
-
-  // Use the legacy version which is more Node.js friendly
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
-
-  console.log(`[PDF Thumbnail] pdfjs-dist loaded successfully`)
-
-  // Note: We don't need to configure workerSrc when passing PDF data directly
-  // to getDocument(). The worker is only needed when loading from a URL.
-
-  return pdfjs
-}
-
-// CanvasFactory for Node.js canvas
-// Uses dynamic require to avoid build-time errors with DOMMatrix
-class NodeCanvasFactory {
-  create(width: number, height: number) {
-    // Dynamic require to prevent static analysis of canvas during build
-    // eslint-disable-next-line global-require, import/no-dynamic-require
-    const { createCanvas } = require('canvas')
-    const canvas = createCanvas(width, height)
-    return {
-      canvas,
-      context: canvas.getContext('2d'),
-    }
-  }
-
-  reset(canvasAndContext: { canvas: any; context: any }) {
-    const { canvas } = canvasAndContext
-    canvas.width = 0
-    canvas.height = 0
-  }
-
-  destroy(canvasAndContext: { canvas: any; context: any }) {
-    // No need to explicitly destroy canvas in Node.js
-  }
 }
 
 /**
@@ -151,8 +51,8 @@ export async function generateImageThumbnail(
 }
 
 /**
- * Generates a thumbnail for a PDF file using pdfjs-dist
- * Works cross-platform without Python dependencies
+ * Generates a thumbnail for a PDF file using pdftoppm (poppler-utils)
+ * More reliable than pdfjs in bundled Next.js environments
  */
 export async function generatePdfThumbnail(
   filePath: string,
@@ -169,68 +69,53 @@ export async function generatePdfThumbnail(
     const width = options.width || 200
     const height = options.height || 200
 
-    // Dynamic import to avoid build-time issues
-    console.log(`[PDF Thumbnail] Loading pdf.js...`)
-    const pdfjs = await loadPdfJs()
-    console.log(`[PDF Thumbnail] pdf.js loaded successfully`)
+    // Use pdftoppm from poppler-utils to convert PDF to PNG
+    // This is more reliable than pdfjs in Docker/bundled environments
+    console.log(`[PDF Thumbnail] Using pdftoppm to convert PDF...`)
 
-    // Load PDF document using file path directly (works better in Node.js)
-    console.log(`[PDF Thumbnail] Loading PDF from: ${filePath}`)
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
 
-    // Use getDocument with data parameter (works without worker configuration)
-    const { readFile } = await import('fs/promises')
-    const pdfData = await readFile(filePath)
-    console.log(`[PDF Thumbnail] PDF file read: ${pdfData.length} bytes`)
-
-    // Convert Buffer to Uint8Array (pdf.js requires Uint8Array, not Buffer)
-    const uint8Array = new Uint8Array(pdfData)
-    console.log(`[PDF Thumbnail] Converted to Uint8Array`)
-
-    // Disable worker since we're passing data directly (avoids worker loading issues)
-    console.log(`[PDF Thumbnail] Disabling worker for direct data processing`)
-    const doc = await pdfjs.getDocument({ data: uint8Array, disableWorker: true }).promise
-    console.log(`[PDF Thumbnail] PDF loaded. Pages: ${doc.numPages}`)
-
-    if (doc.numPages === 0) {
-      throw new Error('PDF has no pages')
-    }
-
-    // Get first page
-    const page = await doc.getPage(1)
-    console.log(`[PDF Thumbnail] Page 1 loaded`)
-
-    // Set scale for thumbnail
-    const scale = 1.5
-    const viewport = page.getViewport({ scale })
-    console.log(`[PDF Thumbnail] Viewport: ${viewport.width}x${viewport.height}`)
-
-    // Create canvas factory for Node.js
-    const canvasFactory = new NodeCanvasFactory()
-    const { canvas, context } = canvasFactory.create(viewport.width, viewport.height)
-    console.log(`[PDF Thumbnail] Canvas created`)
-
-    // Render page to canvas
-    const renderContext: any = {
-      canvasContext: context,
-      viewport: viewport,
-      canvas: canvas,
-    }
-
-    console.log(`[PDF Thumbnail] Rendering page...`)
-    await page.render(renderContext).promise
-    console.log(`[PDF Thumbnail] Page rendered successfully`)
-
-    // Convert canvas to PNG buffer and save
-    const buffer = canvas.toBuffer('image/png')
-    console.log(`[PDF Thumbnail] Buffer created: ${buffer.length} bytes`)
-
-    // Save thumbnail
     const thumbnailFilename = `${randomUUID()}.png`
     const thumbnailPath = join(THUMBNAILS_DIR, thumbnailFilename)
-    await writeFile(thumbnailPath, buffer)
-    console.log(`[PDF Thumbnail] Thumbnail saved: ${thumbnailPath}`)
 
-    return thumbnailFilename
+    // pdftoppm converts PDF first page to PNG
+    // -singlefile: output a single file instead of multiple pages
+    // -f 1 -l 1: only convert first page
+    // -png: output format
+    // -W / -H: width/height
+    console.log(`[PDF Thumbnail] Executing pdftoppm...`)
+
+    try {
+      await execFileAsync('pdftoppm', [
+        '-singlefile',
+        '-f', '1',
+        '-l', '1',
+        '-png',
+        '-W', width.toString(),
+        '-H', height.toString(),
+        filePath,
+        thumbnailPath,
+      ])
+
+      console.log(`[PDF Thumbnail] Thumbnail saved: ${thumbnailPath}.png`)
+      return `${thumbnailFilename}.png`
+    } catch (execError) {
+      // Fallback: try without size parameters if pdftoppm doesn't support them
+      console.log(`[PDF Thumbnail] Retrying without size parameters...`)
+      await execFileAsync('pdftoppm', [
+        '-singlefile',
+        '-f', '1',
+        '-l', '1',
+        '-png',
+        filePath,
+        thumbnailPath,
+      ])
+
+      console.log(`[PDF Thumbnail] Thumbnail saved: ${thumbnailPath}.png`)
+      return `${thumbnailFilename}.png`
+    }
   } catch (error) {
     console.error('Error generating PDF thumbnail:', error)
     throw new Error(`Failed to generate thumbnail for PDF: ${error instanceof Error ? error.message : String(error)}`)
