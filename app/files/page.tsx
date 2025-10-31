@@ -788,14 +788,14 @@ export default function FilesPage() {
                 <div className="border-t pt-4 flex gap-2 flex-wrap">
                   {!isEditMode && (
                     <>
-                      {(selectedFile.mimeType === 'application/pdf' || selectedFile.mimeType.startsWith('image/')) &&
-                        !selectedFile.thumbnailPath && (
+                      {(selectedFile.mimeType === 'application/pdf' || selectedFile.mimeType.startsWith('image/')) && (
                         <button
                           onClick={handleGenerateThumbnail}
                           disabled={isGeneratingThumbnail}
                           className="flex-1 min-w-32 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                          title={selectedFile.thumbnailPath ? 'Regenerar thumbnail' : 'Gerar thumbnail'}
                         >
-                          {isGeneratingThumbnail ? 'Gerando...' : 'Gerar Thumbnail'}
+                          {isGeneratingThumbnail ? 'Gerando...' : selectedFile.thumbnailPath ? 'Regenerar Thumbnail' : 'Gerar Thumbnail'}
                         </button>
                       )}
 

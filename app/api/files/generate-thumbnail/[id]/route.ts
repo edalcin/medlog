@@ -41,9 +41,9 @@ export async function POST(
       throw new ForbiddenError('Você não tem permissão para gerar thumbnail deste arquivo')
     }
 
-    // Check if thumbnail already exists
+    // Note: We allow regenerating thumbnails - useful if file was updated or thumbnail corrupted
     if (file.thumbnailPath) {
-      return errorResponse('Este arquivo já possui um thumbnail gerado', 400)
+      console.log(`[Thumbnail] Regenerating existing thumbnail for file ${fileId}`)
     }
 
     // Check if file type supports thumbnail generation

@@ -84,7 +84,8 @@ export async function generatePdfThumbnail(
     // -singlefile: output a single file instead of multiple pages
     // -f 1 -l 1: only convert first page
     // -png: output format
-    // -W / -H: width/height
+    // -scale-to-x / -scale-to-y: resize to fit within these dimensions while maintaining aspect ratio
+    //                             (this ensures the complete page is visible, not just a portion)
     console.log(`[PDF Thumbnail] Executing pdftoppm...`)
 
     try {
@@ -93,8 +94,8 @@ export async function generatePdfThumbnail(
         '-f', '1',
         '-l', '1',
         '-png',
-        '-W', width.toString(),
-        '-H', height.toString(),
+        '-scale-to-x', width.toString(),
+        '-scale-to-y', height.toString(),
         filePath,
         thumbnailPath,
       ])
@@ -102,8 +103,8 @@ export async function generatePdfThumbnail(
       console.log(`[PDF Thumbnail] Thumbnail saved: ${thumbnailPath}.png`)
       return `${thumbnailFilename}.png`
     } catch (execError) {
-      // Fallback: try without size parameters if pdftoppm doesn't support them
-      console.log(`[PDF Thumbnail] Retrying without size parameters...`)
+      // Fallback: try without scale parameters if version doesn't support them
+      console.log(`[PDF Thumbnail] Retrying without scale parameters...`)
       await execFileAsync('pdftoppm', [
         '-singlefile',
         '-f', '1',

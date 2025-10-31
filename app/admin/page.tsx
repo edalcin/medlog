@@ -2222,14 +2222,14 @@ export default function AdminPage() {
 
             {/* Actions */}
             <div className="flex gap-3 justify-end">
-              {(selectedFileForDetail.mimeType === 'application/pdf' || selectedFileForDetail.mimeType.startsWith('image/')) &&
-                !selectedFileForDetail.thumbnailPath && (
+              {(selectedFileForDetail.mimeType === 'application/pdf' || selectedFileForDetail.mimeType.startsWith('image/')) && (
                 <button
                   onClick={() => handleGenerateThumbnail(selectedFileForDetail.id)}
                   disabled={generatingThumbnail}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                  title={selectedFileForDetail.thumbnailPath ? 'Regenerar thumbnail' : 'Gerar thumbnail'}
                 >
-                  {generatingThumbnail ? 'Gerando...' : 'Gerar Thumbnail'}
+                  {generatingThumbnail ? 'Gerando...' : selectedFileForDetail.thumbnailPath ? 'Regenerar Thumbnail' : 'Gerar Thumbnail'}
                 </button>
               )}
 
