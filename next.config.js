@@ -15,13 +15,12 @@ const nextConfig = {
     unoptimized: true,
   },
   webpack: (config, { isServer }) => {
-    // Mark canvas as external to prevent build-time issues
-    // Canvas is only used in server-side code for image thumbnails
-    // pdfjs-dist is NOT external - we handle it with dynamic import and proper worker config
+    // Mark certain packages as external to prevent build-time issues
     if (isServer) {
       config.externals = [
         ...(config.externals || []),
-        'canvas',
+        'canvas',      // Canvas is only used in server-side code for image thumbnails
+        'pdfjs-dist',  // pdfjs-dist must be external so it can load worker from node_modules at runtime
       ]
     }
     return config
