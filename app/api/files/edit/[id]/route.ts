@@ -23,7 +23,7 @@ export async function PUT(
 
     const { id } = params
     const body = await request.json()
-    const { customName, consultationId, categoryIds } = body
+    const { customName, consultationId, categoryIds, professionalId } = body
 
     // Build where clause: if not admin, filter by userId
     const fileWhereClause = session.user.role === 'ADMIN'
@@ -62,7 +62,7 @@ export async function PUT(
         data: {
           customName: customName || null,
           consultationId,
-          professionalId: consultation.professionalId,
+          professionalId: professionalId || consultation.professionalId,
         },
         include: {
           consultation: {
@@ -115,11 +115,12 @@ export async function PUT(
       return successResponse(updatedFile, 'Arquivo atualizado com sucesso')
     }
 
-    // If only updating customName or categories
+    // If only updating customName, categories, or professional
     const updatedFile = await prisma.file.update({
       where: { id },
       data: {
         customName: customName || null,
+        professionalId: professionalId || file.professionalId || null,
       },
       include: {
         consultation: {

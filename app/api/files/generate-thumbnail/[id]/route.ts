@@ -21,9 +21,8 @@ export async function POST(
   try {
     const session = await getServerSession(authOptions)
 
-    // Only admins can generate thumbnails
-    if (!session || session.user?.role !== 'ADMIN') {
-      throw new ForbiddenError('Only administrators can generate thumbnails')
+    if (!session?.user?.id) {
+      throw new ForbiddenError('Não autorizado')
     }
 
     const fileId = params.id
@@ -34,7 +33,12 @@ export async function POST(
     })
 
     if (!file) {
-      throw new NotFoundError('File')
+      throw new NotFoundError('Arquivo')
+    }
+
+    // Check if user owns the file or is admin
+    if (file.userId !== session.user.id && session.user.role !== 'ADMIN') {
+      throw new ForbiddenError('Você não tem permissão para gerar thumbnail deste arquivo')
     }
 
     // Check if thumbnail already exists
@@ -61,19 +65,43 @@ export async function POST(
     )
 
     // Update file record with thumbnail path
-    await prisma.file.update({
+    const updatedFile = await prisma.file.update({
       where: { id: fileId },
       data: { thumbnailPath },
+      include: {
+        categories: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        consultation: {
+          select: {
+            id: true,
+            date: true,
+            proposito: true,
+            professional: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        professional: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     })
 
-    return successResponse(
-      {
-        id: file.id,
-        thumbnailPath,
-      },
-      'Thumbnail gerado com sucesso',
-      200
-    )
+    return successResponse(updatedFile, 'Thumbnail gerado com sucesso', 200)
   } catch (error) {
     return handleApiError(error)
   }

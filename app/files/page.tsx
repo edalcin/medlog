@@ -40,6 +40,12 @@ interface FileCategory {
   name: string
 }
 
+interface Professional {
+  id: string
+  name: string
+  specialties: Array<{ name: string }>
+}
+
 export default function FilesPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -53,7 +59,7 @@ export default function FilesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedProfessional, setSelectedProfessional] = useState('')
-  const [professionals, setProfessionals] = useState<Array<{ id: string; name: string }>>([])
+  const [professionals, setProfessionals] = useState<Professional[]>([])
   const [sortBy, setSortBy] = useState<'name' | 'date' | 'size'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
 
@@ -62,6 +68,14 @@ export default function FilesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // Edit modal state
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editCustomName, setEditCustomName] = useState('')
+  const [editCategories, setEditCategories] = useState<Set<string>>(new Set())
+  const [editProfessional, setEditProfessional] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [isGeneratingThumbnail, setIsGeneratingThumbnail] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -193,6 +207,88 @@ export default function FilesPage() {
     setIsModalOpen(false)
     setSelectedFile(null)
     setShowDeleteConfirm(false)
+    setIsEditMode(false)
+    setEditCustomName('')
+    setEditCategories(new Set())
+    setEditProfessional('')
+  }
+
+  const handleEnterEditMode = () => {
+    if (!selectedFile) return
+    setEditCustomName(selectedFile.customName || '')
+    setEditCategories(new Set(selectedFile.categories?.map(c => c.category.id) || []))
+    setEditProfessional(selectedFile.professional?.id || '')
+    setIsEditMode(true)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false)
+    setEditCustomName('')
+    setEditCategories(new Set())
+    setEditProfessional('')
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedFile) return
+
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/files/edit/${selectedFile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customName: editCustomName || null,
+          categoryIds: Array.from(editCategories),
+          professionalId: editProfessional || null,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao salvar alterações')
+      }
+
+      // Atualiza arquivo na lista
+      const updatedFiles = files.map(f =>
+        f.id === selectedFile.id ? { ...f, ...data.data } : f
+      )
+      setFiles(updatedFiles)
+      setSelectedFile(data.data)
+      setIsEditMode(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao salvar alterações')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleGenerateThumbnail = async () => {
+    if (!selectedFile) return
+
+    setIsGeneratingThumbnail(true)
+    try {
+      const response = await fetch(`/api/files/generate-thumbnail/${selectedFile.id}`, {
+        method: 'POST',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Erro ao gerar thumbnail')
+      }
+
+      // Atualiza arquivo na lista
+      const updatedFiles = files.map(f =>
+        f.id === selectedFile.id ? { ...f, ...data.data } : f
+      )
+      setFiles(updatedFiles)
+      setSelectedFile(data.data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao gerar thumbnail')
+    } finally {
+      setIsGeneratingThumbnail(false)
+    }
   }
 
   const handleDeleteFile = async () => {
@@ -478,13 +574,15 @@ export default function FilesPage() {
         </div>
       )}
 
-      {/* File Details Modal */}
+      {/* File Details/Edit Modal */}
       {isModalOpen && selectedFile && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-start mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">Detalhes do Arquivo</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {isEditMode ? 'Editar Arquivo' : 'Detalhes do Arquivo'}
+                </h2>
                 <button
                   onClick={handleCloseModal}
                   className="text-gray-400 hover:text-gray-600"
@@ -497,21 +595,26 @@ export default function FilesPage() {
 
               <div className="space-y-6">
                 {/* File Preview */}
-                <div className="flex justify-center">
+                <div
+                  className="flex justify-center cursor-pointer group"
+                  onClick={() => window.open(`/api/files/download/${selectedFile.path}`, '_blank')}
+                >
                   {selectedFile.mimeType.startsWith('image/') ? (
                     <img
                       src={`/api/files/download/${selectedFile.path}`}
                       alt={selectedFile.customName || selectedFile.filename}
-                      className="max-h-60 rounded"
+                      className="max-h-60 rounded group-hover:opacity-75 transition-opacity"
+                      title="Clique para visualizar o arquivo"
                     />
                   ) : selectedFile.mimeType === 'application/pdf' && selectedFile.thumbnailPath ? (
                     <img
                       src={`/api/files/thumbnail/${selectedFile.thumbnailPath}`}
                       alt={selectedFile.customName || selectedFile.filename}
-                      className="max-h-60 rounded"
+                      className="max-h-60 rounded group-hover:opacity-75 transition-opacity"
+                      title="Clique para visualizar o arquivo"
                     />
                   ) : (
-                    <div className="h-40 w-40 rounded bg-gray-200 flex items-center justify-center">
+                    <div className="h-40 w-40 rounded bg-gray-200 flex items-center justify-center group-hover:bg-gray-300 transition-colors">
                       <svg className="h-20 w-20 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
@@ -519,120 +622,225 @@ export default function FilesPage() {
                   )}
                 </div>
 
-                {/* File Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Nome</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedFile.customName || selectedFile.filename}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Nome Original</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedFile.filename}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Categorias</label>
-                    <p className="mt-1 text-sm text-gray-900">
-                      {selectedFile.categories && selectedFile.categories.length > 0
-                        ? selectedFile.categories.map(cat => cat.category?.name).join(', ')
-                        : '-'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Tamanho</label>
-                    <p className="mt-1 text-sm text-gray-900">{formatFileSize(selectedFile.size)}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Data de Upload</label>
-                    <p className="mt-1 text-sm text-gray-900">{formatDate(selectedFile.uploadedAt)}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Tipo MIME</label>
-                    <p className="mt-1 text-sm text-gray-900">{selectedFile.mimeType}</p>
-                  </div>
-                </div>
+                {/* File Information - Edit or View Mode */}
+                {isEditMode ? (
+                  <form className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Nome Personalizado
+                      </label>
+                      <input
+                        type="text"
+                        value={editCustomName}
+                        onChange={(e) => setEditCustomName(e.target.value)}
+                        placeholder={selectedFile.filename}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-500">Nome original: {selectedFile.filename}</p>
+                    </div>
 
-                {/* Associations */}
-                <div className="border-t pt-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Associações</h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Categorias
+                      </label>
+                      <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded-md p-3 bg-gray-50">
+                        {categories.length === 0 ? (
+                          <p className="text-xs text-gray-500">Nenhuma categoria disponível</p>
+                        ) : (
+                          categories.map((category) => (
+                            <label key={category.id} className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={editCategories.has(category.id)}
+                                onChange={(e) => {
+                                  const newCategories = new Set(editCategories)
+                                  if (e.target.checked) {
+                                    newCategories.add(category.id)
+                                  } else {
+                                    newCategories.delete(category.id)
+                                  }
+                                  setEditCategories(newCategories)
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">{category.name}</span>
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
 
-                  {selectedFile.consultation && (
-                    <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-                      <h4 className="font-medium text-gray-900">Consulta Associada</h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        Data: {formatDate(selectedFile.consultation.date)}
-                      </p>
-                      {selectedFile.consultation.proposito && (
-                        <p className="text-sm text-gray-600">
-                          Propósito: {selectedFile.consultation.proposito}
-                        </p>
-                      )}
-                      {selectedFile.consultation.professional && (
-                        <p className="text-sm text-gray-600">
-                          Profissional: {selectedFile.consultation.professional.name}
-                        </p>
-                      )}
-                      <Link
-                        href={`/consultations/${selectedFile.consultation.id}`}
-                        className="text-sm text-blue-600 hover:text-blue-800 mt-2 inline-block"
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Profissional
+                      </label>
+                      <select
+                        value={editProfessional}
+                        onChange={(e) => setEditProfessional(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
-                        Ver Consulta →
-                      </Link>
+                        <option value="">-- Nenhum --</option>
+                        {professionals.map((prof) => (
+                          <option key={prof.id} value={prof.id}>
+                            {prof.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                  )}
 
-                  {selectedFile.professional && !selectedFile.consultation && (
-                    <div className="mb-4 p-4 bg-green-50 rounded-lg">
-                      <h4 className="font-medium text-gray-900">Profissional Associado</h4>
-                      <p className="text-sm text-gray-600 mt-1">
-                        {selectedFile.professional.name}
-                      </p>
-                      <Link
-                        href={`/professionals/${selectedFile.professional.id}`}
-                        className="text-sm text-blue-600 hover:text-blue-800 mt-2 inline-block"
-                      >
-                        Ver Profissional →
-                      </Link>
+                    {selectedFile.consultation && (
+                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-sm text-blue-800">
+                          <strong>ℹ️ Consulta Associada:</strong> {formatDate(selectedFile.consultation.date)}
+                        </p>
+                      </div>
+                    )}
+                  </form>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Nome</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedFile.customName || selectedFile.filename}</p>
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Nome Original</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedFile.filename}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Categorias</label>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedFile.categories && selectedFile.categories.length > 0
+                          ? selectedFile.categories.map(cat => cat.category?.name).join(', ')
+                          : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Tamanho</label>
+                      <p className="mt-1 text-sm text-gray-900">{formatFileSize(selectedFile.size)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Data de Upload</label>
+                      <p className="mt-1 text-sm text-gray-900">{formatDate(selectedFile.uploadedAt)}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Tipo MIME</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedFile.mimeType}</p>
+                    </div>
+                  </div>
+                )}
 
-                  {!selectedFile.consultation && !selectedFile.professional && (
-                    <div className="p-4 bg-yellow-50 rounded-lg">
-                      <p className="text-sm text-yellow-800">
-                        ⚠️ Este arquivo não possui associações. Acesse a página de edição para associá-lo.
-                      </p>
-                    </div>
-                  )}
-                </div>
+                {/* Associations - Only in View Mode */}
+                {!isEditMode && (
+                  <div className="border-t pt-4">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Associações</h3>
+
+                    {selectedFile.consultation && (
+                      <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                        <h4 className="font-medium text-gray-900">Consulta Associada</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Data: {formatDate(selectedFile.consultation.date)}
+                        </p>
+                        {selectedFile.consultation.proposito && (
+                          <p className="text-sm text-gray-600">
+                            Propósito: {selectedFile.consultation.proposito}
+                          </p>
+                        )}
+                        {selectedFile.consultation.professional && (
+                          <p className="text-sm text-gray-600">
+                            Profissional: {selectedFile.consultation.professional.name}
+                          </p>
+                        )}
+                        <Link
+                          href={`/consultations/${selectedFile.consultation.id}`}
+                          className="text-sm text-blue-600 hover:text-blue-800 mt-2 inline-block"
+                        >
+                          Ver Consulta →
+                        </Link>
+                      </div>
+                    )}
+
+                    {selectedFile.professional && !selectedFile.consultation && (
+                      <div className="mb-4 p-4 bg-green-50 rounded-lg">
+                        <h4 className="font-medium text-gray-900">Profissional Associado</h4>
+                        <p className="text-sm text-gray-600 mt-1">
+                          {selectedFile.professional.name}
+                        </p>
+                        <Link
+                          href={`/professionals/${selectedFile.professional.id}`}
+                          className="text-sm text-blue-600 hover:text-blue-800 mt-2 inline-block"
+                        >
+                          Ver Profissional →
+                        </Link>
+                      </div>
+                    )}
+
+                    {!selectedFile.consultation && !selectedFile.professional && (
+                      <div className="p-4 bg-yellow-50 rounded-lg">
+                        <p className="text-sm text-yellow-800">
+                          ⚠️ Este arquivo não possui associações. Clique em &quot;Editar&quot; para associá-lo.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Actions */}
-                <div className="border-t pt-4 flex gap-2">
-                  <a
-                    href={`/api/files/download/${selectedFile.path}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                  >
-                    Visualizar
-                  </a>
-                  <Link
-                    href={`/files/${selectedFile.id}/edit`}
-                    className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                  >
-                    Editar
-                  </Link>
-                  <a
-                    href={`/api/files/download/${selectedFile.path}`}
-                    download={selectedFile.customName || selectedFile.filename}
-                    className="flex-1 inline-flex justify-center items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-                  >
-                    Baixar
-                  </a>
-                  <button
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
-                  >
-                    Deletar
-                  </button>
+                <div className="border-t pt-4 flex gap-2 flex-wrap">
+                  {!isEditMode && (
+                    <>
+                      {(selectedFile.mimeType === 'application/pdf' || selectedFile.mimeType.startsWith('image/')) &&
+                        !selectedFile.thumbnailPath && (
+                        <button
+                          onClick={handleGenerateThumbnail}
+                          disabled={isGeneratingThumbnail}
+                          className="flex-1 min-w-32 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 font-medium"
+                        >
+                          {isGeneratingThumbnail ? 'Gerando...' : 'Gerar Thumbnail'}
+                        </button>
+                      )}
+
+                      <button
+                        onClick={handleEnterEditMode}
+                        className="flex-1 min-w-32 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
+                      >
+                        Editar
+                      </button>
+
+                      <a
+                        href={`/api/files/download/${selectedFile.path}`}
+                        download={selectedFile.customName || selectedFile.filename}
+                        className="flex-1 min-w-32 inline-flex justify-center items-center px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 font-medium"
+                      >
+                        Baixar
+                      </a>
+
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="flex-1 min-w-32 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium"
+                      >
+                        Deletar
+                      </button>
+                    </>
+                  )}
+
+                  {isEditMode && (
+                    <>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={isSaving}
+                        className="flex-1 min-w-32 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={isSaving}
+                        className="flex-1 min-w-32 px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        {isSaving ? 'Salvando...' : 'Salvar'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

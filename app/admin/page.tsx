@@ -2235,7 +2235,9 @@ export default function AdminPage() {
 
               <button
                 onClick={() => {
+                  const currentCategoryIds = new Set(selectedFileForDetail.categories?.map(c => c.category.id) || [])
                   setEditingFile(selectedFileForDetail)
+                  setEditingFileCategories(currentCategoryIds)
                   setIsFileEditFormOpen(true)
                   setIsFileDetailModalOpen(false)
                 }}
