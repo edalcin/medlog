@@ -78,7 +78,26 @@ async function loadPdfJs(): Promise<any> {
 
   // Configure worker for server-side rendering
   // Use the legacy worker which is compatible with Node.js
-  const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
+  // This approach works in both development and production (Docker) environments
+
+  // Get the path to pdfjs-dist package
+  let workerPath: string
+
+  try {
+    // First, try the standard Node.js require.resolve approach
+    workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
+  } catch (error) {
+    try {
+      // Fallback: Use path resolution from pdfjs-dist main module
+      const modulePath = require.resolve('pdfjs-dist/package.json')
+      const moduleDir = modulePath.replace(/\/package\.json$/, '')
+      workerPath = join(moduleDir, 'legacy/build/pdf.worker.mjs')
+    } catch (fallbackError) {
+      // Last resort: Use standard node_modules path (works in Docker)
+      workerPath = join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
+    }
+  }
+
   pdfjs.GlobalWorkerOptions.workerSrc = workerPath
 
   return pdfjs
@@ -157,17 +176,24 @@ export async function generatePdfThumbnail(
   options: ThumbnailGeneratorOptions = {}
 ): Promise<string> {
   try {
+    console.log(`[PDF Thumbnail] Starting generation for: ${filePath}`)
+
     // Create thumbnails directory if it doesn't exist
     await mkdir(THUMBNAILS_DIR, { recursive: true })
+    console.log(`[PDF Thumbnail] Thumbnails directory ready: ${THUMBNAILS_DIR}`)
 
     const width = options.width || 200
     const height = options.height || 200
 
     // Dynamic import to avoid build-time issues
+    console.log(`[PDF Thumbnail] Loading pdf.js...`)
     const pdfjs = await loadPdfJs()
+    console.log(`[PDF Thumbnail] pdf.js loaded successfully`)
 
     // Load PDF document
+    console.log(`[PDF Thumbnail] Loading PDF from: ${filePath}`)
     const doc = await pdfjs.getDocument(filePath).promise
+    console.log(`[PDF Thumbnail] PDF loaded. Pages: ${doc.numPages}`)
 
     if (doc.numPages === 0) {
       throw new Error('PDF has no pages')
@@ -175,14 +201,17 @@ export async function generatePdfThumbnail(
 
     // Get first page
     const page = await doc.getPage(1)
+    console.log(`[PDF Thumbnail] Page 1 loaded`)
 
     // Set scale for thumbnail
     const scale = 1.5
     const viewport = page.getViewport({ scale })
+    console.log(`[PDF Thumbnail] Viewport: ${viewport.width}x${viewport.height}`)
 
     // Create canvas factory for Node.js
     const canvasFactory = new NodeCanvasFactory()
     const { canvas, context } = canvasFactory.create(viewport.width, viewport.height)
+    console.log(`[PDF Thumbnail] Canvas created`)
 
     // Render page to canvas
     const renderContext: any = {
@@ -191,15 +220,19 @@ export async function generatePdfThumbnail(
       canvas: canvas,
     }
 
+    console.log(`[PDF Thumbnail] Rendering page...`)
     await page.render(renderContext).promise
+    console.log(`[PDF Thumbnail] Page rendered successfully`)
 
     // Convert canvas to PNG buffer and save
     const buffer = canvas.toBuffer('image/png')
+    console.log(`[PDF Thumbnail] Buffer created: ${buffer.length} bytes`)
 
     // Save thumbnail
     const thumbnailFilename = `${randomUUID()}.png`
     const thumbnailPath = join(THUMBNAILS_DIR, thumbnailFilename)
     await writeFile(thumbnailPath, buffer)
+    console.log(`[PDF Thumbnail] Thumbnail saved: ${thumbnailPath}`)
 
     return thumbnailFilename
   } catch (error) {
