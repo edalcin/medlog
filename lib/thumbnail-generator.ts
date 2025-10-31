@@ -182,7 +182,11 @@ export async function generatePdfThumbnail(
     const pdfData = await readFile(filePath)
     console.log(`[PDF Thumbnail] PDF file read: ${pdfData.length} bytes`)
 
-    const doc = await pdfjs.getDocument({ data: pdfData }).promise
+    // Convert Buffer to Uint8Array (pdf.js requires Uint8Array, not Buffer)
+    const uint8Array = new Uint8Array(pdfData)
+    console.log(`[PDF Thumbnail] Converted to Uint8Array`)
+
+    const doc = await pdfjs.getDocument({ data: uint8Array }).promise
     console.log(`[PDF Thumbnail] PDF loaded. Pages: ${doc.numPages}`)
 
     if (doc.numPages === 0) {
