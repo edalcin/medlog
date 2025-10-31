@@ -186,7 +186,9 @@ export async function generatePdfThumbnail(
     const uint8Array = new Uint8Array(pdfData)
     console.log(`[PDF Thumbnail] Converted to Uint8Array`)
 
-    const doc = await pdfjs.getDocument({ data: uint8Array }).promise
+    // Disable worker since we're passing data directly (avoids worker loading issues)
+    console.log(`[PDF Thumbnail] Disabling worker for direct data processing`)
+    const doc = await pdfjs.getDocument({ data: uint8Array, disableWorker: true }).promise
     console.log(`[PDF Thumbnail] PDF loaded. Pages: ${doc.numPages}`)
 
     if (doc.numPages === 0) {
