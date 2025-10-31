@@ -72,33 +72,17 @@ interface ThumbnailGeneratorOptions {
   height?: number
 }
 
-// Load pdfjs-dist and configure for Node.js environment
+// Load pdfjs-dist for PDF processing
 async function loadPdfJs(): Promise<any> {
+  console.log(`[PDF Thumbnail] Loading pdfjs-dist...`)
+
+  // Use the legacy version which is more Node.js friendly
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs')
 
-  // Configure worker for server-side rendering
-  // Use the legacy worker which is compatible with Node.js
-  // This approach works in both development and production (Docker) environments
+  console.log(`[PDF Thumbnail] pdfjs-dist loaded successfully`)
 
-  // Get the path to pdfjs-dist package
-  let workerPath: string
-
-  try {
-    // First, try the standard Node.js require.resolve approach
-    workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')
-  } catch (error) {
-    try {
-      // Fallback: Use path resolution from pdfjs-dist main module
-      const modulePath = require.resolve('pdfjs-dist/package.json')
-      const moduleDir = modulePath.replace(/\/package\.json$/, '')
-      workerPath = join(moduleDir, 'legacy/build/pdf.worker.mjs')
-    } catch (fallbackError) {
-      // Last resort: Use standard node_modules path (works in Docker)
-      workerPath = join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
-    }
-  }
-
-  pdfjs.GlobalWorkerOptions.workerSrc = workerPath
+  // Note: We don't need to configure workerSrc when passing PDF data directly
+  // to getDocument(). The worker is only needed when loading from a URL.
 
   return pdfjs
 }
@@ -190,9 +174,15 @@ export async function generatePdfThumbnail(
     const pdfjs = await loadPdfJs()
     console.log(`[PDF Thumbnail] pdf.js loaded successfully`)
 
-    // Load PDF document
+    // Load PDF document using file path directly (works better in Node.js)
     console.log(`[PDF Thumbnail] Loading PDF from: ${filePath}`)
-    const doc = await pdfjs.getDocument(filePath).promise
+
+    // Use getDocument with data parameter (works without worker configuration)
+    const { readFile } = await import('fs/promises')
+    const pdfData = await readFile(filePath)
+    console.log(`[PDF Thumbnail] PDF file read: ${pdfData.length} bytes`)
+
+    const doc = await pdfjs.getDocument({ data: pdfData }).promise
     console.log(`[PDF Thumbnail] PDF loaded. Pages: ${doc.numPages}`)
 
     if (doc.numPages === 0) {
