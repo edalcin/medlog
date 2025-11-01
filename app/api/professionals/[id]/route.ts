@@ -76,7 +76,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       canEdit: professional.userId === session.user.id || session.user.role === 'ADMIN',
       clinic: professional.clinic ? {
         ...professional.clinic,
-        canEdit: professional.clinic.user.id === session.user.id || session.user.role === 'ADMIN',
+        canEdit: professional.clinic.user && (professional.clinic.user.id === session.user.id || session.user.role === 'ADMIN'),
       } : null,
     }
 
