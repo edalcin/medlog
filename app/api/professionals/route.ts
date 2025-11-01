@@ -20,9 +20,20 @@ export async function GET(request: NextRequest) {
     // Build where clause based on filter
     const whereClause: any = {}
 
-    // If user is not admin, show only professionals they created (userId = their ID)
+    // If user is not admin, show professionals they created OR professionals shared with them
     if (session.user.role !== 'ADMIN') {
-      whereClause.userId = session.user.id
+      whereClause.OR = [
+        { userId: session.user.id },
+        {
+          user: {
+            professionalsSharingFrom: {
+              some: {
+                sharingToUserId: session.user.id,
+              },
+            },
+          },
+        },
+      ]
     }
 
     if (statusFilter === 'active') {
