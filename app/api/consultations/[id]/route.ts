@@ -145,7 +145,23 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     if (type === 'CONSULTATION') {
       const professionalWhere = session.user.role === 'ADMIN'
         ? { id: professionalId, isActive: true }
-        : { id: professionalId, isActive: true, userId: session.user.id }
+        : {
+            AND: [
+              { id: professionalId, isActive: true },
+              {
+                OR: [
+                  { userId: session.user.id },  // profissionais que ele criou
+                  {
+                    user: {
+                      professionalsSharingFrom: {
+                        some: { sharingToUserId: session.user.id },  // profissionais compartilhados com ele
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          }
 
       const professional = await prisma.professional.findFirst({
         where: professionalWhere,

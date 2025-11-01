@@ -56,13 +56,45 @@ export async function PUT(
         throw new NotFoundError('Consulta')
       }
 
+      // Verify professional if provided
+      const finalProfessionalId = professionalId || consultation.professionalId
+      if (finalProfessionalId) {
+        const professionalWhere = session.user.role === 'ADMIN'
+          ? { id: finalProfessionalId }
+          : {
+              AND: [
+                { id: finalProfessionalId },
+                {
+                  OR: [
+                    { userId: session.user.id },  // profissionais que ele criou
+                    {
+                      user: {
+                        professionalsSharingFrom: {
+                          some: { sharingToUserId: session.user.id },  // profissionais compartilhados com ele
+                        },
+                      },
+                    },
+                  ],
+                },
+              ],
+            }
+
+        const professional = await prisma.professional.findFirst({
+          where: professionalWhere,
+        })
+
+        if (!professional) {
+          throw new NotFoundError('Profissional')
+        }
+      }
+
       // Update file with new consultation and professional
       const updatedFile = await prisma.file.update({
         where: { id },
         data: {
           customName: customName || null,
           consultationId,
-          professionalId: professionalId || consultation.professionalId,
+          professionalId: finalProfessionalId,
         },
         include: {
           consultation: {
@@ -116,11 +148,43 @@ export async function PUT(
     }
 
     // If only updating customName, categories, or professional
+    // Verify professional if provided
+    const finalProfessionalId = professionalId || file.professionalId || null
+    if (professionalId) {
+      const professionalWhere = session.user.role === 'ADMIN'
+        ? { id: professionalId }
+        : {
+            AND: [
+              { id: professionalId },
+              {
+                OR: [
+                  { userId: session.user.id },  // profissionais que ele criou
+                  {
+                    user: {
+                      professionalsSharingFrom: {
+                        some: { sharingToUserId: session.user.id },  // profissionais compartilhados com ele
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          }
+
+      const professional = await prisma.professional.findFirst({
+        where: professionalWhere,
+      })
+
+      if (!professional) {
+        throw new NotFoundError('Profissional')
+      }
+    }
+
     const updatedFile = await prisma.file.update({
       where: { id },
       data: {
         customName: customName || null,
-        professionalId: professionalId || file.professionalId || null,
+        professionalId: finalProfessionalId,
       },
       include: {
         consultation: {

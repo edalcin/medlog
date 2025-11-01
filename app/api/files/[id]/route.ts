@@ -108,11 +108,28 @@ export async function PUT(
 
     // Verify professional exists if provided (and user has access)
     if (professionalId) {
+      const professionalWhere = session.user.role === 'ADMIN'
+        ? { id: professionalId }
+        : {
+            AND: [
+              { id: professionalId },
+              {
+                OR: [
+                  { userId: session.user.id },  // profissionais que ele criou
+                  {
+                    user: {
+                      professionalsSharingFrom: {
+                        some: { sharingToUserId: session.user.id },  // profissionais compartilhados com ele
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          }
+
       const professional = await prisma.professional.findFirst({
-        where: {
-          id: professionalId,
-          ...(session.user.role !== 'ADMIN' ? { userId: session.user.id } : {}),
-        },
+        where: professionalWhere,
       })
 
       if (!professional) {

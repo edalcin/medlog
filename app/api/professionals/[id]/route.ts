@@ -84,10 +84,28 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
             throw new NotFoundError('Profissional')
         }
 
-        // If user is not admin and trying to change clinicId, verify clinic belongs to user
+        // If user is not admin and trying to change clinicId, verify clinic belongs to user or is shared
         if (session.user.role !== 'ADMIN' && clinicId) {
-            const clinic = await prisma.clinic.findUnique({
-                where: { id: clinicId, userId: session.user.id } as any,
+            const clinicWhere = {
+                AND: [
+                  { id: clinicId },
+                  {
+                    OR: [
+                      { userId: session.user.id },  // clínicas que ele criou
+                      {
+                        user: {
+                          clinicsSharingFrom: {
+                            some: { sharingToUserId: session.user.id },  // clínicas compartilhadas com ele
+                          },
+                        },
+                      },
+                    ],
+                  },
+                ],
+              } as any
+
+            const clinic = await prisma.clinic.findFirst({
+                where: clinicWhere,
             })
             if (!clinic) {
                 throw new NotFoundError('Clínica')
