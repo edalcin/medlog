@@ -37,6 +37,7 @@ interface Professional {
   clinicId: string | null
   clinic: Clinic | null
   phones?: Phone[]
+  canEdit: boolean
 }
 
 export default function ProfessionalDetailsPage() {
@@ -139,6 +140,13 @@ export default function ProfessionalDetailsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Check if user can edit
+    if (!professional?.canEdit) {
+      setError('Você não tem permissão para editar este profissional. Apenas administradores e o criador do registro podem editar.')
+      return
+    }
+
     setSubmitting(true)
     setError(null)
 
@@ -298,6 +306,14 @@ export default function ProfessionalDetailsPage() {
         <h1 className="text-3xl font-bold text-gray-900">Detalhes do Profissional</h1>
       </div>
 
+      {!professional?.canEdit && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-md p-4">
+          <p className="text-blue-800 text-sm">
+            ℹ️ Este profissional foi compartilhado com você. Apenas administradores e o criador do registro podem editar.
+          </p>
+        </div>
+      )}
+
       <div className="bg-white shadow rounded-lg">
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {error && (
@@ -308,7 +324,16 @@ export default function ProfessionalDetailsPage() {
 
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">Nome *</label>
-            <input type="text" id="name" name="name" required value={formData.name || ''} onChange={handleInputChange} className="mt-1 block w-full border-gray-300 rounded-md shadow-sm" />
+            <input
+              type="text"
+              id="name"
+              name="name"
+              required
+              disabled={!professional?.canEdit}
+              value={formData.name || ''}
+              onChange={handleInputChange}
+              className="mt-1 block w-full border-gray-300 rounded-md shadow-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
+            />
           </div>
 
           <div>
@@ -534,8 +559,8 @@ export default function ProfessionalDetailsPage() {
             <button
               type="button"
               onClick={handleDelete}
-              disabled={submitting}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
+              disabled={submitting || !professional?.canEdit}
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? 'Removendo...' : 'Remover'}
             </button>
@@ -545,12 +570,12 @@ export default function ProfessionalDetailsPage() {
                 onClick={() => router.back()}
                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
               >
-                Cancelar
+                Voltar
               </button>
               <button
                 type="submit"
-                disabled={submitting}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                disabled={submitting || !professional?.canEdit}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Salvando...' : 'Salvar Alterações'}
               </button>

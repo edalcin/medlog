@@ -7,6 +7,71 @@ import { ValidationError, NotFoundError } from '../../../../lib/errors'
 
 const prisma = new PrismaClient()
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return errorResponse('Não autorizado', 401)
+    }
+
+    const { id } = params
+
+    // Build where clause: if not admin, include clínicas criadas pelo usuário ou compartilhadas
+    const whereClause = session.user.role === 'ADMIN'
+      ? { id }
+      : {
+          AND: [
+            { id },
+            {
+              OR: [
+                { userId: session.user.id },  // clínicas que ele criou
+                {
+                  user: {
+                    clinicsSharingFrom: {
+                      some: { sharingToUserId: session.user.id },  // clínicas compartilhadas com ele
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        }
+
+    const clinic = await prisma.clinic.findFirst({
+      where: whereClause as any,
+      include: {
+        user: {
+          select: {
+            id: true,
+          },
+        },
+        phones: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
+      },
+    })
+
+    if (!clinic) {
+      throw new NotFoundError('Clínica')
+    }
+
+    // Check if user can edit this clinic
+    const transformedClinic = {
+      ...clinic,
+      canEdit: clinic.userId === session.user.id || session.user.role === 'ADMIN',
+    }
+
+    return successResponse(transformedClinic, 'Clínica encontrada com sucesso')
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }

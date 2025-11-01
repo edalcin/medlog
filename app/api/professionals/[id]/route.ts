@@ -14,20 +14,49 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       return errorResponse('Não autorizado', 401)
     }
 
-    // Build where clause: if not admin, filter by userId
+    // Build where clause: if not admin, include profissionais criados pelo usuário ou compartilhados
     const whereClause = session.user.role === 'ADMIN'
       ? { id: params.id }
-      : { id: params.id, userId: session.user.id }
+      : {
+          AND: [
+            { id: params.id },
+            {
+              OR: [
+                { userId: session.user.id },  // profissionais que ele criou
+                {
+                  user: {
+                    professionalsSharingFrom: {
+                      some: { sharingToUserId: session.user.id },  // profissionais compartilhados com ele
+                    },
+                  },
+                },
+              ],
+            },
+          ],
+        }
 
-    const professional = await prisma.professional.findUnique({
+    const professional = await prisma.professional.findFirst({
       where: whereClause as any,
       include: {
+        user: {
+          select: {
+            id: true,
+          },
+        },
         specialties: {
           include: {
             specialty: true,
           },
         },
-        clinic: true,
+        clinic: {
+          include: {
+            user: {
+              select: {
+                id: true,
+              },
+            },
+          },
+        },
         phones: {
           orderBy: {
             createdAt: 'asc',
@@ -40,10 +69,15 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       throw new NotFoundError('Profissional')
     }
 
-    // Transform to include specialty names
+    // Transform to include specialty names and check if user can edit
     const transformedProfessional = {
       ...professional,
       specialties: professional.specialties.map((ps) => ps.specialty),
+      canEdit: professional.userId === session.user.id || session.user.role === 'ADMIN',
+      clinic: professional.clinic ? {
+        ...professional.clinic,
+        canEdit: professional.clinic.user.id === session.user.id || session.user.role === 'ADMIN',
+      } : null,
     }
 
     return successResponse(transformedProfessional, 'Profissional encontrado com sucesso')
