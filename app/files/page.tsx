@@ -722,10 +722,6 @@ export default function FilesPage() {
                       <label className="block text-sm font-medium text-gray-700">Data de Upload</label>
                       <p className="mt-1 text-sm text-gray-900">{formatDate(selectedFile.uploadedAt)}</p>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Tipo MIME</label>
-                      <p className="mt-1 text-sm text-gray-900">{selectedFile.mimeType}</p>
-                    </div>
                   </div>
                 )}
 

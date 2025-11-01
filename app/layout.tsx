@@ -17,10 +17,10 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="pt-BR">
-      <body className={inter.className}>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={`${inter.className} bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100`}>
         <Providers>
-          <div className="min-h-screen bg-gray-50">
+          <div className="min-h-screen bg-white dark:bg-gray-950">
             <Navigation />
             <main className="container mx-auto px-4 py-8">
               {children}
