@@ -6,47 +6,36 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MedLog is a self-hosted medical consultation tracking system designed for families to maintain private medical records. The core entity is the **Consultation** (medical appointment), which connects Users, Professionals, and Files (documents/images).
 
-**Tech Stack:** Next.js 14 (App Router), React 18, TypeScript, Prisma ORM, MariaDB 11+, NextAuth.js, Tailwind CSS
+**Tech Stack:** Go 1.24 (backend), Svelte 5 + Vite 5 (frontend), SQLite via modernc.org/sqlite, alexedwards/scs v2 (sessions), pressly/goose v3 (migrations), go-chi/chi v5 (router)
 
 ## Development Commands
 
 ```bash
-# Development
-npm run dev                      # Start dev server on http://localhost:3000
-npm install                      # Install dependencies
+# Backend
+go run ./cmd/medlog           # Start backend on :3000
+go build ./...                # Build check
+go test ./...                 # Run tests
 
-# Database
-npx prisma db push               # Sync schema to database (development)
-npx prisma generate              # Generate Prisma Client
-npm run prisma:migrate:dev       # Create and apply migrations (development)
-npm run prisma:migrate:deploy    # Apply migrations (production)
+# Frontend (hot reload dev)
+cd frontend && npm run dev    # Starts on :5173, proxies /api to :3000
+cd frontend && npm run build  # Build to internal/embed/dist/
 
-# Seed scripts
-# Admin user setup:
-# Windows PowerShell:
-$env:ADMIN_PASSWORD='sua_senha'; npm run seed:admin
-# Linux/macOS:
-ADMIN_PASSWORD='sua_senha' npm run seed:admin
+# Docker
+docker build -t medlog:v2 .
+docker compose up
 
-npm run seed:categories          # Seed default file categories
-npm run seed:specialties         # Seed default medical specialties
-npm run seed:clinics             # Seed default clinics/hospitals
-npm run fix:professionals        # Associate default specialty to existing professionals
-
-# Build and deploy
-npm run build                    # Build for production
-npm run start                    # Start production server
-npm run lint                     # Run ESLint
+# Generate session secret
+openssl rand -base64 32
 ```
 
 ## Architecture
 
-### Data Model (Prisma)
+### Data Model
 - **User**: Users of the system (ADMIN or USER role)
-- **Professional**: Healthcare professionals with active/inactive status, multiple specialties, and optional clinic association
+- **Professional**: Healthcare professionals with active/inactive status, multiple specialties, and optional clinic association; scoped to a user (user_id)
 - **Specialty**: Medical specialties dictionary (e.g., Cardiologia, Ortopedia)
 - **ProfessionalSpecialty**: N:N junction table linking professionals to specialties
-- **Clinic**: Clinics/hospitals dictionary (e.g., Hospital Particular, UBS)
+- **Clinic**: Clinics/hospitals dictionary (e.g., Hospital Particular, UBS); scoped to a user (user_id)
 - **Consultation**: Central entity linking User + Professional + date + notes (Markdown) + Files
 - **File**: Uploaded documents (PDF) and images (PNG/JPG) with categorization
 - **FileCategory**: File category dictionary (e.g., Laudo, Receita, Pedido de Exame)
@@ -60,70 +49,43 @@ Key relationships:
 - FileCategory → Files (1:N)
 - Professional → Files (1:N) - for filtering files by professional
 
-### Authentication (NextAuth.js)
+### Authentication
 - Credentials-based authentication (email/password with bcrypt)
-- JWT session strategy
+- Server-side sessions stored in SQLite via alexedwards/scs v2
 - User roles: ADMIN and USER
-- Custom sign-in page: `/auth/signin`
-- Session data includes: `id`, `email`, `name`, `role`
-- Auth configuration: `lib/auth/config.ts`
+- Auth middleware: `internal/auth/middleware.go`
+- Session manager: `internal/auth/session.go`
 
 ### File Upload System
-- Upload directory: `process.env.FILES_PATH` or `./uploads`
+- Upload directory: `FILES_PATH` env var or `./data/uploads`
 - Allowed types: PDF, PNG, JPG (max 10MB per file)
 - Unique filenames: `{uuid}.{extension}`
 - Access via: `/api/files/{filename}`
-- Implementation: `lib/upload.ts`
 
-### App Structure (Next.js App Router)
+### Project Structure
 ```
-app/
-├── api/                            # API routes
-│   ├── auth/                       # NextAuth endpoints + /me
-│   ├── consultations/              # CRUD for consultations
-│   ├── professionals/              # CRUD for professionals
-│   ├── files/                      # File upload and serving
-│   ├── users/                      # User management (ADMIN only)
-│   ├── file-categories/            # File category dictionary management
-│   │   └── [id]/                   # PUT/DELETE category by ID
-│   ├── specialties/                # Medical specialty dictionary management
-│   │   └── [id]/                   # PUT/DELETE specialty by ID
-│   ├── clinics/                    # Clinic/hospital dictionary management
-│   │   └── [id]/                   # PUT/DELETE clinic by ID
-│   └── admin/                      # Admin-only endpoints
-│       ├── stats/                  # Statistics
-│       ├── consultations/          # List all consultations
-│       │   └── bulk-delete/        # Bulk delete consultations
-│       └── professionals/          # List all professionals
-│           └── bulk-delete/        # Bulk delete professionals
-├── consultations/                  # Consultation pages (list, detail, new)
-├── professionals/                  # Professional pages (list, detail, new)
-├── reports/                        # Reports/timeline view
-├── admin/                          # Admin panel (6 tabs)
-└── auth/signin/                    # Sign-in page
-
-lib/
-├── auth/                           # Auth config and utilities
-├── prisma/client.ts                # Singleton Prisma client
-├── upload.ts                       # File upload utilities
-├── responses.ts                    # API response helpers
-└── errors.ts                       # Error handling
-
-components/
-├── providers.tsx                   # React providers (SessionProvider)
-└── navigation.tsx                  # Navigation component
-
-scripts/
-├── seed-admin.ts                   # Create admin user
-├── seed-file-categories.ts         # Seed default file categories
-├── seed-specialties.ts             # Seed default specialties
-├── seed-clinics.ts                 # Seed default clinics/hospitals
-└── fix-professionals-add-default-specialty.ts  # Migration helper
+cmd/medlog/main.go              # Entry point
+internal/
+  auth/session.go               # SCS session manager
+  auth/middleware.go            # RequireAuth, RequireAdmin
+  db/db.go                      # sql.Open + WAL PRAGMA
+  db/migrate.go                 # goose migrations at startup
+  handlers/                     # HTTP handlers (auth, consultations, etc.)
+  middleware/security.go        # Security headers
+  models/                       # SQL query functions (no ORM)
+  embed/                        # Embedded Svelte build output
+  migrations/                   # SQL migration files (embedded)
+migrations/                     # SQL migration files (source)
+frontend/                       # Svelte 5 SPA
+  src/lib/api.ts                # Typed API client
+  src/lib/auth.ts               # Auth stores
+  src/routes/                   # Page components
+  src/components/               # Shared components
 ```
 
 ## Key Patterns
 
-1. **Professional Status**: Only `isActive: true` professionals appear in selection lists for new consultations. Inactive professionals remain in history but cannot be selected.
+1. **Professional Status**: Only `is_active = true` professionals appear in selection lists for new consultations. Inactive professionals remain in history but cannot be selected.
 
 2. **Quick Professional Creation**: Forms for creating consultations allow inline creation of professionals without full details.
 
@@ -141,7 +103,7 @@ scripts/
 
 9. **Referential Integrity**: Dictionaries (categories, specialties) cannot be deleted if in use. Professionals cannot be bulk-deleted if they have consultations.
 
-10. **Admin Panel Organization**: Admin panel has 7 tabs:
+10. **Admin Panel Organization**: Admin panel has tabs for:
     - Users: Full CRUD for system users
     - Consultations: View all + bulk delete
     - Professionals: View all + bulk delete (with validation)
@@ -152,20 +114,27 @@ scripts/
 
 11. **Clinic Association**: Professionals can optionally be associated with a clinic/hospital from a controlled dictionary. Inline creation is supported during professional registration.
 
+12. **No ORM**: All database access uses raw SQL via `database/sql`. Query functions live in `internal/models/`.
+
+13. **User-scoped Data**: Professionals and Clinics have a `user_id` column so each user manages their own data.
+
 ## Environment Variables
 
 Required in `.env`:
 ```
-DATABASE_URL=mysql://user:password@hostname:port/database
-NEXTAUTH_SECRET=                 # Generate with: openssl rand -base64 32
-NEXTAUTH_URL=http://localhost:3000
-FILES_PATH=/data/uploads         # Optional, defaults to ./uploads
+DATABASE_URL=file:./data/medlog.sqlite
+FILES_PATH=./data/uploads
+SESSION_SECRET=<generate with: openssl rand -base64 32>
+PORT=3000
+ADMIN_EMAIL=admin@example.com    # First-boot only
+ADMIN_PASSWORD=changeme          # First-boot only
+SESSION_SECURE=false             # true in production (HTTPS)
 ```
 
 ## Docker Deployment
 
 The project is designed for Docker deployment (e.g., Unraid):
-- Dockerfile builds a standalone Next.js app
-- Volume mount required for `FILES_PATH`
-- Database should be external MariaDB 11+ instance
-- Build command: `docker build -t medlog .`
+- Dockerfile builds a single Go binary with embedded Svelte assets
+- Volume mount required for `FILES_PATH` and the SQLite database directory
+- No external database required — SQLite is embedded
+- Build command: `docker build -t medlog:v2 .`

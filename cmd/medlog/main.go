@@ -70,7 +70,7 @@ func main() {
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api", func(r chi.Router) {
-		registerRoutes(r, database, filesPath)
+		registerRoutes(r, database, filesPath, databaseURL)
 	})
 
 	r.Handle("/*", spaHandler())
@@ -82,7 +82,7 @@ func main() {
 	}
 }
 
-func registerRoutes(r chi.Router, database *sql.DB, filesPath string) {
+func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL string) {
 	authH := &handlers.AuthHandler{DB: database}
 	r.Post("/auth/signin", authH.SignIn)
 	r.Post("/auth/signout", authH.SignOut)
@@ -94,7 +94,7 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath string) {
 	consultH := &handlers.ConsultationHandler{DB: database, FilesPath: filesPath}
 	fileH := &handlers.FileHandler{DB: database, FilesPath: filesPath}
 	userH := &handlers.UserHandler{DB: database}
-	adminH := &handlers.AdminHandler{DB: database, FilesPath: filesPath}
+	adminH := &handlers.AdminHandler{DB: database, FilesPath: filesPath, DBPath: extractDBPath(databaseURL)}
 
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth)
@@ -150,6 +150,8 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath string) {
 		r.Get("/admin/professionals", adminH.ListProfessionals)
 		r.Post("/admin/professionals/bulk-delete", adminH.BulkDeleteProfessionals)
 		r.Get("/admin/files", adminH.ListFiles)
+		r.Get("/admin/backup", adminH.Backup)
+		r.Post("/admin/restore", adminH.Restore)
 	})
 }
 
@@ -217,4 +219,15 @@ func envOrDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// extractDBPath converts a SQLite DATABASE_URL to a plain file path.
+// "file:/path/to/db.sqlite" → "/path/to/db.sqlite"
+// "file:./data/medlog.sqlite?cache=shared" → "./data/medlog.sqlite"
+func extractDBPath(databaseURL string) string {
+	s := strings.TrimPrefix(databaseURL, "file:")
+	if idx := strings.Index(s, "?"); idx >= 0 {
+		s = s[:idx]
+	}
+	return s
 }

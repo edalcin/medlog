@@ -1,90 +1,24 @@
-# Build stage: Use Debian-based image for building
-# node:20-bookworm already has Python, build tools, and all dependencies needed for canvas
-FROM node:20-bookworm AS deps
-WORKDIR /app
-
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
-RUN \
-  if [ -f package-lock.json ]; then npm ci; \
-  else echo "Lockfile not found." && exit 1; \
-  fi
-
-# Build stage: compile Next.js app
-FROM node:20-bookworm AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Next.js collects completely anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Generate Prisma client
-RUN npx prisma generate
-
-# Build Next.js with a dummy DATABASE_URL (Prisma requires it but won't connect during build)
-ENV DATABASE_URL="mysql://user:password@localhost:3306/medlog"
+# Stage 1: Build Svelte frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
 RUN npm run build
 
-# Production image: use Alpine for small size
-# Alpine includes OpenSSL 1.1 which is required by Prisma 5.x
-FROM node:20-alpine3.19 AS runner
+# Stage 2: Build Go binary (embeds frontend)
+FROM golang:1.24-alpine AS go-builder
 WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=frontend-builder /frontend/dist ./internal/embed/dist
+RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags='-s -w' -o medlog ./cmd/medlog
 
-ENV NODE_ENV=production
-# Uncomment the following line in case you want to disable telemetry during runtime.
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Install runtime dependencies for canvas and PDF thumbnail generation
-# Canvas: cairo, jpeg, pango, giflib, pixman (shared libraries for canvas binary)
-# PDF: poppler-utils (pdftoppm command for PDF to PNG conversion)
-RUN apk add --no-cache \
-  su-exec \
-  cairo \
-  jpeg \
-  pango \
-  giflib \
-  pixman \
-  libc6-compat \
-  poppler-utils
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy the built application
-COPY --from=builder /app/public ./public
-
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-# Copy node_modules from builder for runtime
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
-
-# Create uploads directory with proper permissions
-RUN mkdir -p /app/data/uploads && chown -R nextjs:nodejs /app/data/uploads
-
-COPY --from=builder /app/prisma ./prisma
-COPY docker-entrypoint.sh ./docker-entrypoint.sh
-RUN chmod +x docker-entrypoint.sh
-
-# Don't switch to nextjs user yet - entrypoint will handle permissions and switch user
-# USER nextjs
-
+# Stage 3: Minimal runtime
+FROM gcr.io/distroless/static:nonroot
+COPY --from=go-builder /app/medlog /medlog
 EXPOSE 3000
-
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-# Default upload directory (can be overridden via docker-compose/runtime)
-ENV FILES_PATH=/app/data/uploads
-
-# Entrypoint script para rodar migrations antes de subir o server
-ENV MEDLOG_VERSION=0.1.0
-ENTRYPOINT ["/bin/sh","./docker-entrypoint.sh"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD ["/medlog", "healthcheck"]
+ENTRYPOINT ["/medlog"]

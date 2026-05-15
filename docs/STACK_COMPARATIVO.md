@@ -1,5 +1,7 @@
 # Relatório Comparativo de Stack — MedLog vs PKD
 
+> **Note (2026-05-15):** Migration to Go + Svelte 5 + SQLite completed. This document records the analysis that led to the decision.
+
 > **Nota:** Este documento serve como guia para futuras migrações evolutivas do MedLog.
 > As seções de lições aprendidas descrevem problemas reais encontrados em uma tentativa
 > de migração (2026-04-24) e suas soluções, para que possam ser aplicadas sem retrabalho.
