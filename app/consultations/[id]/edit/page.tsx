@@ -93,7 +93,7 @@ export default function EditConsultationPage() {
   const [editingFile, setEditingFile] = useState<ExistingFile | null>(null)
   const [fileToDelete, setFileToDelete] = useState<string | null>(null)
   const [isAssociateModalOpen, setIsAssociateModalOpen] = useState(false)
-  const [associatedFileIds, setAssociatedFileIds] = useState<number[]>([])
+  const [associatedFileIds, setAssociatedFileIds] = useState<string[]>([])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -364,7 +364,7 @@ export default function EditConsultationPage() {
     }
   }
 
-  const handleAssociateFiles = async (fileIds: number[]) => {
+  const handleAssociateFiles = async (fileIds: string[]) => {
     setAssociatedFileIds(prev => [...prev, ...fileIds])
   }
 
@@ -834,7 +834,7 @@ export default function EditConsultationPage() {
         isOpen={isAssociateModalOpen}
         onClose={() => setIsAssociateModalOpen(false)}
         onAssociate={handleAssociateFiles}
-        consultationId={parseInt(id as string)}
+        consultationId={id as string}
       />
     </div>
   )

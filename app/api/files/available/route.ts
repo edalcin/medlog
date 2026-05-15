@@ -25,17 +25,28 @@ export async function GET(request: NextRequest) {
       where.userId = session.user.id
     }
 
+    const andConditions: any[] = []
+
     // If search is provided, search by customName or filename
     if (search) {
-      where.OR = [
-        { customName: { contains: search } },
-        { filename: { contains: search } },
-      ]
+      andConditions.push({
+        OR: [
+          { customName: { contains: search } },
+          { filename: { contains: search } },
+        ],
+      })
     }
 
     // Exclude files already associated with the current consultation
+    // Note: { not: x } in SQL doesn't match NULLs, so we must explicitly include them
     if (consultationId) {
-      where.consultationId = { not: parseInt(consultationId) }
+      andConditions.push({
+        OR: [{ consultationId: null }, { consultationId: { not: consultationId } }],
+      })
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions
     }
 
     // Get files

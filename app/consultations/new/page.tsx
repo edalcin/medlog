@@ -61,7 +61,7 @@ export default function NewConsultationPage() {
   })
   const [selectedFiles, setSelectedFiles] = useState<FileWithCategory[]>([])
   const [isAssociateModalOpen, setIsAssociateModalOpen] = useState(false)
-  const [associatedFileIds, setAssociatedFileIds] = useState<number[]>([])
+  const [associatedFileIds, setAssociatedFileIds] = useState<string[]>([])
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -187,7 +187,7 @@ export default function NewConsultationPage() {
     }
   }
 
-  const handleAssociateFiles = async (fileIds: number[]) => {
+  const handleAssociateFiles = async (fileIds: string[]) => {
     setAssociatedFileIds(prev => [...prev, ...fileIds])
   }
 

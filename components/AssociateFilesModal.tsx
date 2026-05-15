@@ -2,25 +2,31 @@
 
 import { useState, useEffect } from 'react'
 
-interface File {
-  id: number
+interface FileCategory {
+  id: string
+  name: string
+}
+
+interface FileFileCategory {
+  category: FileCategory
+}
+
+interface AvailableFile {
+  id: string
   filename: string
   customName: string | null
   mimeType: string
   uploadedAt: string
-  category: {
-    id: number
-    name: string
-  } | null
+  categories: FileFileCategory[]
   professional: {
-    id: number
+    id: string
     name: string
   } | null
   consultation: {
-    id: number
+    id: string
     date: string
     user: {
-      id: number
+      id: string
       name: string
     }
   } | null
@@ -29,8 +35,8 @@ interface File {
 interface AssociateFilesModalProps {
   isOpen: boolean
   onClose: () => void
-  onAssociate: (fileIds: number[]) => Promise<void>
-  consultationId?: number
+  onAssociate: (fileIds: string[]) => Promise<void>
+  consultationId?: string
 }
 
 export default function AssociateFilesModal({
@@ -39,8 +45,8 @@ export default function AssociateFilesModal({
   onAssociate,
   consultationId,
 }: AssociateFilesModalProps) {
-  const [files, setFiles] = useState<File[]>([])
-  const [selectedFiles, setSelectedFiles] = useState<Set<number>>(new Set())
+  const [files, setFiles] = useState<AvailableFile[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [associating, setAssociating] = useState(false)
@@ -74,7 +80,7 @@ export default function AssociateFilesModal({
     }
   }
 
-  const toggleFile = (fileId: number) => {
+  const toggleFile = (fileId: string) => {
     const newSelected = new Set(selectedFiles)
     if (newSelected.has(fileId)) {
       newSelected.delete(fileId)
@@ -154,8 +160,8 @@ export default function AssociateFilesModal({
                       {file.customName || file.filename}
                     </div>
                     <div className="text-sm text-gray-500 mt-1 space-y-1">
-                      {file.category && (
-                        <div>Categoria: {file.category.name}</div>
+                      {file.categories.length > 0 && (
+                        <div>Categoria: {file.categories.map(fc => fc.category.name).join(', ')}</div>
                       )}
                       {file.professional && (
                         <div>Profissional: {file.professional.name}</div>
