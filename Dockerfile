@@ -16,7 +16,7 @@ COPY --from=frontend-builder /internal/embed/dist ./internal/embed/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags='-s -w' -o medlog ./cmd/medlog
 
 # Stage 3: Minimal runtime
-FROM gcr.io/distroless/static:nonroot
+FROM gcr.io/distroless/static
 COPY --from=go-builder /app/medlog /medlog
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
