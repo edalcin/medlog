@@ -12,7 +12,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=frontend-builder /frontend/dist ./internal/embed/dist
+COPY --from=frontend-builder /internal/embed/dist ./internal/embed/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags='-s -w' -o medlog ./cmd/medlog
 
 # Stage 3: Minimal runtime
