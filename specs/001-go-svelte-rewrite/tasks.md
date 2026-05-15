@@ -199,7 +199,7 @@
 - [x] T072 [P] Update `.gitignore`: add `/medlog` (Go binary), `frontend/dist/`, `frontend/node_modules/`, `internal/embed/dist/`, `*.sqlite-wal`, `*.sqlite-shm`, keep existing ignores for `.env`
 - [x] T073 [P] Verify no secrets in tracked files: `git diff --cached` shows no `.env`, no passwords, `.env.example` has only placeholder values
 - [x] T074 [P] Update `docs/`: archive `STACK_COMPARATIVO.md` with note that migration was completed; update any other docs referencing old stack
-- [ ] T075 Create final git commit on main branch with message summarizing the v2 rewrite
+- [x] T075 Create final git commit on main branch with message summarizing the v2 rewrite
 
 ---
 
