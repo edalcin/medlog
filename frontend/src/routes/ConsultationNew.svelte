@@ -11,7 +11,7 @@
   let error = $state('')
 
   let date = $state(new Date().toISOString().split('T')[0])
-  let type = $state('CONSULTA')
+  let type = $state('CONSULTATION')
   let proposito = $state('')
   let notes = $state('')
   let professionalId = $state('')
@@ -87,8 +87,8 @@
         <div class="form-group">
           <label for="type">Tipo *</label>
           <select id="type" bind:value={type} disabled={submitting}>
-            <option value="CONSULTA">CONSULTA</option>
-            <option value="EVENTO">EVENTO</option>
+            <option value="CONSULTATION">Consulta</option>
+            <option value="EVENT">Evento</option>
           </select>
         </div>
         <div class="form-group">

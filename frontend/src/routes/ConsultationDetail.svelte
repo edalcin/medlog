@@ -163,8 +163,8 @@
           <div class="form-group">
             <label for="edit-type">Tipo</label>
             <select id="edit-type" bind:value={editType}>
-              <option value="CONSULTA">CONSULTA</option>
-              <option value="EVENTO">EVENTO</option>
+              <option value="CONSULTATION">Consulta</option>
+              <option value="EVENT">Evento</option>
             </select>
           </div>
           <div class="form-group">
@@ -204,8 +204,8 @@
     {:else}
       <div class="detail-section">
         <div class="meta-row">
-          <span class="badge {consultation.type === 'CONSULTA' ? 'badge-blue' : 'badge-yellow'}">
-            {consultation.type}
+          <span class="badge {consultation.type === 'CONSULTATION' ? 'badge-blue' : 'badge-yellow'}">
+            {consultation.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}
           </span>
           {#if consultation.rating}
             <span class="rating">{'★'.repeat(consultation.rating)}{'☆'.repeat(5 - consultation.rating)}</span>

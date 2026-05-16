@@ -81,7 +81,7 @@
           <div class="item-date">{formatDate(c.date)}</div>
           <div class="item-body">
             <div class="item-top">
-              <span class="badge {c.type === 'CONSULTA' ? 'badge-blue' : 'badge-yellow'}">{c.type}</span>
+              <span class="badge {c.type === 'CONSULTATION' ? 'badge-blue' : 'badge-yellow'}">{c.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}</span>
               {#if c.professional}
                 <span class="professional-name">{c.professional.name}</span>
                 {#if c.professional.specialties.length > 0}

@@ -3,7 +3,7 @@
   import * as api from '../lib/api'
   import type { User, Consultation, Professional, MedFile, Specialty, FileCategory, Clinic, AdminStats } from '../lib/api'
 
-  type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files'
+  type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'backup'
 
   let activeTab = $state<Tab>('users')
   let stats = $state<AdminStats | null>(null)
@@ -395,7 +395,7 @@
   {/if}
 
   <div class="tabs">
-    {#each [['users','Usuários'],['consultations','Consultas'],['professionals','Profissionais'],['specialties','Especialidades'],['categories','Categorias'],['clinics','Clínicas'],['files','Arquivos']] as [key, label]}
+    {#each [['users','Usuários'],['consultations','Consultas'],['professionals','Profissionais'],['specialties','Especialidades'],['categories','Categorias'],['clinics','Clínicas'],['files','Arquivos'],['backup','Backup & Restauração']] as [key, label]}
       <button
         class="tab-btn"
         class:active={activeTab === key}
@@ -489,7 +489,7 @@
               <tr>
                 <td><input type="checkbox" checked={selectedConsultationIds.includes(c.id)} onchange={() => toggleConsultation(c.id)} /></td>
                 <td>{formatDate(c.date)}</td>
-                <td><span class="badge {c.type === 'CONSULTA' ? 'badge-blue' : 'badge-yellow'}">{c.type}</span></td>
+                <td><span class="badge {c.type === 'CONSULTATION' ? 'badge-blue' : 'badge-yellow'}">{c.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}</span></td>
                 <td>{c.professional?.name ?? '—'}</td>
                 <td class="truncate">{c.proposito ?? '—'}</td>
               </tr>
@@ -667,13 +667,9 @@
           </tbody>
         </table>
       </div>
-    {/if}
 
-  </div>
-
-  <!-- Backup & Restore -->
-  <div class="backup-section card">
-    <h3>Backup & Restauração</h3>
+    <!-- Backup Tab -->
+    {:else if activeTab === 'backup'}
     <div class="backup-row">
       <div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">
@@ -705,6 +701,8 @@
         {/if}
       </div>
     </div>
+    {/if}
+
   </div>
 </div>
 
@@ -814,16 +812,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  .backup-section {
-    margin-top: 8px;
-  }
-
-  .backup-section h3 {
-    font-size: 15px;
-    font-weight: 600;
-    margin-bottom: 16px;
   }
 
   .backup-row {
