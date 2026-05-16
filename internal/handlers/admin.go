@@ -58,7 +58,7 @@ func (h *AdminHandler) BulkDeleteConsultations(w http.ResponseWriter, r *http.Re
 }
 
 func (h *AdminHandler) ListProfessionals(w http.ResponseWriter, r *http.Request) {
-	list, err := models.ProfessionalFindAll(r.Context(), h.DB, "", false)
+	list, err := models.ProfessionalFindAll(r.Context(), h.DB, "", true, false)
 	if err != nil {
 		writeError(w, "db error", http.StatusInternalServerError)
 		return

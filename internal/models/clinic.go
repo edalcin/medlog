@@ -15,10 +15,16 @@ type Clinic struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-func ClinicFindAll(ctx context.Context, db *sql.DB, userID string) ([]Clinic, error) {
-	rows, err := db.QueryContext(ctx,
-		`SELECT id, name, address, user_id, created_at, updated_at FROM clinics
-		 WHERE user_id=? OR user_id IS NULL ORDER BY name`, userID)
+func ClinicFindAll(ctx context.Context, db *sql.DB, userID string, isAdmin bool) ([]Clinic, error) {
+	var q string
+	var args []any
+	if isAdmin {
+		q = `SELECT id, name, address, user_id, created_at, updated_at FROM clinics ORDER BY name`
+	} else {
+		q = `SELECT id, name, address, user_id, created_at, updated_at FROM clinics WHERE user_id=? OR user_id IS NULL ORDER BY name`
+		args = []any{userID}
+	}
+	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}

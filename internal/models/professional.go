@@ -49,10 +49,17 @@ func professionalLoadSpecialties(ctx context.Context, db *sql.DB, profID string)
 	return list, rows.Err()
 }
 
-func ProfessionalFindAll(ctx context.Context, db *sql.DB, userID string, activeOnly bool) ([]Professional, error) {
-	q := `SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at
-	      FROM professionals WHERE (user_id=? OR user_id IS NULL)`
-	args := []any{userID}
+func ProfessionalFindAll(ctx context.Context, db *sql.DB, userID string, isAdmin bool, activeOnly bool) ([]Professional, error) {
+	var q string
+	var args []any
+	if isAdmin {
+		q = `SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at
+		     FROM professionals WHERE 1=1`
+	} else {
+		q = `SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at
+		     FROM professionals WHERE (user_id=? OR user_id IS NULL)`
+		args = []any{userID}
+	}
 	if activeOnly {
 		q += " AND is_active=1"
 	}

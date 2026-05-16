@@ -20,8 +20,9 @@ type ProfessionalHandler struct {
 
 func (h *ProfessionalHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 	activeOnly := r.URL.Query().Get("active") == "true"
-	list, err := models.ProfessionalFindAll(r.Context(), h.DB, userID, activeOnly)
+	list, err := models.ProfessionalFindAll(r.Context(), h.DB, userID, role == "ADMIN", activeOnly)
 	if err != nil {
 		writeError(w, "db error", http.StatusInternalServerError)
 		return

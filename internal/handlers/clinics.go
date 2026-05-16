@@ -17,7 +17,8 @@ type ClinicHandler struct{ DB *sql.DB }
 
 func (h *ClinicHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
-	list, err := models.ClinicFindAll(r.Context(), h.DB, userID)
+	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
+	list, err := models.ClinicFindAll(r.Context(), h.DB, userID, role == "ADMIN")
 	if err != nil {
 		writeError(w, "db error", http.StatusInternalServerError)
 		return
