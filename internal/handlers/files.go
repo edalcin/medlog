@@ -126,8 +126,12 @@ func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 
 	f, err := os.Open(path)
 	if err != nil {
-		writeError(w, "file not found", http.StatusNotFound)
-		return
+		// Migrated files store bare filename in path column — try FilesPath prefix
+		f, err = os.Open(filepath.Join(h.FilesPath, filepath.Base(path)))
+		if err != nil {
+			writeError(w, "file not found", http.StatusNotFound)
+			return
+		}
 	}
 	defer f.Close()
 

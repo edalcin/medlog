@@ -95,11 +95,13 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 	fileH := &handlers.FileHandler{DB: database, FilesPath: filesPath}
 	userH := &handlers.UserHandler{DB: database}
 	adminH := &handlers.AdminHandler{DB: database, FilesPath: filesPath, DBPath: extractDBPath(databaseURL)}
+	dashH := &handlers.DashboardHandler{DB: database}
 
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth)
 
 		r.Get("/auth/me", authH.Me)
+		r.Get("/dashboard", dashH.Get)
 
 		r.Get("/specialties", specialtyH.List)
 		r.Get("/file-categories", categoryH.List)

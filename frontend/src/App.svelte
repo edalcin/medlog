@@ -11,11 +11,13 @@
   import ProfessionalDetail from './routes/ProfessionalDetail.svelte'
   import Reports from './routes/Reports.svelte'
   import Admin from './routes/Admin.svelte'
+  import Dashboard from './routes/Dashboard.svelte'
 
   import './app.css'
 
   const routes = {
-    '/': ConsultationList,
+    '/': Dashboard,
+    '/dashboard': Dashboard,
     '/signin': SignIn,
     '/consultations': ConsultationList,
     '/consultations/new': ConsultationNew,

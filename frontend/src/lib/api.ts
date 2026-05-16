@@ -65,6 +65,38 @@ export interface AdminStats {
   files: number
 }
 
+export interface DashboardStats {
+  summary: {
+    totalConsultations: number
+    totalEpisodes: number
+    totalProfessionals: number
+    totalFiles: number
+  }
+  bySpecialty: Array<{ name: string; count: number }>
+  byClinic: Array<{ name: string; count: number }>
+  byYear: Array<{ year: string; count: number }>
+  byProfessional: Array<{ name: string; specialty: string; count: number }>
+  byMonth: Array<{ month: string; count: number }>
+  recentConsultations: Array<{
+    id: string
+    date: string
+    professionalName: string
+    specialty: string
+  }>
+  recentEpisodes: Array<{
+    id: string
+    date: string
+    title: string
+  }>
+  topRatedProfessionals: Array<{
+    id: string
+    name: string
+    specialty: string
+    averageRating: number
+    totalRatings: number
+  }>
+}
+
 // Base API path — same origin, proxied in dev
 const BASE = '/api'
 
@@ -93,6 +125,10 @@ export const signout = () =>
 
 export const me = () =>
   request<User>('GET', '/auth/me')
+
+// Dashboard
+export const getDashboard = () =>
+  request<DashboardStats>('GET', '/dashboard')
 
 // Consultations
 export const getConsultations = () =>

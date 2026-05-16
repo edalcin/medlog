@@ -11,7 +11,10 @@
 <nav>
   <div class="nav-brand">MedLog</div>
   <div class="nav-links">
-    <a href="/consultations" use:link class:active={$location === '/consultations' || $location === '/'}>
+    <a href="/dashboard" use:link class:active={$location === '/' || $location === '/dashboard'}>
+      Dashboard
+    </a>
+    <a href="/consultations" use:link class:active={$location === '/consultations'}>
       Consultas
     </a>
     <a href="/professionals" use:link class:active={$location.startsWith('/professionals')}>
