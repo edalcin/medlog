@@ -1,6 +1,6 @@
 module medlog
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/alexedwards/scs/v2 v2.9.0
@@ -9,6 +9,11 @@ require (
 	github.com/pressly/goose/v3 v3.24.3
 	golang.org/x/crypto v0.38.0
 	modernc.org/sqlite v1.37.1
+)
+
+require (
+	filippo.io/edwards25519 v1.2.0 // indirect
+	github.com/go-sql-driver/mysql v1.10.0 // indirect
 )
 
 require (

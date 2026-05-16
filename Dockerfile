@@ -15,10 +15,13 @@ COPY . .
 COPY --from=frontend-builder /internal/embed/dist ./internal/embed/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags='-s -w' -o medlog ./cmd/medlog
 
-# Stage 3: Minimal runtime
-FROM gcr.io/distroless/static
+# Stage 3: Runtime
+FROM alpine:3.21
+RUN apk add --no-cache sqlite ca-certificates tzdata
 COPY --from=go-builder /app/medlog /medlog
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD ["/medlog", "healthcheck"]
-ENTRYPOINT ["/medlog"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

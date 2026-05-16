@@ -55,6 +55,18 @@ docker-compose.*.yml
 *.temp
 # Database backups (NOT to be synced)
 backup/
+*.bak-before-migration
+migration_dump.sql
+migration_dump.sql.imported
+migration_dump.done
+
+# One-time migration tools (post-migration, not needed in repo)
+cmd/migrate-mariadb/
+cmd/sqlite-import/
+sqlite-import.exe
+
+# Windows artifacts
+nul
 
 # Go binary
 /medlog
