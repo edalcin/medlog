@@ -1,179 +1,156 @@
-# MedLog - Instalação e Atualização no Unraid
+# MedLog — Instalação no Unraid
 
-Este guia explica como instalar e atualizar o MedLog no Unraid.
+O MedLog usa SQLite embutido — **não requer MariaDB ou banco externo**.
 
-## 📦 Instalação Inicial
+---
 
-### 1. Preparar o script de instalação
+## Instalação Inicial
 
-```bash
-# Baixar o template
-wget https://raw.githubusercontent.com/edalcin/medlog/main/unraid-setup.sh.template
+### 1. Criar diretórios de dados
 
-# Copiar para o arquivo de trabalho
-cp unraid-setup.sh.template unraid-setup.sh
-
-# Editar com suas configurações
-nano unraid-setup.sh
-```
-
-### 2. Editar as variáveis de ambiente
-
-No arquivo `unraid-setup.sh`, configure:
-
-- **DATABASE_URL**: String de conexão do MariaDB
-  ```
-  mysql://usuario:senha@ip:porta/database
-  ```
-
-- **NEXTAUTH_SECRET**: Gere com o comando:
-  ```bash
-  openssl rand -base64 32
-  ```
-
-- **NEXTAUTH_URL**: URL pública da aplicação
-  ```
-  https://seu-dominio.com
-  ```
-
-- **Volumes e paths**: Ajuste conforme necessário
-  ```
-  /mnt/user/Storage/appsdata/medlog/
-  ```
-
-### 3. Executar a instalação
+No terminal do Unraid:
 
 ```bash
-bash unraid-setup.sh
+mkdir -p /mnt/user/appdata/medlog/db
+mkdir -p /mnt/user/appdata/medlog/uploads
 ```
 
-## 🔄 Atualização
-
-### Opção 1: Via Interface do Unraid (RECOMENDADO)
-
-1. Vá para **Docker** tab
-2. Clique em **Check for Updates**
-3. Clique em **Update** no container medlog
-4. ✅ **Pronto!** As migrações do banco rodam automaticamente
-
-### Opção 2: Via Script (Terminal)
+### 2. Gerar SESSION_SECRET
 
 ```bash
-# Baixar o template (primeira vez)
-wget https://raw.githubusercontent.com/edalcin/medlog/main/unraid-update.sh.template
-cp unraid-update.sh.template unraid-update.sh
-
-# Editar com as MESMAS configurações do unraid-setup.sh
-nano unraid-update.sh
-
-# Executar atualização
-bash unraid-update.sh
+openssl rand -base64 32
 ```
 
-### Opção 3: Manual
+Guarde o valor — será usado na variável `SESSION_SECRET`.
+
+### 3. Criar o container
+
+Via **Docker → Add Container** ou pelo terminal:
+
+```bash
+docker run -d \
+  --name medlog \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -v /mnt/user/appdata/medlog/db:/data/db \
+  -v /mnt/user/appdata/medlog/uploads:/data/uploads \
+  -e DATABASE_URL="file:/data/db/medlog.sqlite" \
+  -e FILES_PATH="/data/uploads" \
+  -e SESSION_SECRET="sua_chave_gerada_acima" \
+  -e PORT="3000" \
+  -e ADMIN_EMAIL="admin@exemplo.com" \
+  -e ADMIN_PASSWORD="senha_forte_aqui" \
+  -e SESSION_SECURE="true" \
+  ghcr.io/edalcin/medlog:latest
+```
+
+> `ADMIN_EMAIL` e `ADMIN_PASSWORD` são usados apenas no **primeiro boot** para criar o administrador. Após a criação do usuário, remova essas variáveis por segurança.
+
+### 4. Verificar
+
+```bash
+docker logs -f medlog
+```
+
+Aguardar a linha `server listening on :3000` e acessar `http://ip-do-unraid:3000`.
+
+---
+
+## Atualização
+
+### Via interface do Unraid (recomendado)
+
+1. Aba **Docker** → **Check for Updates**
+2. Clicar **Update** no container `medlog`
+3. Migrações do banco rodam automaticamente na inicialização
+
+### Via terminal
 
 ```bash
 docker stop medlog
 docker rm medlog
 docker pull ghcr.io/edalcin/medlog:latest
-bash unraid-setup.sh
+# Re-executar o docker run com as mesmas variáveis
 ```
 
-## ✅ Por Que Não Preciso Mais Rodar o Script?
+---
 
-### Antes (problema):
-- `SKIP_MIGRATIONS=true` estava configurado
-- Migrações do banco **não rodavam** automaticamente
-- Cada update quebrava a aplicação
+## Backup e Restauração
 
-### Agora (solução):
-- `SKIP_MIGRATIONS` foi **removido**
-- Migrações rodam **automaticamente** na inicialização
-- Updates via Unraid UI funcionam perfeitamente
+O sistema possui backup e restauração integrados no painel administrativo (aba **Backup & Restauração**):
 
-## 🔍 Verificar se está funcionando
+- **Download Backup:** baixa o arquivo `.sqlite` com checkpoint WAL aplicado
+- **Restaurar:** faz upload de um `.sqlite` válido para substituir o banco atual
+
+Adicionalmente, como o banco é um único arquivo, pode-se copiar diretamente:
 
 ```bash
-# Ver logs em tempo real
-docker logs -f medlog
+# Backup manual
+cp /mnt/user/appdata/medlog/db/medlog.sqlite /mnt/user/backup/medlog-$(date +%Y%m%d).sqlite
 
-# Verificar se migrações rodaram
-docker logs medlog | grep -i migration
-
-# Ver status do container
-docker ps | grep medlog
+# Verificar logs
+docker logs medlog | tail -50
 ```
 
-## 📝 Comandos Úteis
+---
 
-```bash
-# Ver logs
-docker logs -f medlog
+## Variáveis de Ambiente
 
-# Parar container
-docker stop medlog
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `DATABASE_URL` | sim | `file:/data/db/medlog.sqlite` |
+| `FILES_PATH` | sim | Diretório de uploads (ex: `/data/uploads`) |
+| `SESSION_SECRET` | sim | String aleatória min. 32 chars (`openssl rand -base64 32`) |
+| `PORT` | não | Porta do servidor (padrão: `3000`) |
+| `ADMIN_EMAIL` | primeiro boot | Email do admin inicial |
+| `ADMIN_PASSWORD` | primeiro boot | Senha do admin inicial |
+| `SESSION_SECURE` | não | `true` em produção (HTTPS). Padrão: `false` |
 
-# Iniciar container
-docker start medlog
+---
 
-# Reiniciar container
-docker restart medlog
+## Troubleshooting
 
-# Entrar no container
-docker exec -it medlog sh
+### Container não inicia
 
-# Ver versão da imagem
-docker inspect medlog | grep Image
-```
-
-## ⚠️ Importante
-
-1. **Nunca comite** os arquivos `unraid-setup.sh` e `unraid-update.sh` - eles contêm credenciais
-2. **Sempre use os templates** (.template) como base
-3. **Mantenha backup** das suas configurações
-4. **Teste updates** em ambiente de desenvolvimento primeiro (opcional)
-
-## 🔐 Segurança
-
-Os arquivos de configuração são ignorados pelo git (`.gitignore`):
-```
-unraid-setup.sh      # Ignorado - contém credenciais
-unraid-update.sh     # Ignorado - contém credenciais
-```
-
-Apenas os templates são versionados:
-```
-unraid-setup.sh.template    # Versionado - valores placeholder
-unraid-update.sh.template   # Versionado - valores placeholder
-```
-
-## 🆘 Troubleshooting
-
-### Erro: "Container não inicia"
 ```bash
 docker logs medlog
 ```
 
-### Erro: "Cannot connect to database"
-Verifique:
-- MariaDB está rodando
-- Credenciais estão corretas
-- Firewall permite conexão
+### Permission denied nos volumes
 
-### Erro: "Migrações falharam"
 ```bash
-# Entrar no container
-docker exec -it medlog sh
+# Verificar dono dos diretórios
+ls -la /mnt/user/appdata/medlog/
 
-# Rodar migrações manualmente
-npx prisma migrate deploy
-
-# Ver status das migrações
-npx prisma migrate status
+# O container roda como root — se necessário, ajustar permissões
+chmod 755 /mnt/user/appdata/medlog/db
+chmod 755 /mnt/user/appdata/medlog/uploads
 ```
 
-## 📚 Links Úteis
+### Banco corrompido
+
+```bash
+# Parar container
+docker stop medlog
+
+# Verificar integridade
+sqlite3 /mnt/user/appdata/medlog/db/medlog.sqlite "PRAGMA integrity_check;"
+
+# Restaurar a partir de backup via painel admin ou copiando o arquivo
+cp /mnt/user/backup/medlog-20260101.sqlite /mnt/user/appdata/medlog/db/medlog.sqlite
+
+docker start medlog
+```
+
+### Entrar no container
+
+```bash
+docker exec -it medlog sh
+```
+
+---
+
+## Links
 
 - [Repositório GitHub](https://github.com/edalcin/medlog)
 - [Documentação Técnica](./TECHNICAL.md)
-- [Instruções para Claude](./CLAUDE.md)

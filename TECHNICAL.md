@@ -1,394 +1,220 @@
-# Documentação Técnica - MedLog
-
-Esta documentação contém informações técnicas detalhadas sobre a arquitetura, desenvolvimento e estrutura do banco de dados do MedLog.
+# Documentação Técnica — MedLog
 
 ---
 
-## 🏗️ Arquitetura e Tecnologias
+## Stack
 
-### Stack Tecnológico
+| Camada | Tecnologia |
+|--------|-----------|
+| Backend | Go 1.24 |
+| Router | go-chi/chi v5 |
+| Sessões | alexedwards/scs v2 (armazenadas no SQLite) |
+| Migrações | pressly/goose v3 |
+| Banco | SQLite via modernc.org/sqlite (pure-Go, CGO_ENABLED=0) |
+| Frontend | Svelte 5 + Vite 5 + TypeScript |
+| Roteamento SPA | @keenmate/svelte-spa-router |
+| Deploy | Docker multi-stage (alpine:3.21, ~30MB imagem final) |
 
-**Frontend:**
-- Next.js 14 (App Router)
-- React 18
-- TypeScript 5+
-- shadcn/ui + Tailwind CSS
-- NextAuth.js para autenticação
+O frontend é compilado em tempo de build e embutido no binário Go via `//go:embed`. O resultado é um único executável sem dependências externas além do SQLite.
 
-**Backend:**
-- Node.js 20+
-- Express.js
-- TypeScript 5+
-- Prisma ORM
+---
 
-**Database:**
-- MariaDB 11+
-
-**Processamento de Imagens e PDFs:**
-- Sharp (otimização de imagens)
-- pdfjs-dist (processamento de PDFs)
-- canvas (renderização em Node.js)
-
-**Deploy:**
-- Docker (multi-stage build)
-- GitHub Container Registry (ghcr.io)
-- Unraid ready
-
-### Arquitetura
+## Arquitetura
 
 ```
-┌─────────────────────────────────────────────────┐
-│              Next.js 14 Frontend                │
-│   (React + TypeScript + shadcn/ui)              │
-├─────────────────────────────────────────────────┤
-│              NextAuth.js (OAuth)                │
-├─────────────────────────────────────────────────┤
-│         Express.js API Routes                   │
-│   (TypeScript + Prisma)                         │
-├─────────────────────────────────────────────────┤
-│              MariaDB 11+                        │
-│   (Prisma ORM)                                  │
-└─────────────────────────────────────────────────┘
-         ↓                    ↓
-    Uploads              Cloudflare
-  (Filesystem)            Tunnel
+┌─────────────────────────────────────────┐
+│           Browser                       │
+│   Svelte 5 SPA (embutido no binário)    │
+└───────────────────┬─────────────────────┘
+                    │ HTTP/JSON
+┌───────────────────▼─────────────────────┐
+│           Go Binary (:3000)             │
+│                                         │
+│  chi router                             │
+│  ├── /api/*   → handlers/               │
+│  ├── /files/* → serve uploads           │
+│  └── /*       → embed/dist (SPA)        │
+│                                         │
+│  alexedwards/scs (sessions em SQLite)   │
+└───────────────────┬─────────────────────┘
+                    │
+┌───────────────────▼─────────────────────┐
+│     SQLite (WAL, foreign keys on)       │
+│     + volume de uploads (arquivos)      │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## 📊 Estrutura do Banco de Dados
+## Estrutura do Projeto
 
-O sistema utiliza 5 tabelas principais:
+```
+cmd/medlog/main.go              # Entry point — wiring de handlers e rotas
+internal/
+  auth/
+    session.go                  # SCS session manager
+    middleware.go               # RequireAuth, RequireAdmin
+  db/
+    db.go                       # sql.Open + PRAGMA WAL
+    migrate.go                  # goose executa migrations no startup
+  handlers/                     # Handlers HTTP por domínio
+  middleware/security.go        # Security headers
+  models/                       # Funções SQL (sem ORM)
+  embed/                        # Build do Svelte embutido
+  migrations/                   # SQL embutidos para goose
+migrations/                     # Fontes SQL (versionados)
+frontend/
+  src/lib/api.ts                # Cliente API tipado
+  src/lib/auth.ts               # Stores de autenticação
+  src/routes/                   # Páginas (Dashboard, Consultations, etc.)
+  src/components/               # Componentes reutilizáveis
+  public/                       # Assets estáticos (doctor-icon.png, etc.)
+```
+
+---
+
+## Schema do Banco de Dados
 
 ```
 users
-├── id (PK)
-├── email (unique)
-├── name
-├── google_id
-├── is_admin
-├── active
-└── timestamps
+  id, email, username, name, password_hash, role (ADMIN|USER), theme, timestamps
 
-health_professionals
-├── id (PK)
-├── name
-├── specialty (pode ser NULL em criação rápida)
-├── crm
-├── phone
-├── phone_secondary (novo)
-├── address
-├── city (novo)
-├── state (novo)
-├── active (controla pulldown)
-└── timestamps
+specialties
+  id, name (unique), created_at
+
+clinics
+  id, name, address, user_id → users, timestamps
+  UNIQUE(name, user_id)
+
+professionals
+  id, name, crm, address, notes, is_active, user_id → users, clinic_id → clinics, timestamps
+
+professional_specialties
+  id, professional_id → professionals, specialty_id → specialties, created_at
+  UNIQUE(professional_id, specialty_id)
 
 consultations
-├── id (PK)
-├── user_id (FK → users)
-├── professional_id (FK → health_professionals)
-├── consultation_date
-├── specialty
-├── notes (Markdown)
-└── timestamps
+  id, date, proposito, notes (Markdown), type (CONSULTATION|EVENT), rating (1-5)
+  user_id → users, professional_id → professionals, timestamps
 
-consultation_files
-├── id (PK)
-├── consultation_id (FK → consultations)
-├── professional_id (FK → health_professionals) ⭐ NOVO
-├── file_name
-├── file_path
-├── file_type
-├── file_size
-└── timestamps
+file_categories
+  id, name (unique), created_at
 
-sessions
-├── id (PK)
-├── user_id (FK → users)
-├── expires_at
-└── data
+files
+  id, filename, custom_name, path, mime_type, size, hash, thumbnail_path
+  consultation_id → consultations, professional_id → professionals, user_id → users, uploaded_at
+
+file_file_categories
+  id, file_id → files, category_id → file_categories, created_at
+  UNIQUE(file_id, category_id)
+
+sessions                        # gerenciado pelo scs
+  token, data, expiry
 ```
 
-**⭐ Mudança Importante:** Arquivos agora têm `professional_id` para permitir busca direta de todos os arquivos de um profissional sem JOINs complexos.
+**Cascade deletes:**
+- `users` delete → cascata em `consultations`, `professionals`, `clinics`, `files`
+- `consultations` delete → cascata em `files`
+- `professionals` delete → cascata em `professional_specialties`
+- `clinic` delete → SET NULL em `professionals.clinic_id`
 
 ---
 
-## 🚀 Desenvolvimento Local
+## Desenvolvimento Local
 
 ### Pré-requisitos
 
+- Go 1.24+
 - Node.js 20+
-- npm ou yarn
-- MariaDB 11+
 
 ### Setup
 
 ```bash
-# Clone o repositório
+# Clone
 git clone https://github.com/edalcin/medlog.git
 cd medlog
 
-# Instale dependências
+# Backend
+cp .env.example .env   # edite conforme necessário
+go run ./cmd/medlog
+
+# Frontend (hot reload em :5173, proxies /api → :3000)
+cd frontend
 npm install
-
-# Configure variáveis de ambiente (.env.local)
-DATABASE_URL="mysql://medlog_user:senha@localhost:3306/medlog"
-NEXTAUTH_SECRET="gere_com_openssl_rand_base64_32"
-NEXTAUTH_URL="http://localhost:3000"
-FILES_PATH="./uploads"
-
-# Execute migrations
-npx prisma db push
-
-# Crie usuário admin
-ADMIN_PASSWORD='SenhaForte123!' npm run seed:admin
-
-# Inicie desenvolvimento
 npm run dev
 ```
 
-### Comandos Úteis
-
-```bash
-# Desenvolvimento
-npm run dev              # Next.js dev server (http://localhost:3000)
-
-# Database
-npx prisma generate      # Gera Prisma Client
-npx prisma migrate dev   # Cria migration
-npx prisma studio        # GUI do banco (http://localhost:5555)
-npx prisma db seed       # Popula com dados de teste
-
-# Build
-npm run build           # Build de produção
-npm start               # Inicia produção
-
-# Testes
-npm test                # Testes unitários
-npm run test:watch      # Watch mode
-
-# Linting
-npm run lint            # ESLint
-npm run type-check      # TypeScript check
-```
-
-### Migrações e Seed
-
-Para aplicar o schema do banco em produção/desenvolvimento:
-
-```bash
-npm run prisma:migrate:deploy
-```
-
-Gerar nova migration após alterar o schema (`prisma/schema.prisma`):
-
-```bash
-npm run prisma:migrate:dev
-```
-
-Gerar somente o client Prisma:
-
-```bash
-npm run prisma:generate
-```
-
-Criar usuário admin inicial (não armazene ADMIN_PASSWORD no .env):
-
-```bash
-ADMIN_PASSWORD='SenhaForte123!' npm run seed:admin
-```
-
-Reset local (cuidado - destrói dados):
-
-```bash
-npx prisma migrate reset
-```
-
----
-
-## 🔧 Configuração Avançada
-
-### Variáveis de Ambiente Completas
+### Variáveis de ambiente (`.env`)
 
 ```env
-# Database (Obrigatório)
-DATABASE_URL=mysql://medlog_user:senha_segura@192.168.1.100:3306/medlog
-
-# Security (Obrigatório - gere com openssl rand -base64 32)
-NEXTAUTH_SECRET=string_aleatoria_min_32_caracteres
-NEXTAUTH_URL=http://192.168.1.100:3000
-
-# Files (Obrigatório)
-FILES_PATH=/app/data/uploads    # Path dos uploads no container
-
-# Opcional
-NODE_ENV=production             # production ou development
-MAX_FILE_SIZE=10485760          # 10MB em bytes (padrão)
-ALLOWED_FILE_TYPES=pdf,png,jpg,jpeg  # Tipos permitidos
+DATABASE_URL=file:./data/medlog.sqlite
+FILES_PATH=./data/uploads
+SESSION_SECRET=gere_com_openssl_rand_base64_32
+PORT=3000
+ADMIN_EMAIL=admin@exemplo.com
+ADMIN_PASSWORD=senha_forte
+SESSION_SECURE=false
 ```
 
-### Limites e Configurações
+### Comandos
 
-- **Tamanho máximo por arquivo:** 10MB (configurável via `MAX_FILE_SIZE`)
-- **Tipos de arquivo aceitos:** PDF, PNG, JPG/JPEG
-- **Quantidade de arquivos:** Ilimitada
-- **Thumbnails:** Gerados automaticamente para imagens (200x200px) e sob demanda para PDFs
-- **Sessões:** Expiram em 7 dias de inatividade
-- **Registros de Login:** Armazenados indefinidamente com índices para performance
+```bash
+# Backend
+go run ./cmd/medlog       # dev server em :3000
+go build ./...            # verificar compilação
+go test ./...             # testes
 
----
+# Frontend
+cd frontend
+npm run dev               # hot reload em :5173
+npm run build             # build → internal/embed/dist/
 
-## 🎯 Novas Funcionalidades (v2.0+)
-
-### 1. Sistema de Registro de Logins
-
-**Painel Administrativo → Aba "Logins"**
-
-Rastreia todos os logins de usuários e administradores:
-
-- **Dados registrados:** Nome, email, role (Admin/Usuário), data e hora
-- **Filtros:** Por email/nome de usuário e intervalo de datas
-- **Ordenação:** Por nome, email ou data/hora do login
-- **Acesso:** Apenas administradores podem visualizar
-
-**API:**
-```
-GET /api/admin/login-logs
-Parâmetros:
-  - userEmail: string (filtro por email/nome)
-  - startDate: ISO-8601 (data inicial)
-  - endDate: ISO-8601 (data final)
-  - limit: number (padrão: 1000)
-  - offset: number (padrão: 0)
-```
-
-**Banco de Dados:**
-```sql
-CREATE TABLE login_logs (
-  id UUID PRIMARY KEY,
-  userId UUID NOT NULL,
-  userName VARCHAR(255),
-  userEmail VARCHAR(255),
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE,
-  INDEX (userId),
-  INDEX (timestamp)
-);
+# Docker
+docker build -t medlog:local .
+docker compose up
 ```
 
 ---
 
-### 2. Gerenciamento Avançado de Arquivos
+## Autenticação e Sessões
 
-**Painel Administrativo → Aba "Arquivos"**
-
-Interface melhorada com modal de detalhes:
-
-#### Interface da Tabela
-- Clicar em qualquer linha abre modal com detalhes completos
-- Exibe thumbnail pequeno (8x8px) de cada arquivo
-- Tabela compacta e responsiva sem scroll horizontal
-- Columns: Arquivo | Categoria | Data | Usuário | Profissional
-
-#### Modal de Detalhes
-Ao clicar em um arquivo, exibe:
-
-**Seção de Visualização:**
-- Imagem em tamanho grande (clicável para abrir em nova aba)
-- PDF mostra thumbnail gerado
-- Permite abrir arquivo original no navegador
-
-**Informações Completas:**
-- Nome e nome original (se renomeado)
-- Tamanho do arquivo
-- Tipo MIME
-- Categoria do arquivo
-- Data da consulta associada
-- Usuário que enviou
-- Profissional associado
-- Data/hora de upload
-- Status de thumbnail
-
-**Botões de Ação:**
-- `Visualizar Arquivo` - Abre em nova aba do browser
-- `Gerar Thumbnail` - Gera thumbnail sob demanda (PDFs e imagens)
-- `Editar` - Abre formulário para renomear
-- `Excluir` - Remove arquivo com confirmação
-- `Fechar` - Fecha o modal
+- Credenciais (email + bcrypt password) — sem OAuth
+- Sessões server-side via `alexedwards/scs` armazenadas no SQLite
+- Roles: `ADMIN` (acesso global) e `USER` (acesso aos próprios dados)
+- Profissionais e clínicas são user-scoped (`user_id`): cada usuário vê os próprios + os globais (`user_id IS NULL`)
+- ADMIN vê todos os registros de todos os usuários
 
 ---
 
-### 3. Geração de Thumbnails
+## Upload de Arquivos
 
-#### Automática (no upload)
-- **Imagens (PNG, JPG):** Thumbnail gerado automaticamente no upload
-- **PDFs:** Thumbnail gerado sob demanda via botão no painel
-- **Tamanho:** 200x200px
-- **Qualidade:** PNG com compressão otimizada
-- **Fallback seguro:** Upload não falha se geração de thumbnail falhar
-
-#### Sob Demanda
-**API:**
-```
-POST /api/files/generate-thumbnail/[fileId]
-Resposta: { id, thumbnailPath }
-Acesso: Apenas administradores
-```
-
-#### Técnica Implementada
-- **Imagens:** Sharp (biblioteca otimizada de Node.js)
-- **PDFs:** pdfjs-dist + canvas (sem dependência de Python)
-- **Compatibilidade:** Windows, Linux, Docker, Unraid
-- **Renderização PDF:** Primeira página em alta qualidade (DPI 150)
+- Tipos aceitos: PDF, PNG, JPG (max 10MB)
+- Filename: `{uuid}.{ext}` — nunca expõe nome original no filesystem
+- Caminho: `{FILES_PATH}/{uuid}.{ext}`
+- Acesso via: `GET /api/files/{filename}` (requer autenticação)
 
 ---
 
-### 4. Detalhes Técnicos da Tabela de Arquivos
+## Backup e Restauração
 
-**Otimizações Implementadas:**
+Disponível no Painel Administrativo → aba "Backup & Restauração":
 
-1. **Espaçamento Reduzido:**
-   - Padding horizontal: px-3 (antes px-6)
-   - Padding vertical: py-3 (antes py-4)
-   - Economia de 50% de espaço horizontal
-
-2. **Tratamento de Texto Longo:**
-   - Nome de arquivo: `truncate` (ellipsis)
-   - Email: `truncate` (não quebra linha)
-   - Especialidades: `line-clamp-1` (máximo 1 linha)
-
-3. **Elementos Compactos:**
-   - Thumbnails: 8x8px (antes 10x10px)
-   - Fonte geral: text-sm
-   - Texto secundário: text-xs
-
-4. **Resultado:**
-   - ✅ Tabela cabe totalmente na tela
-   - ✅ Todas as 5 colunas visíveis
-   - ✅ Sem scroll horizontal
+- **Backup:** faz `PRAGMA wal_checkpoint(TRUNCATE)` e serve o arquivo `.sqlite` diretamente
+- **Restauração:** valida magic bytes SQLite, substitui atomicamente via rename, re-pinga a conexão, invalida sessões ativas
 
 ---
 
-## 📚 Documentação Adicional
+## Docker
 
-- **Especificação Técnica Completa:** `.specify/inicioDesenv.md`
-- **Decisões Técnicas:** `.specify/decisions.md`
-- **Roadmap de Desenvolvimento:** `.specify/READY_TO_START.md`
-- **Guia de Início Rápido:** `START_HERE.md`
-- **PRD Original:** `PRD.md`
+Build multi-stage:
+1. `node:20-alpine` → compila o Svelte
+2. `golang:1.24-alpine` → compila o binário Go com frontend embutido (`CGO_ENABLED=0`)
+3. `alpine:3.21` → imagem final (~30MB) com apenas o binário
 
----
-
-## 🤝 Contribuindo
-
-Este projeto é para uso pessoal/familiar, mas contribuições são bem-vindas:
-
-1. Fork o repositório
-2. Crie uma branch (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -am 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
-5. Abra um Pull Request
+Sem dependência de banco externo — SQLite é embedded.
 
 ---
 
-**Última atualização: 29 de outubro de 2025**
+## Contribuindo
+
+PRs são bem-vindos. Mantenha o stack simples e a imagem Docker pequena.
