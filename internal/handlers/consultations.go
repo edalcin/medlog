@@ -23,21 +23,31 @@ func (h *ConsultationHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
 	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 
+	page, limit := parsePagination(r)
+	offset := (page - 1) * limit
+
 	var list []models.Consultation
+	var total int
 	var err error
 	if role == "ADMIN" {
-		list, err = models.ConsultationFindAll(r.Context(), h.DB)
+		list, err = models.ConsultationFindAll(r.Context(), h.DB, limit, offset)
+		if err == nil {
+			total, err = models.ConsultationCountAll(r.Context(), h.DB)
+		}
 	} else {
-		list, err = models.ConsultationFindByUserID(r.Context(), h.DB, userID)
+		list, err = models.ConsultationFindByUserID(r.Context(), h.DB, userID, limit, offset)
+		if err == nil {
+			total, err = models.ConsultationCountByUserID(r.Context(), h.DB, userID)
+		}
 	}
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
 		list = []models.Consultation{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+	writePagedJSON(w, list, total, page, limit)
 }
 
 func (h *ConsultationHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -76,10 +86,10 @@ func (h *ConsultationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := models.ConsultationCreate(r.Context(), h.DB, uuid.New().String(), in)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, c)
+	writeJSON(w, http.StatusCreated, map[string]any{"data": c})
 }
 
 func (h *ConsultationHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -92,7 +102,7 @@ func (h *ConsultationHandler) Get(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
@@ -100,7 +110,7 @@ func (h *ConsultationHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, "not found", http.StatusNotFound)
 		return
 	}
-	writeJSON(w, http.StatusOK, c)
+	writeJSON(w, http.StatusOK, map[string]any{"data": c})
 }
 
 func (h *ConsultationHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +123,7 @@ func (h *ConsultationHandler) Update(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
@@ -156,10 +166,10 @@ func (h *ConsultationHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	c, err := models.ConsultationUpdate(r.Context(), h.DB, id, in)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, c)
+	writeJSON(w, http.StatusOK, map[string]any{"data": c})
 }
 
 func (h *ConsultationHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -172,7 +182,7 @@ func (h *ConsultationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
@@ -182,7 +192,7 @@ func (h *ConsultationHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.ConsultationDelete(r.Context(), h.DB, id, h.FilesPath); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

@@ -92,10 +92,10 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	f, err := models.FileCreate(r.Context(), h.DB, in)
 	if err != nil {
 		os.Remove(destPath)
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, f)
+	writeJSON(w, http.StatusCreated, map[string]any{"data": f})
 }
 
 func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
@@ -119,7 +119,7 @@ func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 		if err == sql.ErrNoRows {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
@@ -143,6 +143,7 @@ func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "private, max-age=3600")
 	http.ServeContent(w, r, origFilename, stat.ModTime(), f)
 }
 
@@ -152,7 +153,7 @@ func (h *FileHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		if err == sql.ErrNoRows {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}

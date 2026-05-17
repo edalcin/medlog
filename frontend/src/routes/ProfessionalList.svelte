@@ -8,6 +8,11 @@
   let loading = $state(true)
   let error = $state('')
   let activeOnly = $state(true)
+  let page = $state(1)
+  let total = $state(0)
+  let search = $state('')
+  let searchDebounce: ReturnType<typeof setTimeout>
+  const limit = 20
 
   onMount(async () => {
     await load()
@@ -15,9 +20,11 @@
 
   async function load() {
     loading = true
+    error = ''
     try {
-      const res = await api.getProfessionals(activeOnly)
+      const res = await api.getProfessionals(activeOnly, page, limit, search)
       all = res.data
+      total = res.total
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao carregar profissionais'
     } finally {
@@ -25,16 +32,39 @@
     }
   }
 
+  let totalPages = $derived(Math.max(1, Math.ceil(total / limit)))
+
+  async function goTo(p: number) {
+    page = p
+    await load()
+  }
+
   async function toggleFilter() {
     activeOnly = !activeOnly
+    page = 1
     await load()
+  }
+
+  function onSearchInput() {
+    clearTimeout(searchDebounce)
+    searchDebounce = setTimeout(() => {
+      page = 1
+      load()
+    }, 300)
   }
 </script>
 
 <div class="page">
   <div class="page-header">
     <h1>Profissionais</h1>
-    <div style="display:flex;gap:8px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input
+        type="search"
+        bind:value={search}
+        oninput={onSearchInput}
+        placeholder="Buscar por nome..."
+        style="padding:6px 12px;font-size:13px;min-width:180px"
+      />
       <button class="btn btn-ghost" onclick={toggleFilter}>
         {activeOnly ? 'Ver todos' : 'Apenas ativos'}
       </button>
@@ -57,14 +87,17 @@
       {#each all as p (p.id)}
         <div
           class="pro-item"
-          onclick={() => push(`/professionals/${p.id}`)}
+          class:shared={p.isShared}
+          onclick={() => !p.isShared && push(`/professionals/${p.id}`)}
           role="button"
-          tabindex="0"
-          onkeydown={(e) => e.key === 'Enter' && push(`/professionals/${p.id}`)}
+          tabindex={p.isShared ? -1 : 0}
+          onkeydown={(e) => !p.isShared && e.key === 'Enter' && push(`/professionals/${p.id}`)}
         >
           <div class="pro-main">
             <span class="pro-name">{p.name}</span>
-            {#if !p.isActive}
+            {#if p.isShared}
+              <span class="badge badge-yellow" title="Compartilhado por outro usuário">Compartilhado</span>
+            {:else if !p.isActive}
               <span class="badge badge-red">Inativo</span>
             {:else}
               <span class="badge badge-green">Ativo</span>
@@ -85,6 +118,13 @@
         </div>
       {/each}
     </div>
+    {#if totalPages > 1}
+      <div class="pagination">
+        <button class="btn btn-ghost" disabled={page <= 1} onclick={() => goTo(page - 1)}>‹ Anterior</button>
+        <span class="page-info">Página {page} de {totalPages} · {total} total</span>
+        <button class="btn btn-ghost" disabled={page >= totalPages} onclick={() => goTo(page + 1)}>Próxima ›</button>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -136,6 +176,19 @@
   }
 
   .clinic {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .page-info {
     font-size: 13px;
     color: var(--text-muted);
   }

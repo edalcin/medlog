@@ -12,11 +12,6 @@ require (
 )
 
 require (
-	filippo.io/edwards25519 v1.2.0 // indirect
-	github.com/go-sql-driver/mysql v1.10.0 // indirect
-)
-
-require (
 	github.com/alexedwards/scs/sqlite3store v0.0.0-20251002162104-209de6e426de
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

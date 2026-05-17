@@ -32,54 +32,23 @@ O projeto passou por uma refatoração estrutural significativa (MariaDB → SQL
 
 ### 2.2 ⚠️ Inconsistências
 
-#### A. SESSION_SECRET não utilizado pelo SCS
+#### A. ✅ SESSION_SECRET não utilizado pelo SCS — RESOLVIDO
 
-`.env.example` define `SESSION_SECRET`, o Unraid o injeta corretamente, mas `internal/auth/session.go` **nunca lê essa variável**. O SCS gerará uma chave de criptografia aleatória a cada restart do processo.
+> **Implementado em 2026-05-17** — `internal/auth/session.go`, `internal/migrations/003_rate_limiting_and_config.sql`, `cmd/medlog/main.go`
 
-- **Impacto:** Todas as sessões são invalidadas a cada deploy/restart do container. Usuários são deslogados.
-- **Recomendação:** Passar `SESSION_SECRET` ao inicializar o SCS, ou documentar explicitamente que sessões são voláteis por design.
+SCS usa SQLite store (`sqlite3store`) para persistência de sessões — a chave de criptografia não é o vetor de invalidação. Implementada detecção de rotação de segredo:
+- `EnsureSessionSecret(db, secret)`: hash SHA256 do segredo armazenado em `app_config`
+- Se hash mudou → `InvalidateAllSessions(db)` (DELETE FROM sessions) → atualiza hash
+- Se hash igual → sessões preservadas através de restarts
+- `SESSION_SECRET` agora é `mustEnv` — obrigatório para iniciar o servidor
 
-#### B. Divergência de paths entre docker-entrypoint.sh e docker-compose.yml
+#### B. ✅ Divergência de paths entre docker-entrypoint.sh e docker-compose.yml — RESOLVIDO
 
-O `docker-entrypoint.sh` cria diretórios em `/app/data/`:
-```sh
-DATA_DIR="/app/data"
-DB_DIR="${DATA_DIR}/db"
-UPLOADS_DIR="${DATA_DIR}/uploads"
-```
+> **Implementado em 2026-05-17** — `docker-compose.yml`, `.env.example`
 
-O `docker-compose.yml` referencia `/data/` (sem `/app`):
-```yaml
-DATABASE_URL: file:/data/db/medlog.sqlite
-FILES_PATH: /data/uploads
-volumes:
-  - ./data/db:/data/db
-  - ./data/uploads:/data/uploads
-```
-
-O `.env.example` também usa `/data/`:
-```env
-DATABASE_URL=file:/data/db/medlog.sqlite
-FILES_PATH=/data/uploads
-```
-
-- **Impacto:** Quem usar `docker-compose.yml` sem customizar as variáveis terá erro, pois os diretórios `/data/db` e `/data/uploads` **não são criados pelo entrypoint** (ele só cria `/app/data/*`). O SQLite falhará ao tentar criar o banco se o diretório pai não existir. O Unraid só funciona porque você alinhou manualmente os paths para `/app/data`.
-- **Recomendação:** Alinhar entrypoint e compose para o mesmo path base. **Opção recomendada:** usar `/app/data` em tudo — entrypoint já cria os subdiretórios, e um volume único simplifica a configuração:
-
-```yaml
-# docker-compose.yml (corrigido)
-environment:
-  DATABASE_URL: file:/app/data/db/medlog.sqlite
-  FILES_PATH: /app/data/uploads
-volumes:
-  - ./data:/app/data
-```
-
-```env
-# .env.example (corrigido)
-DATABASE_URL=file:/app/data/db/medlog.sqlite
-FILES_PATH=/app/data/uploads
-```
+Alinhado para `/app/data/` em todos os arquivos:
+- `docker-compose.yml`: volume único `./data:/app/data`; `DATABASE_URL: file:/app/data/db/medlog.sqlite`; `FILES_PATH: /app/data/uploads`; adicionado `TRUST_PROXY` env var
+- `.env.example`: paths atualizados para `/app/data/`; adicionado `TRUST_PROXY=false` com comentário explicativo
 
 #### C. Duplicação de arquivos de migração
 
@@ -93,25 +62,11 @@ Apenas `internal/migrations/` é efetivamente usado pelo goose em runtime. A dup
 - **Impacto:** Se alguém editar apenas `migrations/`, a mudança não será aplicada.
 - **Recomendação:** Manter apenas `internal/migrations/` como fonte única, ou usar `go:generate` para copiar, ou um symlink.
 
-#### D. Padrão de resposta inconsistente na API
+#### D. ✅ Padrão de resposta inconsistente na API — RESOLVIDO
 
-| Endpoint | Formato de resposta |
-|----------|-------------------|
-| `POST /auth/signin` | `{ id, email, name, role }` (objeto direto) |
-| `GET /auth/me` | `{ id, email, name, role }` (objeto direto) |
-| `GET /dashboard` | Objeto direto |
-| `GET /consultations` | `{ data: [...] }` |
-| `POST /consultations` | Objeto direto |
-| `GET /specialties` | `{ data: [...] }` |
-| `POST /specialties` | Objeto direto |
-| `GET /professionals` | `{ data: [...] }` |
-| `POST /professionals` | Objeto direto |
-| `GET /admin/stats` | Objeto direto |
-| `GET /admin/consultations` | `{ data: [...] }` |
+> **Implementado em 2026-05-17** — todos os handlers + `frontend/src/lib/api.ts`
 
-Metade dos endpoints retorna o objeto diretamente, a outra metade envolve em `{ data: ... }`. O frontend (`api.ts`) já lida com ambos formatos, mas é frágil.
-
-- **Recomendação:** Padronizar. **Opção recomendada:** `{ data: T }` para todos os endpoints, pois permite adicionar metadados (paginação, erros estruturados) sem quebrar compatibilidade.
+Todos os endpoints agora retornam `{ data: T }`. Handlers atualizados: `auth.go`, `consultations.go`, `professionals.go`, `clinics.go`, `specialties.go`, `categories.go`, `users.go`, `dashboard.go`, `files.go`, `admin.go`. `theme` adicionado à resposta de `signin` e `me`, exposto via `SessionKeyTheme`. Frontend: `api.ts` atualiza todos os tipos, extrai `.data` em cada chamada — callers recebem `T` diretamente via `.then(r => r.data)`.
 
 #### E. Geração de IDs inconsistente
 
@@ -121,21 +76,17 @@ Metade dos endpoints retorna o objeto diretamente, a outra metade envolve em `{ 
 
 - **Recomendação:** Remover `newID()` e usar `uuid.New().String()` consistentemente em todo o código.
 
-#### F. Arquivo `stores.ts` vazio
+#### F. ✅ Arquivo `stores.ts` vazio — RESOLVIDO
 
-`frontend/src/lib/stores.ts` contém apenas `export {}`. Código morto.
+> **Implementado em 2026-05-17** — arquivo removido
 
-- **Recomendação:** Remover o arquivo ou populá-lo com stores reais.
+`frontend/src/lib/stores.ts` removido (era código morto com apenas `export {}`).
 
-#### G. Bug no Reports.svelte — badge de tipo sempre amarelo
+#### G. ✅ Bug no Reports.svelte — badge de tipo sempre amarelo — RESOLVIDO
 
-```svelte
-<span class="badge {c.type === 'CONSULTA' ? 'badge-blue' : 'badge-yellow'}">{c.type}</span>
-```
+> **Implementado em 2026-05-17** — `frontend/src/routes/Reports.svelte`
 
-O valor real de `c.type` é `'CONSULTATION'` (definido no backend), **não** `'CONSULTA'`. Como a comparação nunca é verdadeira, o badge sempre fica amarelo.
-
-- **Recomendação:** Corrigir para `c.type === 'CONSULTATION'`.
+Corrigido para `c.type === 'CONSULTATION'` com label amigável `{c.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}`.
 
 ---
 
@@ -143,59 +94,35 @@ O valor real de `c.type` é `'CONSULTATION'` (definido no backend), **não** `'C
 
 ### 3.1 🔴 Críticos
 
-#### A. Ausência de rate limiting no login
+#### A. ✅ Ausência de rate limiting no login — RESOLVIDO
 
-`POST /auth/signin` não tem proteção contra brute-force. Um atacante pode tentar senhas indefinidamente sem bloqueio.
+> **Implementado em 2026-05-17** — `internal/middleware/ratelimit.go`, `internal/migrations/003_rate_limiting_and_config.sql`
 
-- **Risco:** Alto — comprometimento de contas por força bruta
-- **Recomendação:** Implementar rate limiting com chi middleware. Exemplo: bloquear após 5 tentativas em 1 minuto por IP, com delay progressivo. Alternativa: usar biblioteca como `didip/tollbooth` ou implementar contador no SQLite com limpeza periódica.
+Rate limiting implementado como chi middleware sem dependências externas:
+- Tabela `rate_limit_attempts` (ip, window_start, attempts) com `ON CONFLICT DO UPDATE SET attempts = attempts + 1`
+- 5 tentativas/minuto por IP; retorna 429 + `Retry-After: 60`
+- IP detection: `CF-Connecting-IP` → `X-Forwarded-For` (TRUST_PROXY=true) → `RemoteAddr`
+- Cleanup automático: `DELETE WHERE window_start < datetime('now', '-2 minutes')` a cada request
+- Aplicado exclusivamente em `POST /auth/signin` via `.With(RateLimit(db, trustProxy))`
 
-#### B. Ausência de Content-Security-Policy
+#### B. ✅ Ausência de Content-Security-Policy — RESOLVIDO
 
-`internal/middleware/security.go` define headers de segurança básicos mas **não inclui CSP**:
+> **Implementado em 2026-05-17** — `internal/middleware/security.go`
 
+CSP adicionado em `Security` middleware:
 ```go
-w.Header().Set("X-Content-Type-Options", "nosniff")
-w.Header().Set("X-Frame-Options", "DENY")
-w.Header().Set("X-XSS-Protection", "1; mode=block")
-w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
-// FALTA: Content-Security-Policy
+w.Header().Set("Content-Security-Policy",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'")
 ```
-
-- **Risco:** Médio-alto — sem CSP, XSS tem impacto maior (embora o MarkdownPreview já faça HTML escaping)
-- **Recomendação:** Adicionar:
-```go
-w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'")
-```
+`connect-src 'self'` confirma que frontend só pode chamar mesma origem — sem exfiltração de dados via fetch/XHR para domínios externos.
 
 ### 3.2 🟡 Médios
 
-#### C. `ConsultationUpdate` e `UserUpdate` — múltiplos updates sem transação
+#### C. ✅ `ConsultationUpdate` e `UserUpdate` — múltiplos updates sem transação — RESOLVIDO
 
-```go
-// Cada campo gera um UPDATE separado e independente
-if in.Date != nil {
-    db.ExecContext(ctx, "UPDATE consultations SET date=?, updated_at=? WHERE id=?", ...)
-}
-if in.Proposito != nil {
-    db.ExecContext(ctx, "UPDATE consultations SET proposito=?, updated_at=? WHERE id=?", ...)
-}
-if in.Notes != nil {
-    db.ExecContext(ctx, "UPDATE consultations SET notes=?, updated_at=? WHERE id=?", ...)
-}
-// ... até 6 UPDATEs separados para uma única operação
-```
+> **Implementado em 2026-05-17** — `internal/models/consultation.go`, `user.go`
 
-- **Risco:** Race condition (outro request pode ler estado intermediário); falha parcial deixa dados inconsistentes
-- **Recomendação:** Construir uma única query UPDATE com `SET` dinâmico e executar em uma transação. Exemplo:
-
-```go
-tx, _ := db.BeginTx(ctx, nil)
-defer tx.Rollback()
-// construir query dinâmica com todos os campos alterados
-// executar único UPDATE
-tx.Commit()
-```
+Ambas as funções agora constroem um único `UPDATE SET a=?,b=? WHERE id=?` dinamicamente com `strings.Join`. Única statement SQL = atomicidade garantida pelo SQLite sem necessidade de transação explícita.
 
 #### D. SQL com concatenação de string (baixo risco atual, frágil para futuro)
 
@@ -211,15 +138,11 @@ q := "SELECT COUNT(*) FROM consultations c WHERE c.type = 'CONSULTATION' " + use
 - **Risco:** Baixo atualmente (valores controlados), mas frágil a refatorações
 - **Recomendação:** Construir queries com placeholders consistentes, evitando concatenação mesmo em casos seguros
 
-#### E. Credenciais hardcoded no migrador MariaDB
+#### E. ✅ Credenciais hardcoded no migrador MariaDB — RESOLVIDO
 
-`cmd/migrate-mariadb/main.go`:
-```go
-dsn := "medlog:medlog@tcp(192.168.1.10:3333)/medlog?parseTime=true&charset=utf8mb4"
-```
+> **Implementado em 2026-05-17** — `cmd/migrate-mariadb/` e `cmd/sqlite-import/` removidos
 
-- **Risco:** Credenciais e IP interno visíveis no repositório público
-- **Recomendação:** Mover para variáveis de ambiente. Se a ferramenta for de uso único (migração já concluída), remover do repositório.
+Ambos os diretórios deletados do repositório. `go mod tidy` removeu dependência `github.com/go-sql-driver/mysql` do `go.mod` e `go.sum`.
 
 #### F. `MarkdownPreview.svelte` — renderizador de Markdown frágil
 
@@ -263,42 +186,26 @@ O erro real do banco é descartado. O cliente não vê detalhes (bom para segura
 
 ## 4. Otimização e Performance
 
-### 4.1 🔴 Problemas N+1 (Crítico para performance)
+### 4.1 ✅ RESOLVIDO — Problemas N+1 (Crítico para performance)
 
-#### A. Listagem de consultas: N+1 queries
+> **Implementado em 2026-05-17** — `internal/models/helpers.go`, `consultation.go`, `professional.go`, `file.go`
 
-```go
-func consultationBase(...) ([]Consultation, error) {
-    // 1 query para buscar consultas
-    rows, _ := db.QueryContext(ctx, "SELECT ... FROM consultations ...")
-    for rows.Next() {
-        // +1 query POR CONSULTA para buscar professional
-        c.Professional, _ = ProfessionalFindByID(ctx, db, *c.ProfessionalID)
-        // +1 query POR CONSULTA para buscar files
-        c.Files, _ = FileFindByConsultationID(ctx, db, c.ID)
-        // Files, por sua vez, faz +1 query POR ARQUIVO para categories
-    }
-}
-```
+#### A. ✅ Listagem de consultas: N+1 queries — RESOLVIDO
 
-**100 consultas com 2 arquivos cada = 1 + 100 + 100 + (100×2) = 401 queries**
+Implementado batch loading em `consultationBase()`:
+- `helpers.go`: funções `inClause(n)` e `anySlice(ss)` para queries `IN (...)`
+- Profissionais: `SELECT ... FROM professionals WHERE id IN (...)` — 1 query para todos
+- Arquivos: `SELECT ... FROM files WHERE consultation_id IN (...)` — 1 query para todos
+- Categorias: `fileLoadCategoriesBatch()` com JOIN — 1 query para todos os arquivos
 
-- **Recomendação:**
-  1. Fazer JOIN na query principal para trazer dados do professional
-  2. Batch load de files: `SELECT * FROM files WHERE consultation_id IN (?, ?, ...)`
-  3. Batch load de categorias: `SELECT ... FROM file_file_categories WHERE file_id IN (...)`
+**100 consultas com 2 arquivos cada: 401 queries → 4 queries**
 
-#### B. Listagem de profissionais: N+1 para specialties
+#### B. ✅ Listagem de profissionais: N+1 para specialties — RESOLVIDO
 
-```go
-for rows.Next() {
-    p.Specialties, _ = professionalLoadSpecialties(ctx, db, p.ID) // +1 query
-}
-```
+Implementado `professionalLoadSpecialtiesBatch()` em `professional.go`:
+- `SELECT ps.professional_id, s.* FROM professional_specialties ps JOIN specialties s ... WHERE ps.professional_id IN (...)`
 
-**50 profissionais = 51 queries**
-
-- **Recomendação:** JOIN com `GROUP_CONCAT` no SQLite, ou batch load após o loop principal.
+**50 profissionais: 51 queries → 2 queries**
 
 ### 4.2 🟡 Performance Geral
 
@@ -308,11 +215,13 @@ O dashboard executa 8 queries individuais em sequência. Para datasets <10k regi
 
 - **Recomendação:** Agrupar queries relacionadas (ex: summary com uma única query usando UNION ALL). Implementar cache com TTL de 5 minutos no backend.
 
-#### D. Sem paginação em nenhum endpoint
+#### D. ✅ Sem paginação em nenhum endpoint — RESOLVIDO
 
-Nenhum endpoint de lista suporta paginação (`?page=1&limit=20`). Com 1000+ registros, a listagem fica lenta no backend e pesada no frontend.
+> **Implementado em 2026-05-17** — `internal/models/`, `internal/handlers/`, frontend Svelte components
 
-- **Recomendação:** Implementar paginação em `/consultations`, `/professionals`, `/admin/consultations`, `/admin/professionals`, `/admin/files`.
+Paginação implementada com `?page=N&limit=N` (default page=1, limit=20, max=100). Resposta: `{ data, total, page, limit }`.
+- Backend: `parsePagination` + `writePagedJSON` em `handlers/helpers.go`; count functions `ConsultationCountAll/ByUserID`, `ProfessionalCount`, `FileCount`; modelos com `LIMIT ? OFFSET ?`
+- Frontend: `ConsultationList.svelte`, `ProfessionalList.svelte`, `Admin.svelte` (3 tabs) com controles de paginação prev/next
 
 #### E. Sem cache de recursos estáticos para uploads
 
@@ -339,16 +248,17 @@ Arquivos servidos via `/api/files/{filename}` dependem apenas do `http.ServeCont
 | `phones` | ✅ Definida com índices | ❌ Sem código | ❌ |
 | `user_professional_sharing` | ✅ Definida | ❌ Sem código | ❌ |
 | `user_clinic_sharing` | ✅ Definida | ❌ Sem código | ❌ |
-| `login_logs` | ✅ Definida | ✅ INSERT no SignIn | ❌ Sem visualização |
+| `login_logs` | ✅ Definida | ✅ INSERT no SignIn + ip/UA | ✅ Aba "Logs de Acesso" no admin |
 
 - **`phones`**: Tabela existe desde v0.2.1 mas nunca foi implementada.
 - **`user_*_sharing`**: Compartilhamento entre usuários — funcionalidade planejada mas não implementada.
-- **`login_logs`**: Dados são coletados mas não há tela no admin para visualizá-los.
+- **`login_logs`**: ✅ Visualização implementada no painel admin (aba "Logs de Acesso") com paginação.
 
-- **Recomendação:**
-  - `phones`: implementar CRUD ou remover tabela com migration de limpeza
-  - `user_*_sharing`: decidir se será implementado na v2 ou adiado; se adiado, remover do schema atual
+- **Decisão do desenvolvedor (17/05/2026):** Todas as tabelas serão mantidas e implementadas:
+  - `phones`: implementar CRUD com associação a profissionais e clínicas
+  - `user_professional_sharing` e `user_clinic_sharing`: implementar compartilhamento entre usuários
   - `login_logs`: adicionar aba "Logs de Acesso" no painel admin
+  - Ver matriz de prioridades (itens #15, #17, #18, #19) para cronograma
 
 ### 5.2 Funcionalidades Ausentes (presentes no v0.2.1 ou planejadas)
 
@@ -368,27 +278,30 @@ Arquivos servidos via `/api/files/{filename}` dependem apenas do `http.ServeCont
 | Backup/Restore | ✅ |
 | Bulk delete (consultas/profissionais) | ✅ |
 | Inline create (especialidades/clínicas) | ✅ |
-| **Telefones de profissionais/clínicas** | ❌ |
-| **Compartilhamento entre usuários** | ❌ |
-| **Alteração de senha pelo próprio usuário** | ❌ |
-| **Visualização de login logs** | ❌ |
-| **Tema do usuário (claro/escuro)** | ❌ (campo existe, não usado) |
-| **Inline create de profissional na criação de consulta** | ❌ |
+| **Telefones de profissionais/clínicas** | ✅ CRUD completo |
+| **Compartilhamento entre usuários** | ✅ CRUD + UI completa |
+| **Alteração de senha pelo próprio usuário** | ✅ `PUT /api/users/me/password` |
+| **Visualização de login logs** | ✅ Aba "Logs de Acesso" no admin |
+| **Tema do usuário (claro/escuro)** | ✅ LIGHT/DARK/SYSTEM com persistência |
+| **Inline create de profissional na criação de consulta** | ✅ InlineCreate + `professionals` resourceType |
 
 ### 5.3 Campo "theme" não utilizado
 
-A tabela `users` tem coluna `theme` (valores: SYSTEM, LIGHT, DARK), mas:
-- O frontend só tem tema escuro (hardcoded em `app.css`)
-- Não há endpoint para o usuário alterar o próprio tema
-- `auth.ts` não expõe o tema na store
+~~A tabela `users` tem coluna `theme` (valores: SYSTEM, LIGHT, DARK), mas~~:
 
-- **Recomendação:** Implementar toggle de tema ou remover o campo do schema. Se implementar, usar CSS custom properties e media query `prefers-color-scheme` para o valor SYSTEM.
+> **Implementado em 2026-05-17** — `frontend/src/app.css`, `internal/handlers/users.go`, `frontend/src/lib/auth.ts`, `frontend/src/App.svelte`, `frontend/src/components/Navigation.svelte`
+
+- `app.css`: `:root,[data-theme="dark"]` = dark; `[data-theme="light"]` = light; `@media (prefers-color-scheme: light)` aplica light quando SYSTEM + OS light
+- Endpoint `PATCH /api/users/me/theme` — valida LIGHT|DARK|SYSTEM, atualiza DB + sessão
+- `auth.ts`: `setTheme()` atualiza store otimisticamente + chama API em background
+- `App.svelte`: `$effect` lê `user.theme` e seta/remove `data-theme` em `<html>`; SYSTEM remove o atributo, deixando media query decidir
+- `Navigation.svelte`: botão cicla SYSTEM→LIGHT→DARK→SYSTEM
 
 ---
 
 ## 6. Tratamento de Erros
 
-### 6.1 Erros silenciados (ignorados com `_`)
+### 6.1 ✅ Erros silenciados (ignorados com `_`) — PARCIALMENTE RESOLVIDO (models)
 
 | Arquivo | Contexto | Descrição |
 |---------|----------|-----------|
@@ -431,16 +344,14 @@ if rows.Scan(&c.ID, ...) == nil {
   2. Testes de integração para `handlers/*.go` (usando `httptest` + SQLite em memória)
   3. Testes de contrato para API (verificar formatos de resposta)
 
-### 7.2 Logs Insuficientes
+### 7.2 ✅ Logs Insuficientes — RESOLVIDO
 
-Apenas o middleware `Logger` do chi gera logs de requests HTTP. Não há logging de:
-- Erros de banco de dados (detalhe real, não só "db error")
-- Falhas de upload de arquivos
-- Operações de delete (consultas, profissionais, arquivos)
-- Restauração de backup
-- Tentativas de login falhas (importante para segurança)
+> **Implementado em 2026-05-17** — `internal/handlers/helpers.go` + todos os handlers
 
-- **Recomendação:** Adotar `log/slog` (Go 1.21+) com níveis estruturados. Incluir logs em pontos críticos.
+Adotado `log/slog` (Go 1.21+ stdlib) via helper centralizado `writeDBError(w, err)`:
+- Chama `slog.Error("db error", "err", err)` antes de retornar 500
+- Aplicado em todos os 9 handler files — erros de banco agora logados com detalhe real
+- Zero dependências externas — `log/slog` é stdlib Go 1.21+
 
 ### 7.3 Cobertura de Documentação
 
@@ -492,71 +403,81 @@ Apenas o middleware `Logger` do chi gera logs de requests HTTP. Não há logging
 
 | # | Item | Categoria | Esforço |
 |---|------|-----------|---------|
-| 1 | Corrigir N+1 queries nas listagens de consultas e profissionais | Performance | 4h |
-| 2 | Implementar rate limiting no endpoint de login | Segurança | 2h |
-| 3 | Adicionar header Content-Security-Policy | Segurança | 30min |
-| 4 | Alinhar paths entre `docker-entrypoint.sh`, `docker-compose.yml` e `.env.example` | Deploy | 30min |
-| 5 | Passar `SESSION_SECRET` ao SCS para persistência de sessões | Funcionalidade | 1h |
-| 6 | Remover credenciais hardcoded do `cmd/migrate-mariadb` | Segurança | 15min |
+| ~~1~~ | ~~Corrigir N+1 queries nas listagens de consultas e profissionais~~ | ~~Performance~~ | ✅ DONE |
+| ~~2~~ | ~~Implementar rate limiting no endpoint de login~~ | ~~Segurança~~ | ✅ DONE |
+| ~~3~~ | ~~Adicionar header Content-Security-Policy~~ | ~~Segurança~~ | ✅ DONE |
+| ~~4~~ | ~~Alinhar paths entre `docker-entrypoint.sh`, `docker-compose.yml` e `.env.example`~~ | ~~Deploy~~ | ✅ DONE |
+| ~~5~~ | ~~Passar `SESSION_SECRET` ao SCS para persistência de sessões~~ | ~~Funcionalidade~~ | ✅ DONE |
+| ~~6~~ | ~~Remover `cmd/migrate-mariadb` e `cmd/sqlite-import` com credenciais hardcoded~~ | ~~Segurança~~ | ✅ DONE |
 
 ### 🟡 Alta Prioridade
 
 | # | Item | Categoria | Esforço |
 |---|------|-----------|---------|
-| 7 | Padronizar formato de resposta da API (`{ data: T }`) | Consistência | 3h |
-| 8 | Implementar paginação nos endpoints de lista | Performance | 4h |
-| 9 | Corrigir `ConsultationUpdate`/`UserUpdate` para usar transação | Integridade | 2h |
-| 10 | Adicionar logging de erros nos models com `log.Printf` | Manutenibilidade | 2h |
-| 11 | Corrigir badge de tipo no `Reports.svelte` (`'CONSULTA'` → `'CONSULTATION'`) | Bug | 5min |
-| 12 | Implementar endpoint de alteração de senha para o próprio usuário | Funcionalidade | 1h |
-| 13 | Remover `stores.ts` vazio | Limpeza | 1min |
+| ~~7~~ | ~~Padronizar formato de resposta da API (`{ data: T }`)~~ | ~~Consistência~~ | ✅ DONE |
+| ~~8~~ | ~~Implementar paginação nos endpoints de lista~~ | ~~Performance~~ | ✅ DONE |
+| ~~9~~ | ~~Corrigir `ConsultationUpdate`/`UserUpdate` para usar transação~~ | ~~Integridade~~ | ✅ DONE |
+| ~~10~~ | ~~Adicionar logging de erros nos models com `log.Printf`~~ | ~~Manutenibilidade~~ | ✅ DONE |
+| ~~11~~ | ~~Corrigir badge de tipo no `Reports.svelte` (`'CONSULTA'` → `'CONSULTATION'`)~~ | ~~Bug~~ | ✅ DONE |
+| ~~12~~ | ~~Implementar endpoint de alteração de senha para o próprio usuário~~ | ~~Funcionalidade~~ | ✅ DONE |
+| ~~13~~ | ~~Remover `stores.ts` vazio~~ | ~~Limpeza~~ | ✅ DONE |
+| ~~14~~ | ~~Implementar tema claro/escuro usando campo `theme` (funcionalidade da v0.2.1)~~ | ~~UX~~ | ✅ DONE |
+| ~~15~~ | ~~Implementar visualização de login logs no admin~~ | ~~Funcionalidade~~ | ✅ DONE |
 
 ### 🟢 Média Prioridade
 
 | # | Item | Categoria | Esforço |
 |---|------|-----------|---------|
-| 14 | Escrever testes unitários para `models/*.go` | Qualidade | 8h |
-| 15 | Resolver tabelas órfãs (`phones`, `sharing`) — implementar ou remover | Funcionalidade | 2h-8h |
-| 16 | Adicionar visualização de login logs no admin | Funcionalidade | 2h |
-| 17 | Implementar tema claro/escuro usando campo `theme` | UX | 4h |
-| 18 | Substituir MarkdownPreview por biblioteca robusta (`marked`) | Qualidade | 2h |
-| 19 | Adicionar inline create de profissional no `ConsultationNew` | UX | 2h |
-| 20 | Adicionar cache com TTL no dashboard | Performance | 2h |
+| ~~16~~ | ~~Escrever testes de integração para `models/*.go` + `handlers/*.go` (SQLite `:memory:`)~~ | ~~Qualidade~~ | ✅ DONE |
+| ~~17~~ | ~~Implementar CRUD de `phones` (associado a profissionais e clínicas)~~ | ~~Funcionalidade~~ | ✅ DONE |
+| ~~18~~ | ~~Implementar `user_professional_sharing` (compartilhamento entre usuários)~~ | ~~Funcionalidade~~ | ✅ DONE |
+| ~~19~~ | ~~Implementar `user_clinic_sharing` (compartilhamento entre usuários)~~ | ~~Funcionalidade~~ | ✅ DONE |
+| ~~20~~ | ~~Substituir MarkdownPreview por biblioteca robusta (`marked`)~~ | ~~Qualidade~~ | ✅ DONE |
+| ~~21~~ | ~~Adicionar inline create de profissional no `ConsultationNew`~~ | ~~UX~~ | ✅ DONE |
+| ~~22~~ | ~~Adicionar cache com TTL no dashboard~~ | ~~Performance~~ | ✅ DONE |
 
 ### 🔵 Baixa Prioridade
 
 | # | Item | Categoria | Esforço |
 |---|------|-----------|---------|
-| 21 | Documentação OpenAPI/Swagger | Documentação | 8h |
-| 22 | Unificar arquivos de migração duplicados | Limpeza | 30min |
-| 23 | Análise de bundle size do frontend | Otimização | 1h |
-| 24 | Adicionar tratamento de timeout/offline no frontend | UX | 3h |
-| 25 | Campo de busca no `ProfessionalList` | UX | 1h |
-| 26 | Limpar formulário após criar consulta (ou navegar) | UX | 30min |
-| 27 | Adicionar `Cache-Control` headers nos uploads | Performance | 15min |
-| 28 | Melhorar `InlineCreate` para suportar address em clinics | Funcionalidade | 1h |
+| 23 | Documentação OpenAPI/Swagger | Documentação | 8h |
+| ~~24~~ | ~~Unificar arquivos de migração duplicados~~ | ~~Limpeza~~ | ✅ DONE |
+| 25 | Análise de bundle size do frontend | Otimização | 1h |
+| ~~26~~ | ~~Adicionar tratamento de timeout/offline no frontend~~ | ~~UX~~ | ✅ DONE (AbortSignal.timeout) |
+| ~~27~~ | ~~Campo de busca no `ProfessionalList`~~ | ~~UX~~ | ✅ DONE |
+| ~~28~~ | ~~Limpar formulário após criar consulta (ou navegar)~~ | ~~UX~~ | ✅ DONE |
+| ~~29~~ | ~~Adicionar `Cache-Control` headers nos uploads~~ | ~~Performance~~ | ✅ DONE |
+| ~~30~~ | ~~Melhorar `InlineCreate` para suportar address em clinics~~ | ~~Funcionalidade~~ | ✅ DONE |
 
 ---
 
-## 10. Perguntas para o Desenvolvedor
+## 10. Perguntas para o Desenvolvedor (Respondidas)
 
-Para alinhar expectativas antes de iniciar as correções:
+> **Data das respostas:** 17/05/2026
 
 1. **Tabelas órfãs (`phones`, `user_*_sharing`):** Elas vieram do schema v0.2.1. Você planeja implementá-las ou prefere removê-las com uma migration de limpeza?
+   - ✅ **Resposta:** Manter todas. `phones` deve ser implementada com associação a profissionais e clínicas (como na v0.2.1). `user_professional_sharing` e `user_clinic_sharing` devem ser implementadas para compartilhamento entre usuários (como na v0.2.1). `login_logs` deve ser mantida e ter visualização no admin.
 
 2. **Formato de resposta da API:** Confirmo padronização para `{ data: T }` em todos os endpoints?
+   - ✅ **Resposta:** Sim, padronizar todos os endpoints (singulares e listas) para `{ data: T }`.
 
 3. **Rate limiting:** Prefere solução simples (contador em SQLite com middleware customizado) ou integração com biblioteca externa?
+   - ✅ **Resposta:** Solução simples com SQLite + middleware chi customizado, sem dependências externas.
 
 4. **Tema claro/escuro:** É prioridade implementar agora ou pode ficar para depois?
+   - ✅ **Resposta:** Implementar agora. A versão anterior (v0.2.1) já tinha esta opção para os usuários. Reclassificado para alta prioridade.
 
 5. **Testes:** Qual cobertura inicial é aceitável — apenas models, ou models + handlers? Prefere testes de unidade ou de integração com SQLite `:memory:`?
+   - ✅ **Resposta:** Models + handlers, com testes de integração usando SQLite `:memory:`. Sem alterações de código nesta iteração — apenas planejamento.
 
 6. **Paths do Docker:** Confirmo alinhar tudo para `/app/data/` (entrypoint + compose + .env.example)?
+   - ✅ **Resposta:** Sim, alinhar todos os paths para `/app/data/`, com volume único `./data:/app/data`.
 
 7. **Ferramentas de migração (`cmd/migrate-mariadb`, `cmd/sqlite-import`):** Ainda são necessárias ou podem ser removidas do repositório?
+   - ✅ **Resposta:** Remover completamente. Incluindo todas as credenciais hardcoded que devem ser eliminadas do código.
 
 8. **Markdown:** Posso adicionar dependência `marked` (leve, sem dependências transitivas) ao frontend para parsing robusto?
+   - ✅ **Resposta:** Sim, adicionar `marked` para parsing robusto de Markdown.
 
 ---
 

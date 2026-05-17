@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"os"
 	"time"
 )
@@ -23,26 +24,35 @@ type File struct {
 	UploadedAt     time.Time      `json:"uploadedAt"`
 }
 
-func fileLoadCategories(ctx context.Context, db *sql.DB, fileID string) ([]FileCategory, error) {
+// fileLoadCategoriesBatch loads categories for multiple files in a single query.
+// Returns a map from file ID to its categories.
+func fileLoadCategoriesBatch(ctx context.Context, db *sql.DB, fileIDs []string) map[string][]FileCategory {
+	result := map[string][]FileCategory{}
+	if len(fileIDs) == 0 {
+		return result
+	}
 	rows, err := db.QueryContext(ctx,
-		`SELECT fc.id, fc.name, fc.created_at
-		 FROM file_categories fc
-		 JOIN file_file_categories ffc ON ffc.category_id = fc.id
-		 WHERE ffc.file_id = ?
-		 ORDER BY fc.name`, fileID)
+		`SELECT ffc.file_id, fc.id, fc.name, fc.created_at
+		 FROM file_file_categories ffc
+		 JOIN file_categories fc ON fc.id = ffc.category_id
+		 WHERE ffc.file_id IN `+inClause(len(fileIDs))+`
+		 ORDER BY fc.name`,
+		anySlice(fileIDs)...)
 	if err != nil {
-		return nil, err
+		slog.Error("batch load file categories", "err", err)
+		return result
 	}
 	defer rows.Close()
-	list := []FileCategory{}
 	for rows.Next() {
+		var fileID string
 		var c FileCategory
-		if err := rows.Scan(&c.ID, &c.Name, &c.CreatedAt); err != nil {
-			return nil, err
+		if err := rows.Scan(&fileID, &c.ID, &c.Name, &c.CreatedAt); err != nil {
+			slog.Error("scan file category", "err", err)
+			continue
 		}
-		list = append(list, c)
+		result[fileID] = append(result[fileID], c)
 	}
-	return list, rows.Err()
+	return result
 }
 
 func FileFindByConsultationID(ctx context.Context, db *sql.DB, consultationID string) ([]File, error) {
@@ -55,23 +65,47 @@ func FileFindByConsultationID(ctx context.Context, db *sql.DB, consultationID st
 	}
 	defer rows.Close()
 	var list []File
+	var fileIDs []string
 	for rows.Next() {
 		var f File
 		if err := rows.Scan(&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
 			&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt); err != nil {
 			return nil, err
 		}
-		f.Categories, _ = fileLoadCategories(ctx, db, f.ID)
+		f.Categories = []FileCategory{}
 		list = append(list, f)
+		fileIDs = append(fileIDs, f.ID)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(fileIDs) > 0 {
+		catMap := fileLoadCategoriesBatch(ctx, db, fileIDs)
+		for i, f := range list {
+			if cats, ok := catMap[f.ID]; ok {
+				list[i].Categories = cats
+			}
+		}
+	}
+	return list, nil
 }
 
-func FileFindAll(ctx context.Context, db *sql.DB) ([]File, error) {
-	rows, err := db.QueryContext(ctx,
-		`SELECT id, filename, custom_name, path, mime_type, size, hash, thumbnail_path,
-		        consultation_id, professional_id, user_id, uploaded_at
-		 FROM files ORDER BY uploaded_at DESC`)
+func FileCount(ctx context.Context, db *sql.DB) (int, error) {
+	var n int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM files").Scan(&n)
+	return n, err
+}
+
+func FileFindAll(ctx context.Context, db *sql.DB, limit, offset int) ([]File, error) {
+	q := `SELECT id, filename, custom_name, path, mime_type, size, hash, thumbnail_path,
+	             consultation_id, professional_id, user_id, uploaded_at
+	      FROM files ORDER BY uploaded_at DESC`
+	var args []any
+	if limit > 0 {
+		q += " LIMIT ? OFFSET ?"
+		args = append(args, limit, offset)
+	}
+	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +133,12 @@ func FileFindByID(ctx context.Context, db *sql.DB, id string) (*File, error) {
 	if err != nil {
 		return nil, err
 	}
-	f.Categories, _ = fileLoadCategories(ctx, db, f.ID)
+	catMap := fileLoadCategoriesBatch(ctx, db, []string{f.ID})
+	if cats, ok := catMap[f.ID]; ok {
+		f.Categories = cats
+	} else {
+		f.Categories = []FileCategory{}
+	}
 	return &f, nil
 }
 
@@ -132,9 +171,11 @@ func FileCreate(ctx context.Context, db *sql.DB, in CreateFileInput) (*File, err
 		return nil, err
 	}
 	for _, cid := range in.CategoryIDs {
-		_, _ = tx.ExecContext(ctx,
+		if _, err := tx.ExecContext(ctx,
 			`INSERT OR IGNORE INTO file_file_categories (id, file_id, category_id, created_at) VALUES (?, ?, ?, ?)`,
-			newID(), in.ID, cid, now)
+			newID(), in.ID, cid, now); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -144,13 +185,16 @@ func FileCreate(ctx context.Context, db *sql.DB, in CreateFileInput) (*File, err
 
 func FileDelete(ctx context.Context, db *sql.DB, id string) error {
 	var path string
-	_ = db.QueryRowContext(ctx, "SELECT path FROM files WHERE id=?", id).Scan(&path)
-	_, err := db.ExecContext(ctx, "DELETE FROM files WHERE id=?", id)
-	if err != nil {
+	if err := db.QueryRowContext(ctx, "SELECT path FROM files WHERE id=?", id).Scan(&path); err != nil {
+		slog.Error("FileDelete: get path", "id", id, "err", err)
+	}
+	if _, err := db.ExecContext(ctx, "DELETE FROM files WHERE id=?", id); err != nil {
 		return err
 	}
 	if path != "" {
-		_ = removeFile(path)
+		if err := removeFile(path); err != nil {
+			slog.Error("FileDelete: remove file", "path", path, "err", err)
+		}
 	}
 	return nil
 }

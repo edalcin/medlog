@@ -88,7 +88,7 @@
                   <div class="timeline-content">
                     <div class="timeline-top">
                       <span class="tl-date">{formatDay(c.date)}</span>
-                      <span class="badge {c.type === 'CONSULTA' ? 'badge-blue' : 'badge-yellow'}">{c.type}</span>
+                      <span class="badge {c.type === 'CONSULTATION' ? 'badge-blue' : 'badge-yellow'}">{c.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}</span>
                       {#if c.professional}
                         <span class="tl-pro">{c.professional.name}</span>
                       {/if}

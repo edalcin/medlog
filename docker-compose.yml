@@ -4,13 +4,13 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./data/db:/data/db
-      - ./data/uploads:/data/uploads
+      - ./data:/app/data
     environment:
-      DATABASE_URL: file:/data/db/medlog.sqlite
-      FILES_PATH: /data/uploads
+      DATABASE_URL: file:/app/data/db/medlog.sqlite
+      FILES_PATH: /app/data/uploads
       SESSION_SECRET: ${SESSION_SECRET}
       PORT: 3000
+      TRUST_PROXY: ${TRUST_PROXY:-false}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     restart: unless-stopped

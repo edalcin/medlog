@@ -3,6 +3,8 @@ package models
 import (
 	"context"
 	"database/sql"
+	"log/slog"
+	"strings"
 	"time"
 )
 
@@ -21,43 +23,148 @@ type Consultation struct {
 	UpdatedAt      time.Time     `json:"updatedAt"`
 }
 
-func consultationBase(ctx context.Context, db *sql.DB, where string, args []any) ([]Consultation, error) {
+func consultationBase(ctx context.Context, db *sql.DB, where string, args []any, limit, offset int) ([]Consultation, error) {
 	q := `SELECT id, date, proposito, notes, type, rating, user_id, professional_id, created_at, updated_at
 	      FROM consultations ` + where + ` ORDER BY date DESC`
+	if limit > 0 {
+		q += " LIMIT ? OFFSET ?"
+		args = append(args, limit, offset)
+	}
 	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
 	var list []Consultation
+	profIDSet := map[string]bool{}
+	var profIDs []string
+
 	for rows.Next() {
 		var c Consultation
 		if err := rows.Scan(&c.ID, &c.Date, &c.Proposito, &c.Notes, &c.Type, &c.Rating,
 			&c.UserID, &c.ProfessionalID, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
-		if c.ProfessionalID != nil {
-			c.Professional, _ = ProfessionalFindByID(ctx, db, *c.ProfessionalID)
-		}
-		c.Files, _ = FileFindByConsultationID(ctx, db, c.ID)
-		if c.Files == nil {
-			c.Files = []File{}
-		}
+		c.Files = []File{}
 		list = append(list, c)
+		if c.ProfessionalID != nil && !profIDSet[*c.ProfessionalID] {
+			profIDSet[*c.ProfessionalID] = true
+			profIDs = append(profIDs, *c.ProfessionalID)
+		}
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return list, nil
+	}
+
+	// Batch load professionals
+	profMap := map[string]*Professional{}
+	if len(profIDs) > 0 {
+		pRows, err := db.QueryContext(ctx,
+			`SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at
+			 FROM professionals WHERE id IN `+inClause(len(profIDs)),
+			anySlice(profIDs)...)
+		if err != nil {
+			slog.Error("consultationBase: batch load professionals", "err", err)
+		} else {
+			defer pRows.Close()
+			var pIDs []string
+			for pRows.Next() {
+				var p Professional
+				var isActive int
+				if err := pRows.Scan(&p.ID, &p.Name, &p.CRM, &p.Address, &p.Notes, &isActive,
+					&p.UserID, &p.ClinicID, &p.CreatedAt, &p.UpdatedAt); err != nil {
+					slog.Error("consultationBase: scan professional", "err", err)
+					continue
+				}
+				p.IsActive = isActive == 1
+				p.Specialties = []Specialty{}
+				profMap[p.ID] = &p
+				pIDs = append(pIDs, p.ID)
+			}
+			// Batch load specialties for all professionals
+			if len(pIDs) > 0 {
+				specMap := professionalLoadSpecialtiesBatch(ctx, db, pIDs)
+				for id, specs := range specMap {
+					if prof, ok := profMap[id]; ok {
+						prof.Specialties = specs
+					}
+				}
+			}
+		}
+	}
+
+	// Batch load files by consultation IDs
+	consultIDs := make([]string, len(list))
+	for i, c := range list {
+		consultIDs[i] = c.ID
+	}
+	filesMap := map[string][]File{}
+
+	fRows, err := db.QueryContext(ctx,
+		`SELECT id, filename, custom_name, path, mime_type, size, hash, thumbnail_path,
+		        consultation_id, professional_id, user_id, uploaded_at
+		 FROM files WHERE consultation_id IN `+inClause(len(consultIDs))+` ORDER BY uploaded_at DESC`,
+		anySlice(consultIDs)...)
+	if err != nil {
+		slog.Error("consultationBase: batch load files", "err", err)
+	} else {
+		defer fRows.Close()
+		var allFiles []File
+		var fileIDs []string
+		for fRows.Next() {
+			var f File
+			if err := fRows.Scan(&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
+				&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt); err != nil {
+				slog.Error("consultationBase: scan file", "err", err)
+				continue
+			}
+			f.Categories = []FileCategory{}
+			allFiles = append(allFiles, f)
+			fileIDs = append(fileIDs, f.ID)
+		}
+		// Batch load categories for all files
+		if len(fileIDs) > 0 {
+			catMap := fileLoadCategoriesBatch(ctx, db, fileIDs)
+			for i, f := range allFiles {
+				if cats, ok := catMap[f.ID]; ok {
+					allFiles[i].Categories = cats
+				}
+			}
+		}
+		for _, f := range allFiles {
+			if f.ConsultationID != nil {
+				filesMap[*f.ConsultationID] = append(filesMap[*f.ConsultationID], f)
+			}
+		}
+	}
+
+	// Assemble
+	for i := range list {
+		if list[i].ProfessionalID != nil {
+			list[i].Professional = profMap[*list[i].ProfessionalID]
+		}
+		if files, ok := filesMap[list[i].ID]; ok {
+			list[i].Files = files
+		}
+	}
+
+	return list, nil
 }
 
-func ConsultationFindByUserID(ctx context.Context, db *sql.DB, userID string) ([]Consultation, error) {
-	return consultationBase(ctx, db, "WHERE user_id=?", []any{userID})
+func ConsultationFindByUserID(ctx context.Context, db *sql.DB, userID string, limit, offset int) ([]Consultation, error) {
+	return consultationBase(ctx, db, "WHERE user_id=?", []any{userID}, limit, offset)
 }
 
-func ConsultationFindAll(ctx context.Context, db *sql.DB) ([]Consultation, error) {
-	return consultationBase(ctx, db, "", nil)
+func ConsultationFindAll(ctx context.Context, db *sql.DB, limit, offset int) ([]Consultation, error) {
+	return consultationBase(ctx, db, "", nil, limit, offset)
 }
 
 func ConsultationFindByID(ctx context.Context, db *sql.DB, id string) (*Consultation, error) {
-	list, err := consultationBase(ctx, db, "WHERE id=?", []any{id})
+	list, err := consultationBase(ctx, db, "WHERE id=?", []any{id}, 1, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +172,18 @@ func ConsultationFindByID(ctx context.Context, db *sql.DB, id string) (*Consulta
 		return nil, sql.ErrNoRows
 	}
 	return &list[0], nil
+}
+
+func ConsultationCountByUserID(ctx context.Context, db *sql.DB, userID string) (int, error) {
+	var n int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM consultations WHERE user_id=?", userID).Scan(&n)
+	return n, err
+}
+
+func ConsultationCountAll(ctx context.Context, db *sql.DB) (int, error) {
+	var n int
+	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM consultations").Scan(&n)
+	return n, err
 }
 
 type CreateConsultationInput struct {
@@ -99,40 +218,66 @@ type UpdateConsultationInput struct {
 }
 
 func ConsultationUpdate(ctx context.Context, db *sql.DB, id string, in UpdateConsultationInput) (*Consultation, error) {
+	var sets []string
+	var args []any
 	now := time.Now().UTC()
+
 	if in.Date != nil {
-		db.ExecContext(ctx, "UPDATE consultations SET date=?, updated_at=? WHERE id=?", *in.Date, now, id)
+		sets = append(sets, "date=?")
+		args = append(args, *in.Date)
 	}
 	if in.Proposito != nil {
-		db.ExecContext(ctx, "UPDATE consultations SET proposito=?, updated_at=? WHERE id=?", *in.Proposito, now, id)
+		sets = append(sets, "proposito=?")
+		args = append(args, *in.Proposito)
 	}
 	if in.Notes != nil {
-		db.ExecContext(ctx, "UPDATE consultations SET notes=?, updated_at=? WHERE id=?", *in.Notes, now, id)
+		sets = append(sets, "notes=?")
+		args = append(args, *in.Notes)
 	}
 	if in.Type != nil {
-		db.ExecContext(ctx, "UPDATE consultations SET type=?, updated_at=? WHERE id=?", *in.Type, now, id)
+		sets = append(sets, "type=?")
+		args = append(args, *in.Type)
 	}
 	if in.Rating != nil {
-		db.ExecContext(ctx, "UPDATE consultations SET rating=?, updated_at=? WHERE id=?", *in.Rating, now, id)
+		sets = append(sets, "rating=?")
+		args = append(args, *in.Rating)
 	}
 	if in.ProfessionalID != nil {
-		db.ExecContext(ctx, "UPDATE consultations SET professional_id=?, updated_at=? WHERE id=?", *in.ProfessionalID, now, id)
+		sets = append(sets, "professional_id=?")
+		args = append(args, *in.ProfessionalID)
+	}
+	if len(sets) == 0 {
+		return ConsultationFindByID(ctx, db, id)
+	}
+	sets = append(sets, "updated_at=?")
+	args = append(args, now, id)
+
+	if _, err := db.ExecContext(ctx,
+		"UPDATE consultations SET "+strings.Join(sets, ",")+` WHERE id=?`, args...); err != nil {
+		return nil, err
 	}
 	return ConsultationFindByID(ctx, db, id)
 }
 
 func ConsultationDelete(ctx context.Context, db *sql.DB, id, filesPath string) error {
 	rows, err := db.QueryContext(ctx, "SELECT path FROM files WHERE consultation_id=?", id)
-	if err == nil {
+	if err != nil {
+		slog.Error("ConsultationDelete: list file paths", "id", id, "err", err)
+	} else {
 		defer rows.Close()
 		var paths []string
 		for rows.Next() {
 			var p string
-			rows.Scan(&p)
+			if err := rows.Scan(&p); err != nil {
+				slog.Error("ConsultationDelete: scan path", "err", err)
+				continue
+			}
 			paths = append(paths, p)
 		}
 		for _, p := range paths {
-			_ = removeFile(p)
+			if err := removeFile(p); err != nil {
+				slog.Error("ConsultationDelete: remove file", "path", p, "err", err)
+			}
 		}
 	}
 	_, err = db.ExecContext(ctx, "DELETE FROM consultations WHERE id=?", id)

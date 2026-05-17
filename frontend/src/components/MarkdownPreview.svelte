@@ -1,38 +1,10 @@
 <script lang="ts">
+  import { marked } from 'marked'
+
   let { content } = $props<{ content: string }>()
-
-  function renderMarkdown(md: string): string {
-    if (!md) return ''
-    // Escape HTML first to prevent XSS, then apply markdown transforms
-    let html = md
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      // Headings
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-      // Bold and italic
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Inline code
-      .replace(/`(.+?)`/g, '<code>$1</code>')
-      // List items
-      .replace(/^- (.+)$/gm, '<li>$1</li>')
-      // Wrap consecutive list items in <ul>
-      .replace(/(<li>[\s\S]*?<\/li>(\n|$))+/g, (match) => `<ul>${match}</ul>`)
-      // Paragraphs: blank line = paragraph break
-      .replace(/\n\n/g, '</p><p>')
-
-    return `<p>${html}</p>`
-      // Clean up empty paragraphs around block elements
-      .replace(/<p>(<[hul])/g, '$1')
-      .replace(/(<\/[hul][^>]*>)<\/p>/g, '$1')
-      .replace(/<p><\/p>/g, '')
-  }
 </script>
 
-<div class="markdown-preview">{@html renderMarkdown(content)}</div>
+<div class="markdown-preview">{@html content ? marked.parse(content) as string : ''}</div>
 
 <style>
   .markdown-preview {

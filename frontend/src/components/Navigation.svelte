@@ -1,10 +1,19 @@
 <script lang="ts">
   import { link, location, push } from '@keenmate/svelte-spa-router'
-  import { currentUser, isAdmin, signout } from '../lib/auth'
+  import { currentUser, isAdmin, signout, setTheme } from '../lib/auth'
 
   async function handleSignout() {
     await signout()
     push('/signin')
+  }
+
+  const themeLabels: Record<string, string> = { SYSTEM: '⊙', LIGHT: '○', DARK: '●' }
+  const themeNext: Record<string, 'LIGHT' | 'DARK' | 'SYSTEM'> = { SYSTEM: 'LIGHT', LIGHT: 'DARK', DARK: 'SYSTEM' }
+  const themeTitles: Record<string, string> = { SYSTEM: 'Tema: Sistema', LIGHT: 'Tema: Claro', DARK: 'Tema: Escuro' }
+
+  function cycleTheme() {
+    const current = $currentUser?.theme ?? 'SYSTEM'
+    setTheme(themeNext[current] ?? 'SYSTEM')
   }
 </script>
 
@@ -23,6 +32,9 @@
     <a href="/reports" use:link class:active={$location === '/reports'}>
       Relatórios
     </a>
+    <a href="/sharing" use:link class:active={$location === '/sharing'}>
+      Compartilhamento
+    </a>
     {#if $isAdmin}
       <a href="/admin" use:link class:active={$location === '/admin'}>
         Admin
@@ -35,6 +47,11 @@
       {#if $currentUser.role === 'ADMIN'}
         <span class="badge badge-yellow">Admin</span>
       {/if}
+      <button
+        class="btn btn-ghost btn-sm theme-btn"
+        onclick={cycleTheme}
+        title={themeTitles[$currentUser.theme ?? 'SYSTEM']}
+      >{themeLabels[$currentUser.theme ?? 'SYSTEM']}</button>
       <button class="btn btn-ghost btn-sm" onclick={handleSignout}>Sair</button>
     {/if}
   </div>
@@ -102,5 +119,12 @@
   .btn-sm {
     padding: 4px 12px;
     font-size: 13px;
+  }
+
+  .theme-btn {
+    font-size: 16px;
+    padding: 4px 8px;
+    min-width: 32px;
+    justify-content: center;
   }
 </style>

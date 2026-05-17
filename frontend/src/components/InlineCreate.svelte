@@ -4,15 +4,18 @@
   let {
     resourceType,
     label,
+    showAddress = false,
     onCreated,
   } = $props<{
-    resourceType: 'specialties' | 'file-categories' | 'clinics'
+    resourceType: 'specialties' | 'file-categories' | 'clinics' | 'professionals'
     label: string
+    showAddress?: boolean
     onCreated: (item: { id: string; name: string }) => void
   }>()
 
   let open = $state(false)
   let name = $state('')
+  let address = $state('')
   let saving = $state(false)
   let error = $state('')
 
@@ -26,11 +29,14 @@
         created = await api.createSpecialty(name.trim())
       } else if (resourceType === 'file-categories') {
         created = await api.createCategory(name.trim())
+      } else if (resourceType === 'clinics') {
+        created = await api.createClinic(name.trim(), showAddress ? address.trim() || undefined : undefined)
       } else {
-        created = await api.createClinic(name.trim())
+        created = await api.createProfessional({ name: name.trim(), isActive: true, specialtyIds: [] })
       }
       onCreated(created)
       name = ''
+      address = ''
       open = false
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao criar'
@@ -56,8 +62,16 @@
       bind:value={name}
       placeholder="Nome do {label}"
       disabled={saving}
-      onkeydown={(e) => e.key === 'Enter' && submit()}
+      onkeydown={(e) => e.key === 'Enter' && !showAddress && submit()}
     />
+    {#if showAddress && resourceType === 'clinics'}
+      <input
+        bind:value={address}
+        placeholder="Endereço (opcional)"
+        disabled={saving}
+        onkeydown={(e) => e.key === 'Enter' && submit()}
+      />
+    {/if}
     <button type="button" class="btn btn-primary btn-xs" onclick={submit} disabled={saving || !name.trim()}>
       {saving ? '...' : 'Salvar'}
     </button>

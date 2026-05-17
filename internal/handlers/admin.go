@@ -28,19 +28,26 @@ func (h *AdminHandler) Stats(w http.ResponseWriter, r *http.Request) {
 		h.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM "+t).Scan(&n)
 		counts[t] = n
 	}
-	writeJSON(w, http.StatusOK, counts)
+	writeJSON(w, http.StatusOK, map[string]any{"data": counts})
 }
 
 func (h *AdminHandler) ListConsultations(w http.ResponseWriter, r *http.Request) {
-	list, err := models.ConsultationFindAll(r.Context(), h.DB)
+	page, limit := parsePagination(r)
+	offset := (page - 1) * limit
+	list, err := models.ConsultationFindAll(r.Context(), h.DB, limit, offset)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
+		return
+	}
+	total, err := models.ConsultationCountAll(r.Context(), h.DB)
+	if err != nil {
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
 		list = []models.Consultation{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+	writePagedJSON(w, list, total, page, limit)
 }
 
 func (h *AdminHandler) BulkDeleteConsultations(w http.ResponseWriter, r *http.Request) {
@@ -58,15 +65,22 @@ func (h *AdminHandler) BulkDeleteConsultations(w http.ResponseWriter, r *http.Re
 }
 
 func (h *AdminHandler) ListProfessionals(w http.ResponseWriter, r *http.Request) {
-	list, err := models.ProfessionalFindAll(r.Context(), h.DB, "", true, false)
+	page, limit := parsePagination(r)
+	offset := (page - 1) * limit
+	list, err := models.ProfessionalFindAll(r.Context(), h.DB, "", true, false, "", limit, offset)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
+		return
+	}
+	total, err := models.ProfessionalCount(r.Context(), h.DB, "", true, false, "")
+	if err != nil {
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
 		list = []models.Professional{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+	writePagedJSON(w, list, total, page, limit)
 }
 
 func (h *AdminHandler) BulkDeleteProfessionals(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +94,7 @@ func (h *AdminHandler) BulkDeleteProfessionals(w http.ResponseWriter, r *http.Re
 	for _, id := range req.IDs {
 		hasConsult, err := models.ProfessionalHasConsultations(r.Context(), h.DB, id)
 		if err != nil {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 			return
 		}
 		if hasConsult {
@@ -94,16 +108,34 @@ func (h *AdminHandler) BulkDeleteProfessionals(w http.ResponseWriter, r *http.Re
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }
 
-func (h *AdminHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
-	list, err := models.FileFindAll(r.Context(), h.DB)
+func (h *AdminHandler) ListLoginLogs(w http.ResponseWriter, r *http.Request) {
+	page, limit := parsePagination(r)
+	offset := (page - 1) * limit
+	list, total, err := models.LoginLogFindAll(r.Context(), h.DB, limit, offset)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
+		return
+	}
+	writePagedJSON(w, list, total, page, limit)
+}
+
+func (h *AdminHandler) ListFiles(w http.ResponseWriter, r *http.Request) {
+	page, limit := parsePagination(r)
+	offset := (page - 1) * limit
+	list, err := models.FileFindAll(r.Context(), h.DB, limit, offset)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	total, err := models.FileCount(r.Context(), h.DB)
+	if err != nil {
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
 		list = []models.File{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+	writePagedJSON(w, list, total, page, limit)
 }
 
 // Backup serves the SQLite database file as a downloadable attachment.

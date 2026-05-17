@@ -4,6 +4,7 @@ export interface User {
   email: string
   name: string
   role: 'ADMIN' | 'USER'
+  theme: 'SYSTEM' | 'LIGHT' | 'DARK'
 }
 
 export interface Specialty {
@@ -20,6 +21,7 @@ export interface Clinic {
   id: string
   name: string
   address?: string
+  isShared: boolean
 }
 
 export interface Professional {
@@ -28,6 +30,7 @@ export interface Professional {
   crm?: string
   notes?: string
   isActive: boolean
+  isShared: boolean
   userId?: string
   clinicId?: string
   clinic?: Clinic
@@ -63,6 +66,9 @@ export interface AdminStats {
   consultations: number
   professionals: number
   files: number
+  specialties: number
+  clinics: number
+  file_categories: number
 }
 
 export interface DashboardStats {
@@ -97,6 +103,13 @@ export interface DashboardStats {
   }>
 }
 
+export interface PagedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  limit: number
+}
+
 // Base API path — same origin, proxied in dev
 const BASE = '/api'
 
@@ -107,6 +120,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
     credentials: 'include',
+    signal: AbortSignal.timeout(30000),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
@@ -118,21 +132,21 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 // Auth endpoints
 export const signin = (email: string, password: string) =>
-  request<User>('POST', '/auth/signin', { email, password })
+  request<{ data: User }>('POST', '/auth/signin', { email, password }).then(r => r.data)
 
 export const signout = () =>
   request<{ ok: boolean }>('POST', '/auth/signout')
 
 export const me = () =>
-  request<User>('GET', '/auth/me')
+  request<{ data: User }>('GET', '/auth/me').then(r => r.data)
 
 // Dashboard
 export const getDashboard = () =>
-  request<DashboardStats>('GET', '/dashboard')
+  request<{ data: DashboardStats }>('GET', '/dashboard').then(r => r.data)
 
 // Consultations
-export const getConsultations = () =>
-  request<{ data: Consultation[] }>('GET', '/consultations')
+export const getConsultations = (page = 1, limit = 20) =>
+  request<PagedResponse<Consultation>>('GET', `/consultations?page=${page}&limit=${limit}`)
 
 export const createConsultation = (body: {
   date: string
@@ -141,10 +155,10 @@ export const createConsultation = (body: {
   notes?: string
   professionalId?: string
   rating?: number
-}) => request<Consultation>('POST', '/consultations', body)
+}) => request<{ data: Consultation }>('POST', '/consultations', body).then(r => r.data)
 
 export const getConsultation = (id: string) =>
-  request<Consultation>('GET', `/consultations/${id}`)
+  request<{ data: Consultation }>('GET', `/consultations/${id}`).then(r => r.data)
 
 export const updateConsultation = (id: string, body: Partial<{
   date: string
@@ -153,14 +167,14 @@ export const updateConsultation = (id: string, body: Partial<{
   notes: string
   professionalId: string
   rating: number
-}>) => request<Consultation>('PUT', `/consultations/${id}`, body)
+}>) => request<{ data: Consultation }>('PUT', `/consultations/${id}`, body).then(r => r.data)
 
 export const deleteConsultation = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/consultations/${id}`)
 
 // Professionals
-export const getProfessionals = (activeOnly = false) =>
-  request<{ data: Professional[] }>('GET', `/professionals${activeOnly ? '?active=true' : ''}`)
+export const getProfessionals = (activeOnly = false, page = 1, limit = 20, search = '') =>
+  request<PagedResponse<Professional>>('GET', `/professionals?active=${activeOnly}&page=${page}&limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`)
 
 export const createProfessional = (body: {
   name: string
@@ -168,10 +182,10 @@ export const createProfessional = (body: {
   isActive: boolean
   specialtyIds: string[]
   clinicId?: string
-}) => request<Professional>('POST', '/professionals', body)
+}) => request<{ data: Professional }>('POST', '/professionals', body).then(r => r.data)
 
 export const getProfessional = (id: string) =>
-  request<Professional>('GET', `/professionals/${id}`)
+  request<{ data: Professional }>('GET', `/professionals/${id}`).then(r => r.data)
 
 export const updateProfessional = (id: string, body: Partial<{
   name: string
@@ -180,7 +194,7 @@ export const updateProfessional = (id: string, body: Partial<{
   isActive: boolean
   specialtyIds: string[]
   clinicId: string
-}>) => request<Professional>('PUT', `/professionals/${id}`, body)
+}>) => request<{ data: Professional }>('PUT', `/professionals/${id}`, body).then(r => r.data)
 
 export const deleteProfessional = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/professionals/${id}`)
@@ -206,7 +220,7 @@ export const uploadFile = (
       const err = await res.json().catch(() => ({ error: res.statusText }))
       throw Object.assign(new Error(err.error || 'Upload failed'), { status: res.status })
     }
-    return res.json() as Promise<MedFile>
+    return (res.json() as Promise<{ data: MedFile }>).then(r => r.data)
   })
 }
 
@@ -218,10 +232,10 @@ export const getSpecialties = () =>
   request<{ data: Specialty[] }>('GET', '/specialties')
 
 export const createSpecialty = (name: string) =>
-  request<Specialty>('POST', '/specialties', { name })
+  request<{ data: Specialty }>('POST', '/specialties', { name }).then(r => r.data)
 
 export const updateSpecialty = (id: string, name: string) =>
-  request<Specialty>('PUT', `/specialties/${id}`, { name })
+  request<{ data: Specialty }>('PUT', `/specialties/${id}`, { name }).then(r => r.data)
 
 export const deleteSpecialty = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/specialties/${id}`)
@@ -231,10 +245,10 @@ export const getCategories = () =>
   request<{ data: FileCategory[] }>('GET', '/file-categories')
 
 export const createCategory = (name: string) =>
-  request<FileCategory>('POST', '/file-categories', { name })
+  request<{ data: FileCategory }>('POST', '/file-categories', { name }).then(r => r.data)
 
 export const updateCategory = (id: string, name: string) =>
-  request<FileCategory>('PUT', `/file-categories/${id}`, { name })
+  request<{ data: FileCategory }>('PUT', `/file-categories/${id}`, { name }).then(r => r.data)
 
 export const deleteCategory = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/file-categories/${id}`)
@@ -244,10 +258,10 @@ export const getClinics = () =>
   request<{ data: Clinic[] }>('GET', '/clinics')
 
 export const createClinic = (name: string, address?: string) =>
-  request<Clinic>('POST', '/clinics', { name, address: address || null })
+  request<{ data: Clinic }>('POST', '/clinics', { name, address: address || null }).then(r => r.data)
 
 export const updateClinic = (id: string, name: string, address?: string) =>
-  request<Clinic>('PUT', `/clinics/${id}`, { name, address: address || null })
+  request<{ data: Clinic }>('PUT', `/clinics/${id}`, { name, address: address || null }).then(r => r.data)
 
 export const deleteClinic = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/clinics/${id}`)
@@ -256,33 +270,120 @@ export const deleteClinic = (id: string) =>
 export const getUsers = () =>
   request<{ data: User[] }>('GET', '/users')
 
-export const createUser = (body: { email: string; password: string; name: string; role: 'ADMIN' | 'USER' }) =>
-  request<User>('POST', '/users', body)
+export interface UserSummary {
+  id: string
+  name: string
+}
 
-export const updateUser = (id: string, body: Partial<{ email: string; name: string; role: string; password: string }>) =>
-  request<User>('PUT', `/users/${id}`, body)
+export const getUsersOthers = () =>
+  request<{ data: UserSummary[] }>('GET', '/users/others').then(r => r.data)
+
+export const getUser = (id: string) =>
+  request<{ data: User }>('GET', `/users/${id}`).then(r => r.data)
+
+export const createUser = (body: { email: string; password: string; name: string; role: 'ADMIN' | 'USER' }) =>
+  request<{ data: User }>('POST', '/users', body).then(r => r.data)
+
+export const updateUser = (id: string, body: Partial<{ email: string; name: string; role: string; theme: string }>) =>
+  request<{ data: User }>('PUT', `/users/${id}`, body).then(r => r.data)
+
+export const updateUserPassword = (id: string, password: string) =>
+  request<{ ok: boolean }>('PUT', `/users/${id}/password`, { password })
+
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  request<{ ok: boolean }>('PUT', '/users/me/password', { currentPassword, newPassword })
+
+export const updateTheme = (theme: 'LIGHT' | 'DARK' | 'SYSTEM') =>
+  request<{ data: User }>('PATCH', '/users/me/theme', { theme }).then(r => r.data)
 
 export const deleteUser = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/users/${id}`)
 
 // Admin endpoints
 export const getAdminStats = () =>
-  request<AdminStats>('GET', '/admin/stats')
+  request<{ data: AdminStats }>('GET', '/admin/stats').then(r => r.data)
 
-export const getAdminConsultations = () =>
-  request<{ data: Consultation[] }>('GET', '/admin/consultations')
+export const getAdminConsultations = (page = 1, limit = 20) =>
+  request<PagedResponse<Consultation>>('GET', `/admin/consultations?page=${page}&limit=${limit}`)
 
 export const bulkDeleteConsultations = (ids: string[]) =>
-  request<{ deleted: number }>('DELETE', '/admin/consultations/bulk-delete', { ids })
+  request<{ ok: boolean }>('POST', '/admin/consultations/bulk-delete', { ids })
 
-export const getAdminProfessionals = () =>
-  request<{ data: Professional[] }>('GET', '/admin/professionals')
+export const getAdminProfessionals = (page = 1, limit = 20) =>
+  request<PagedResponse<Professional>>('GET', `/admin/professionals?page=${page}&limit=${limit}`)
 
 export const bulkDeleteProfessionals = (ids: string[]) =>
-  request<{ deleted: number }>('DELETE', '/admin/professionals/bulk-delete', { ids })
+  request<{ ok: boolean }>('POST', '/admin/professionals/bulk-delete', { ids })
 
-export const getAdminFiles = () =>
-  request<{ data: MedFile[] }>('GET', '/admin/files')
+export const getAdminFiles = (page = 1, limit = 20) =>
+  request<PagedResponse<MedFile>>('GET', `/admin/files?page=${page}&limit=${limit}`)
+
+export interface LoginLog {
+  id: string
+  userId: string
+  userName: string
+  userEmail: string
+  timestamp: string
+  ipAddress?: string
+  userAgent?: string
+}
+
+export const getAdminLoginLogs = (page = 1, limit = 20) =>
+  request<PagedResponse<LoginLog>>('GET', `/admin/login-logs?page=${page}&limit=${limit}`)
+
+// Phones
+export interface Phone {
+  id: string
+  number: string
+  label?: string
+  professionalId?: string
+  clinicId?: string
+  createdAt: string
+}
+
+export const getProfessionalPhones = (professionalId: string) =>
+  request<{ data: Phone[] }>('GET', `/professionals/${professionalId}/phones`).then(r => r.data)
+
+export const createProfessionalPhone = (professionalId: string, number: string, label?: string) =>
+  request<{ data: Phone }>('POST', `/professionals/${professionalId}/phones`, { number, label }).then(r => r.data)
+
+export const getClinicPhones = (clinicId: string) =>
+  request<{ data: Phone[] }>('GET', `/clinics/${clinicId}/phones`).then(r => r.data)
+
+export const createClinicPhone = (clinicId: string, number: string, label?: string) =>
+  request<{ data: Phone }>('POST', `/clinics/${clinicId}/phones`, { number, label }).then(r => r.data)
+
+export const updatePhone = (id: string, number: string, label?: string) =>
+  request<{ data: Phone }>('PUT', `/phones/${id}`, { number, label }).then(r => r.data)
+
+export const deletePhone = (id: string) =>
+  request<{ ok: boolean }>('DELETE', `/phones/${id}`)
+
+// Sharing
+export interface Sharing {
+  id: string
+  sharingFromUserId: string
+  sharingToUserId: string
+  createdAt: string
+}
+
+export const getProfessionalSharing = () =>
+  request<{ data: Sharing[] }>('GET', '/sharing/professionals').then(r => r.data)
+
+export const createProfessionalSharing = (toUserId: string) =>
+  request<{ data: Sharing }>('POST', '/sharing/professionals', { toUserId }).then(r => r.data)
+
+export const deleteProfessionalSharing = (userId: string) =>
+  request<{ ok: boolean }>('DELETE', `/sharing/professionals/${userId}`)
+
+export const getClinicSharing = () =>
+  request<{ data: Sharing[] }>('GET', '/sharing/clinics').then(r => r.data)
+
+export const createClinicSharing = (toUserId: string) =>
+  request<{ data: Sharing }>('POST', '/sharing/clinics', { toUserId }).then(r => r.data)
+
+export const deleteClinicSharing = (userId: string) =>
+  request<{ ok: boolean }>('DELETE', `/sharing/clinics/${userId}`)
 
 // Returns raw Response so caller can trigger browser download
 export const downloadBackup = () =>

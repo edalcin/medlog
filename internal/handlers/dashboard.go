@@ -4,13 +4,23 @@ import (
 	"database/sql"
 	"math"
 	"net/http"
+	"sync"
+	"time"
 
 	"medlog/internal/auth"
 )
 
-type DashboardHandler struct {
-	DB *sql.DB
+type dashboardCacheEntry struct {
+	stats     DashboardStats
+	cachedAt  time.Time
 }
+
+type DashboardHandler struct {
+	DB    *sql.DB
+	cache sync.Map // map[string]dashboardCacheEntry
+}
+
+const dashboardCacheTTL = 5 * time.Minute
 
 type DashboardStats struct {
 	Summary struct {
@@ -76,6 +86,14 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 	isAdmin := role == "ADMIN"
 
+	if entry, ok := h.cache.Load(userID); ok {
+		e := entry.(dashboardCacheEntry)
+		if time.Since(e.cachedAt) < dashboardCacheTTL {
+			writeJSON(w, http.StatusOK, map[string]any{"data": e.stats})
+			return
+		}
+	}
+
 	var stats DashboardStats
 	ctx := r.Context()
 
@@ -89,19 +107,19 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// --- Summary ---
 	q := "SELECT COUNT(*) FROM consultations c WHERE c.type = 'CONSULTATION' " + userFilter
 	if err := h.DB.QueryRowContext(ctx, q, userArg...).Scan(&stats.Summary.TotalConsultations); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 
 	q = "SELECT COUNT(*) FROM consultations c WHERE c.type != 'CONSULTATION' " + userFilter
 	if err := h.DB.QueryRowContext(ctx, q, userArg...).Scan(&stats.Summary.TotalEpisodes); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 
 	q = "SELECT COUNT(DISTINCT c.professional_id) FROM consultations c WHERE c.professional_id IS NOT NULL " + userFilter
 	if err := h.DB.QueryRowContext(ctx, q, userArg...).Scan(&stats.Summary.TotalProfessionals); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 
@@ -112,7 +130,7 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		fileArg = nil
 	}
 	if err := h.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM files f "+fileFilter, fileArg...).Scan(&stats.Summary.TotalFiles); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 
@@ -290,5 +308,6 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 		stats.TopRated = []topRated{}
 	}
 
-	writeJSON(w, http.StatusOK, stats)
+	h.cache.Store(userID, dashboardCacheEntry{stats: stats, cachedAt: time.Now()})
+	writeJSON(w, http.StatusOK, map[string]any{"data": stats})
 }

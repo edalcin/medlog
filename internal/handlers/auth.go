@@ -29,12 +29,13 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 		Name         string
 		Email        string
 		Role         string
+		Theme        string
 		PasswordHash string
 	}
 	err := h.DB.QueryRowContext(r.Context(),
-		"SELECT id, name, email, role, password_hash FROM users WHERE email = ?",
+		"SELECT id, name, email, role, theme, password_hash FROM users WHERE email = ?",
 		req.Email,
-	).Scan(&user.ID, &user.Name, &user.Email, &user.Role, &user.PasswordHash)
+	).Scan(&user.ID, &user.Name, &user.Email, &user.Role, &user.Theme, &user.PasswordHash)
 	if err != nil {
 		writeError(w, "invalid credentials", http.StatusUnauthorized)
 		return
@@ -51,15 +52,18 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 	auth.Manager.Put(r.Context(), auth.SessionKeyRole, user.Role)
 	auth.Manager.Put(r.Context(), auth.SessionKeyName, user.Name)
 	auth.Manager.Put(r.Context(), auth.SessionKeyEmail, user.Email)
+	auth.Manager.Put(r.Context(), auth.SessionKeyTheme, user.Theme)
 
+	userAgent := r.Header.Get("User-Agent")
+	ip := r.RemoteAddr
 	_, _ = h.DB.ExecContext(r.Context(),
-		"INSERT INTO login_logs (id, user_id, user_name, user_email, timestamp) VALUES (?, ?, ?, ?, ?)",
-		uuid.New().String(), user.ID, user.Name, user.Email, time.Now().UTC(),
+		"INSERT INTO login_logs (id, user_id, user_name, user_email, timestamp, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)",
+		uuid.New().String(), user.ID, user.Name, user.Email, time.Now().UTC(), ip, userAgent,
 	)
 
-	writeJSON(w, http.StatusOK, map[string]string{
-		"id": user.ID, "email": user.Email, "name": user.Name, "role": user.Role,
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]string{
+		"id": user.ID, "email": user.Email, "name": user.Name, "role": user.Role, "theme": user.Theme,
+	}})
 }
 
 func (h *AuthHandler) SignOut(w http.ResponseWriter, r *http.Request) {
@@ -71,10 +75,11 @@ func (h *AuthHandler) SignOut(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]string{
 		"id":    auth.Manager.GetString(r.Context(), auth.SessionKeyUserID),
 		"email": auth.Manager.GetString(r.Context(), auth.SessionKeyEmail),
 		"name":  auth.Manager.GetString(r.Context(), auth.SessionKeyName),
 		"role":  auth.Manager.GetString(r.Context(), auth.SessionKeyRole),
-	})
+		"theme": auth.Manager.GetString(r.Context(), auth.SessionKeyTheme),
+	}})
 }

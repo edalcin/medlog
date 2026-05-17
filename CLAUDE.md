@@ -129,6 +129,7 @@ PORT=3000
 ADMIN_EMAIL=admin@example.com    # First-boot only
 ADMIN_PASSWORD=changeme          # First-boot only
 SESSION_SECURE=false             # true in production (HTTPS)
+TRUST_PROXY=false                # true if behind reverse proxy (enables X-Forwarded-For for rate limiting)
 ```
 
 ## Docker Deployment

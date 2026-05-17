@@ -22,15 +22,25 @@ func (h *ProfessionalHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
 	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 	activeOnly := r.URL.Query().Get("active") == "true"
-	list, err := models.ProfessionalFindAll(r.Context(), h.DB, userID, role == "ADMIN", activeOnly)
+	search := r.URL.Query().Get("search")
+	isAdmin := role == "ADMIN"
+	page, limit := parsePagination(r)
+	offset := (page - 1) * limit
+
+	list, err := models.ProfessionalFindAll(r.Context(), h.DB, userID, isAdmin, activeOnly, search, limit, offset)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
+		return
+	}
+	total, err := models.ProfessionalCount(r.Context(), h.DB, userID, isAdmin, activeOnly, search)
+	if err != nil {
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
 		list = []models.Professional{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+	writePagedJSON(w, list, total, page, limit)
 }
 
 func (h *ProfessionalHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -55,10 +65,10 @@ func (h *ProfessionalHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := models.ProfessionalCreate(r.Context(), h.DB, uuid.New().String(), p, req.SpecialtyIDs)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, result)
+	writeJSON(w, http.StatusCreated, map[string]any{"data": result})
 }
 
 func (h *ProfessionalHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -68,11 +78,11 @@ func (h *ProfessionalHandler) Get(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, p)
+	writeJSON(w, http.StatusOK, map[string]any{"data": p})
 }
 
 func (h *ProfessionalHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -96,17 +106,17 @@ func (h *ProfessionalHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := models.ProfessionalUpdate(r.Context(), h.DB, id, p, req.SpecialtyIDs)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, result)
+	writeJSON(w, http.StatusOK, map[string]any{"data": result})
 }
 
 func (h *ProfessionalHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	hasConsult, err := models.ProfessionalHasConsultations(r.Context(), h.DB, id)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	if hasConsult {
@@ -114,7 +124,7 @@ func (h *ProfessionalHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := models.ProfessionalDelete(r.Context(), h.DB, id); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

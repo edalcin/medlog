@@ -10,6 +10,8 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"medlog/internal/auth"
+
 	"medlog/internal/models"
 )
 
@@ -18,7 +20,7 @@ type UserHandler struct{ DB *sql.DB }
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	list, err := models.UserFindAll(r.Context(), h.DB)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
@@ -63,10 +65,10 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := models.UserCreate(r.Context(), h.DB, uuid.New().String(), in)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, u)
+	writeJSON(w, http.StatusCreated, map[string]any{"data": u})
 }
 
 func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -76,11 +78,11 @@ func (h *UserHandler) Get(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, u)
+	writeJSON(w, http.StatusOK, map[string]any{"data": u})
 }
 
 func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -106,11 +108,11 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, u)
+	writeJSON(w, http.StatusOK, map[string]any{"data": u})
 }
 
 func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +130,7 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := models.UserUpdatePassword(r.Context(), h.DB, id, string(hash)); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
@@ -137,7 +139,80 @@ func (h *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if err := models.UserDelete(r.Context(), h.DB, id); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (h *UserHandler) ListOthers(w http.ResponseWriter, r *http.Request) {
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	list, err := models.UserFindOthers(r.Context(), h.DB, userID)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+}
+
+func (h *UserHandler) MeUpdateTheme(w http.ResponseWriter, r *http.Request) {
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	var req struct {
+		Theme string `json:"theme"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.Theme != "LIGHT" && req.Theme != "DARK" && req.Theme != "SYSTEM" {
+		writeError(w, "theme must be LIGHT, DARK, or SYSTEM", http.StatusBadRequest)
+		return
+	}
+	u, err := models.UserUpdate(r.Context(), h.DB, userID, models.UpdateUserInput{Theme: &req.Theme})
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	auth.Manager.Put(r.Context(), auth.SessionKeyTheme, req.Theme)
+	writeJSON(w, http.StatusOK, map[string]any{"data": u})
+}
+
+func (h *UserHandler) MeUpdatePassword(w http.ResponseWriter, r *http.Request) {
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	var req struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		writeError(w, "currentPassword and newPassword required", http.StatusBadRequest)
+		return
+	}
+	if len(req.NewPassword) < 8 {
+		writeError(w, "newPassword must be at least 8 characters", http.StatusBadRequest)
+		return
+	}
+
+	var currentHash string
+	if err := h.DB.QueryRowContext(r.Context(),
+		"SELECT password_hash FROM users WHERE id=?", userID).Scan(&currentHash); err != nil {
+		writeDBError(w, err)
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(req.CurrentPassword)); err != nil {
+		writeError(w, "current password is incorrect", http.StatusUnauthorized)
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := models.UserUpdatePassword(r.Context(), h.DB, userID, string(hash)); err != nil {
+		writeDBError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

@@ -12,6 +12,7 @@
   import Reports from './routes/Reports.svelte'
   import Admin from './routes/Admin.svelte'
   import Dashboard from './routes/Dashboard.svelte'
+  import Sharing from './routes/Sharing.svelte'
 
   import './app.css'
 
@@ -25,6 +26,7 @@
     '/professionals': ProfessionalList,
     '/professionals/:id': ProfessionalDetail,
     '/reports': Reports,
+    '/sharing': Sharing,
     '/admin': Admin,
   }
 
@@ -34,10 +36,18 @@
 
   const publicRoutes = ['/signin']
 
-  // Auth guard: redirect to sign-in when user is not authenticated
   $effect(() => {
     if (!$authLoading && !$currentUser && !publicRoutes.includes($location)) {
       push('/signin')
+    }
+  })
+
+  $effect(() => {
+    const theme = $currentUser?.theme ?? 'SYSTEM'
+    if (theme === 'SYSTEM') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme.toLowerCase())
     }
   })
 </script>

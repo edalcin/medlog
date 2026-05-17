@@ -34,9 +34,11 @@ func main() {
 	}
 
 	databaseURL := mustEnv("DATABASE_URL")
+	sessionSecret := mustEnv("SESSION_SECRET")
 	filesPath := envOrDefault("FILES_PATH", "./uploads")
 	port := envOrDefault("PORT", "3000")
 	sessionSecure := os.Getenv("SESSION_SECURE") == "true"
+	trustProxy := os.Getenv("TRUST_PROXY") == "true"
 	adminEmail := os.Getenv("ADMIN_EMAIL")
 	adminPassword := os.Getenv("ADMIN_PASSWORD")
 
@@ -58,6 +60,10 @@ func main() {
 		log.Fatalf("bootstrap admin: %v", err)
 	}
 
+	if err := auth.EnsureSessionSecret(database, sessionSecret); err != nil {
+		log.Fatalf("session secret check: %v", err)
+	}
+
 	auth.InitSessions(database, sessionSecure)
 
 	r := chi.NewRouter()
@@ -70,7 +76,7 @@ func main() {
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api", func(r chi.Router) {
-		registerRoutes(r, database, filesPath, databaseURL)
+		registerRoutes(r, database, filesPath, databaseURL, trustProxy)
 	})
 
 	r.Handle("/*", spaHandler())
@@ -89,9 +95,9 @@ func main() {
 	}
 }
 
-func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL string) {
+func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL string, trustProxy bool) {
 	authH := &handlers.AuthHandler{DB: database}
-	r.Post("/auth/signin", authH.SignIn)
+	r.With(appmiddleware.RateLimit(database, trustProxy)).Post("/auth/signin", authH.SignIn)
 	r.Post("/auth/signout", authH.SignOut)
 
 	specialtyH := &handlers.SpecialtyHandler{DB: database}
@@ -100,6 +106,8 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 	profH := &handlers.ProfessionalHandler{DB: database, FilesPath: filesPath}
 	consultH := &handlers.ConsultationHandler{DB: database, FilesPath: filesPath}
 	fileH := &handlers.FileHandler{DB: database, FilesPath: filesPath}
+	phoneH := &handlers.PhoneHandler{DB: database}
+	sharingH := &handlers.SharingHandler{DB: database}
 	userH := &handlers.UserHandler{DB: database}
 	adminH := &handlers.AdminHandler{DB: database, FilesPath: filesPath, DBPath: extractDBPath(databaseURL)}
 	dashH := &handlers.DashboardHandler{DB: database}
@@ -108,6 +116,9 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Use(auth.RequireAuth)
 
 		r.Get("/auth/me", authH.Me)
+		r.Get("/users/others", userH.ListOthers)
+		r.Put("/users/me/password", userH.MeUpdatePassword)
+		r.Patch("/users/me/theme", userH.MeUpdateTheme)
 		r.Get("/dashboard", dashH.Get)
 
 		r.Get("/specialties", specialtyH.List)
@@ -133,6 +144,20 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Post("/files", fileH.Upload)
 		r.Get("/files/{filename}", fileH.Serve)
 		r.Delete("/files/{id}", fileH.Delete)
+
+		r.Get("/professionals/{id}/phones", phoneH.ListByProfessional)
+		r.Post("/professionals/{id}/phones", phoneH.CreateForProfessional)
+		r.Get("/clinics/{id}/phones", phoneH.ListByClinic)
+		r.Post("/clinics/{id}/phones", phoneH.CreateForClinic)
+		r.Put("/phones/{id}", phoneH.Update)
+		r.Delete("/phones/{id}", phoneH.Delete)
+
+		r.Get("/sharing/professionals", sharingH.ListProfessionalSharing)
+		r.Post("/sharing/professionals", sharingH.CreateProfessionalSharing)
+		r.Delete("/sharing/professionals/{userId}", sharingH.DeleteProfessionalSharing)
+		r.Get("/sharing/clinics", sharingH.ListClinicSharing)
+		r.Post("/sharing/clinics", sharingH.CreateClinicSharing)
+		r.Delete("/sharing/clinics/{userId}", sharingH.DeleteClinicSharing)
 	})
 
 	r.Group(func(r chi.Router) {
@@ -159,6 +184,7 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Get("/admin/professionals", adminH.ListProfessionals)
 		r.Post("/admin/professionals/bulk-delete", adminH.BulkDeleteProfessionals)
 		r.Get("/admin/files", adminH.ListFiles)
+		r.Get("/admin/login-logs", adminH.ListLoginLogs)
 		r.Get("/admin/backup", adminH.Backup)
 		r.Post("/admin/restore", adminH.Restore)
 	})

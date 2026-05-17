@@ -4,6 +4,7 @@
   import * as api from '../lib/api'
   import type { Professional } from '../lib/api'
   import FileUpload from '../components/FileUpload.svelte'
+  import InlineCreate from '../components/InlineCreate.svelte'
 
   let professionals = $state<Professional[]>([])
   let loading = $state(true)
@@ -54,6 +55,23 @@
   function goToDetail() {
     if (createdId) push(`/consultations/${createdId}`)
   }
+
+  function resetForm() {
+    createdId = null
+    date = new Date().toISOString().split('T')[0]
+    type = 'CONSULTATION'
+    proposito = ''
+    notes = ''
+    professionalId = ''
+    rating = ''
+    error = ''
+    submitting = false
+  }
+
+  function onProfessionalCreated(item: { id: string; name: string }) {
+    professionals = [...professionals, { id: item.id, name: item.name, isActive: true, isShared: false, specialties: [] }]
+    professionalId = item.id
+  }
 </script>
 
 <div class="page">
@@ -73,8 +91,9 @@
         professionalId={professionalId || undefined}
       />
 
-      <div style="margin-top:20px">
+      <div style="margin-top:20px;display:flex;gap:10px">
         <button class="btn btn-primary" onclick={goToDetail}>Ver Consulta →</button>
+        <button class="btn btn-ghost" onclick={resetForm}>Nova Consulta</button>
       </div>
     </div>
   {:else}
@@ -108,6 +127,7 @@
               <option value={p.id}>{p.name}{p.specialties.length > 0 ? ` — ${p.specialties[0].name}` : ''}</option>
             {/each}
           </select>
+          <InlineCreate resourceType="professionals" label="profissional" onCreated={onProfessionalCreated} />
         {/if}
       </div>
 

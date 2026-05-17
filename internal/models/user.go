@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 )
 
@@ -94,18 +95,35 @@ type UpdateUserInput struct {
 }
 
 func UserUpdate(ctx context.Context, db *sql.DB, id string, in UpdateUserInput) (*User, error) {
+	var sets []string
+	var args []any
 	now := time.Now().UTC()
+
 	if in.Name != nil {
-		db.ExecContext(ctx, "UPDATE users SET name=?, updated_at=? WHERE id=?", *in.Name, now, id)
+		sets = append(sets, "name=?")
+		args = append(args, *in.Name)
 	}
 	if in.Email != nil {
-		db.ExecContext(ctx, "UPDATE users SET email=?, updated_at=? WHERE id=?", *in.Email, now, id)
+		sets = append(sets, "email=?")
+		args = append(args, *in.Email)
 	}
 	if in.Role != nil {
-		db.ExecContext(ctx, "UPDATE users SET role=?, updated_at=? WHERE id=?", *in.Role, now, id)
+		sets = append(sets, "role=?")
+		args = append(args, *in.Role)
 	}
 	if in.Theme != nil {
-		db.ExecContext(ctx, "UPDATE users SET theme=?, updated_at=? WHERE id=?", *in.Theme, now, id)
+		sets = append(sets, "theme=?")
+		args = append(args, *in.Theme)
+	}
+	if len(sets) == 0 {
+		return UserFindByID(ctx, db, id)
+	}
+	sets = append(sets, "updated_at=?")
+	args = append(args, now, id)
+
+	if _, err := db.ExecContext(ctx,
+		"UPDATE users SET "+strings.Join(sets, ",")+` WHERE id=?`, args...); err != nil {
+		return nil, err
 	}
 	return UserFindByID(ctx, db, id)
 }
@@ -119,4 +137,30 @@ func UserUpdatePassword(ctx context.Context, db *sql.DB, id, hash string) error 
 func UserDelete(ctx context.Context, db *sql.DB, id string) error {
 	_, err := db.ExecContext(ctx, "DELETE FROM users WHERE id=?", id)
 	return err
+}
+
+type UserSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func UserFindOthers(ctx context.Context, db *sql.DB, exceptID string) ([]UserSummary, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT id, name FROM users WHERE id != ? ORDER BY name`, exceptID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []UserSummary
+	for rows.Next() {
+		var u UserSummary
+		if err := rows.Scan(&u.ID, &u.Name); err != nil {
+			return nil, err
+		}
+		list = append(list, u)
+	}
+	if list == nil {
+		list = []UserSummary{}
+	}
+	return list, rows.Err()
 }

@@ -8,17 +8,32 @@
   let loading = $state(true)
   let error = $state('')
   let search = $state('')
+  let page = $state(1)
+  let total = $state(0)
+  const limit = 20
 
-  onMount(async () => {
+  async function load() {
+    loading = true
+    error = ''
     try {
-      const res = await api.getConsultations()
+      const res = await api.getConsultations(page, limit)
       consultations = res.data
+      total = res.total
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao carregar consultas'
     } finally {
       loading = false
     }
-  })
+  }
+
+  onMount(load)
+
+  let totalPages = $derived(Math.max(1, Math.ceil(total / limit)))
+
+  async function goTo(p: number) {
+    page = p
+    await load()
+  }
 
   let filtered = $derived(
     search.trim()
@@ -101,6 +116,13 @@
         </div>
       {/each}
     </div>
+    {#if totalPages > 1}
+      <div class="pagination">
+        <button class="btn btn-ghost" disabled={page <= 1} onclick={() => goTo(page - 1)}>‹ Anterior</button>
+        <span class="page-info">Página {page} de {totalPages} · {total} total</span>
+        <button class="btn btn-ghost" disabled={page >= totalPages} onclick={() => goTo(page + 1)}>Próxima ›</button>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -179,5 +201,18 @@
     background: var(--bg-elevated);
     padding: 2px 8px;
     border-radius: 12px;
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+  }
+
+  .page-info {
+    font-size: 13px;
+    color: var(--text-muted);
   }
 </style>

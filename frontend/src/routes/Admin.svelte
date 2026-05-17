@@ -1,9 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import * as api from '../lib/api'
-  import type { User, Consultation, Professional, MedFile, Specialty, FileCategory, Clinic, AdminStats } from '../lib/api'
+  import type { User, Consultation, Professional, MedFile, Specialty, FileCategory, Clinic, AdminStats, LoginLog } from '../lib/api'
 
-  type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'backup'
+  type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'logs' | 'backup'
 
   let activeTab = $state<Tab>('users')
   let stats = $state<AdminStats | null>(null)
@@ -25,11 +25,15 @@
   let adminConsultations = $state<Consultation[]>([])
   let selectedConsultationIds = $state<string[]>([])
   let bulkConError = $state('')
+  let conPage = $state(1)
+  let conTotal = $state(0)
 
   // Professionals tab
   let adminProfessionals = $state<Professional[]>([])
   let selectedProfessionalIds = $state<string[]>([])
   let bulkProError = $state('')
+  let proPage = $state(1)
+  let proTotal = $state(0)
 
   // Specialties tab
   let specsData = $state<Specialty[]>([])
@@ -56,6 +60,14 @@
 
   // Files tab
   let filesData = $state<MedFile[]>([])
+  let filePage = $state(1)
+  let fileTotal = $state(0)
+  const adminLimit = 20
+
+  // Login logs tab
+  let logsData = $state<LoginLog[]>([])
+  let logPage = $state(1)
+  let logTotal = $state(0)
 
   // Backup/Restore
   let restoreFile = $state<File | null>(null)
@@ -69,25 +81,51 @@
   })
 
   async function loadAll() {
-    const [statsRes, usersRes, consRes, prosRes, specsRes, catsRes, clinicsRes, filesRes] = await Promise.allSettled([
+    const [statsRes, usersRes, consRes, prosRes, specsRes, catsRes, clinicsRes, filesRes, logsRes] = await Promise.allSettled([
       api.getAdminStats(),
       api.getUsers(),
-      api.getAdminConsultations(),
-      api.getAdminProfessionals(),
+      api.getAdminConsultations(conPage, adminLimit),
+      api.getAdminProfessionals(proPage, adminLimit),
       api.getSpecialties(),
       api.getCategories(),
       api.getClinics(),
-      api.getAdminFiles(),
+      api.getAdminFiles(filePage, adminLimit),
+      api.getAdminLoginLogs(logPage, adminLimit),
     ])
 
     if (statsRes.status === 'fulfilled') stats = statsRes.value
     if (usersRes.status === 'fulfilled') users = usersRes.value.data
-    if (consRes.status === 'fulfilled') adminConsultations = consRes.value.data
-    if (prosRes.status === 'fulfilled') adminProfessionals = prosRes.value.data
+    if (consRes.status === 'fulfilled') { adminConsultations = consRes.value.data; conTotal = consRes.value.total }
+    if (prosRes.status === 'fulfilled') { adminProfessionals = prosRes.value.data; proTotal = prosRes.value.total }
     if (specsRes.status === 'fulfilled') specsData = specsRes.value.data
     if (catsRes.status === 'fulfilled') catsData = catsRes.value.data
     if (clinicsRes.status === 'fulfilled') clinicsData = clinicsRes.value.data
-    if (filesRes.status === 'fulfilled') filesData = filesRes.value.data
+    if (filesRes.status === 'fulfilled') { filesData = filesRes.value.data; fileTotal = filesRes.value.total }
+    if (logsRes.status === 'fulfilled') { logsData = logsRes.value.data; logTotal = logsRes.value.total }
+  }
+
+  async function loadConsultations(p: number) {
+    conPage = p; selectedConsultationIds = []
+    const res = await api.getAdminConsultations(p, adminLimit)
+    adminConsultations = res.data; conTotal = res.total
+  }
+
+  async function loadProfessionals(p: number) {
+    proPage = p; selectedProfessionalIds = []
+    const res = await api.getAdminProfessionals(p, adminLimit)
+    adminProfessionals = res.data; proTotal = res.total
+  }
+
+  async function loadFiles(p: number) {
+    filePage = p
+    const res = await api.getAdminFiles(p, adminLimit)
+    filesData = res.data; fileTotal = res.total
+  }
+
+  async function loadLogs(p: number) {
+    logPage = p
+    const res = await api.getAdminLoginLogs(p, adminLimit)
+    logsData = res.data; logTotal = res.total
   }
 
   // Users
@@ -398,7 +436,7 @@
   {/if}
 
   <div class="tabs">
-    {#each [['users','Usuários'],['consultations','Consultas'],['professionals','Profissionais'],['specialties','Especialidades'],['categories','Categorias'],['clinics','Clínicas'],['files','Arquivos'],['backup','Backup & Restauração']] as [key, label]}
+    {#each [['users','Usuários'],['consultations','Consultas'],['professionals','Profissionais'],['specialties','Especialidades'],['categories','Categorias'],['clinics','Clínicas'],['files','Arquivos'],['logs','Logs de Acesso'],['backup','Backup & Restauração']] as [key, label]}
       <button
         class="tab-btn"
         class:active={activeTab === key}
@@ -499,6 +537,13 @@
             {/each}
           </tbody>
         </table>
+        {#if Math.ceil(conTotal / adminLimit) > 1}
+          <div class="pagination">
+            <button class="btn btn-ghost" disabled={conPage <= 1} onclick={() => loadConsultations(conPage - 1)}>‹ Anterior</button>
+            <span class="page-info">Página {conPage} de {Math.ceil(conTotal / adminLimit)} · {conTotal} total</span>
+            <button class="btn btn-ghost" disabled={conPage >= Math.ceil(conTotal / adminLimit)} onclick={() => loadConsultations(conPage + 1)}>Próxima ›</button>
+          </div>
+        {/if}
       </div>
 
     <!-- Professionals Tab -->
@@ -534,6 +579,13 @@
             {/each}
           </tbody>
         </table>
+        {#if Math.ceil(proTotal / adminLimit) > 1}
+          <div class="pagination">
+            <button class="btn btn-ghost" disabled={proPage <= 1} onclick={() => loadProfessionals(proPage - 1)}>‹ Anterior</button>
+            <span class="page-info">Página {proPage} de {Math.ceil(proTotal / adminLimit)} · {proTotal} total</span>
+            <button class="btn btn-ghost" disabled={proPage >= Math.ceil(proTotal / adminLimit)} onclick={() => loadProfessionals(proPage + 1)}>Próxima ›</button>
+          </div>
+        {/if}
       </div>
 
     <!-- Specialties Tab -->
@@ -677,6 +729,41 @@
             {/each}
           </tbody>
         </table>
+        {#if Math.ceil(fileTotal / adminLimit) > 1}
+          <div class="pagination">
+            <button class="btn btn-ghost" disabled={filePage <= 1} onclick={() => loadFiles(filePage - 1)}>‹ Anterior</button>
+            <span class="page-info">Página {filePage} de {Math.ceil(fileTotal / adminLimit)} · {fileTotal} total</span>
+            <button class="btn btn-ghost" disabled={filePage >= Math.ceil(fileTotal / adminLimit)} onclick={() => loadFiles(filePage + 1)}>Próxima ›</button>
+          </div>
+        {/if}
+      </div>
+
+    <!-- Login Logs Tab -->
+    {:else if activeTab === 'logs'}
+      <div class="tab-section">
+        <table>
+          <thead>
+            <tr><th>Data/Hora</th><th>Usuário</th><th>E-mail</th><th>IP</th><th>User Agent</th></tr>
+          </thead>
+          <tbody>
+            {#each logsData as l (l.id)}
+              <tr>
+                <td style="white-space:nowrap">{new Date(l.timestamp).toLocaleString('pt-BR')}</td>
+                <td>{l.userName}</td>
+                <td>{l.userEmail}</td>
+                <td>{l.ipAddress ?? '—'}</td>
+                <td class="truncate" title={l.userAgent ?? ''}>{l.userAgent ?? '—'}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+        {#if Math.ceil(logTotal / adminLimit) > 1}
+          <div class="pagination">
+            <button class="btn btn-ghost" disabled={logPage <= 1} onclick={() => loadLogs(logPage - 1)}>‹ Anterior</button>
+            <span class="page-info">Página {logPage} de {Math.ceil(logTotal / adminLimit)} · {logTotal} total</span>
+            <button class="btn btn-ghost" disabled={logPage >= Math.ceil(logTotal / adminLimit)} onclick={() => loadLogs(logPage + 1)}>Próxima ›</button>
+          </div>
+        {/if}
       </div>
 
     <!-- Backup Tab -->
@@ -846,5 +933,18 @@
       padding-left: 0;
       padding-top: 16px;
     }
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .page-info {
+    font-size: 13px;
+    color: var(--text-muted);
   }
 </style>

@@ -17,7 +17,7 @@ type CategoryHandler struct{ DB *sql.DB }
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	list, err := models.CategoryFindAll(r.Context(), h.DB)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
@@ -36,10 +36,10 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	c, err := models.CategoryCreate(r.Context(), h.DB, uuid.New().String(), req.Name)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, c)
+	writeJSON(w, http.StatusCreated, map[string]any{"data": c})
 }
 
 func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -56,18 +56,18 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, c)
+	writeJSON(w, http.StatusOK, map[string]any{"data": c})
 }
 
 func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inUse, err := models.CategoryIsInUse(r.Context(), h.DB, id)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	if inUse {
@@ -75,7 +75,7 @@ func (h *CategoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := models.CategoryDelete(r.Context(), h.DB, id); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})

@@ -17,7 +17,7 @@ type SpecialtyHandler struct{ DB *sql.DB }
 func (h *SpecialtyHandler) List(w http.ResponseWriter, r *http.Request) {
 	list, err := models.SpecialtyFindAll(r.Context(), h.DB)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	if list == nil {
@@ -36,10 +36,10 @@ func (h *SpecialtyHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	s, err := models.SpecialtyCreate(r.Context(), h.DB, uuid.New().String(), req.Name)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, s)
+	writeJSON(w, http.StatusCreated, map[string]any{"data": s})
 }
 
 func (h *SpecialtyHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -56,18 +56,18 @@ func (h *SpecialtyHandler) Update(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
-			writeError(w, "db error", http.StatusInternalServerError)
+			writeDBError(w, err)
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, s)
+	writeJSON(w, http.StatusOK, map[string]any{"data": s})
 }
 
 func (h *SpecialtyHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	inUse, err := models.SpecialtyIsInUse(r.Context(), h.DB, id)
 	if err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	if inUse {
@@ -75,7 +75,7 @@ func (h *SpecialtyHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := models.SpecialtyDelete(r.Context(), h.DB, id); err != nil {
-		writeError(w, "db error", http.StatusInternalServerError)
+		writeDBError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
