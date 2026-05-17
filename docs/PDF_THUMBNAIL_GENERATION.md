@@ -1,5 +1,13 @@
 # PDF Thumbnail Generation - Abordagem Bem-Sucedida
 
+> **⚠️ ARQUIVO HISTÓRICO — MedLog v0.2.1 (Next.js)**
+>
+> Este documento descreve a arquitetura do MedLog **v0.2.1**, que usava Next.js 14 + Node.js + React.
+> O MedLog v2 foi **completamente reescrito** em Go + Svelte 5 + SQLite e **não possui geração de thumbnails de PDF**.
+> O conteúdo abaixo é preservado como referência histórica das decisões tomadas naquela versão.
+
+---
+
 ## 📋 Índice
 
 1. [Resumo Executivo](#resumo-executivo)

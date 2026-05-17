@@ -1,10 +1,12 @@
 # Relatório Comparativo de Stack — MedLog vs PKD
 
-> **Note (2026-05-15):** Migration to Go + Svelte 5 + SQLite completed. This document records the analysis that led to the decision.
+> **⚠️ DOCUMENTO HISTÓRICO — A migração descrita aqui foi concluída em 2026-05-15.**
+> O MedLog v2 roda em Go 1.24 + Svelte 5 + SQLite (sem MariaDB, sem Next.js, sem Prisma).
+> Este documento preserva a análise comparativa e as lições aprendidas durante a migração.
 
-> **Nota:** Este documento serve como guia para futuras migrações evolutivas do MedLog.
-> As seções de lições aprendidas descrevem problemas reais encontrados em uma tentativa
-> de migração (2026-04-24) e suas soluções, para que possam ser aplicadas sem retrabalho.
+> **Lições aprendidas:** As seções abaixo descrevem problemas reais encontrados na tentativa
+> de migração MariaDB → SQLite com Prisma (2026-04-24) e suas soluções. A reescrita final
+> adotou Go nativo com `database/sql` (sem ORM), contornando todos esses problemas.
 
 ## Visão Geral dos Projetos
 
@@ -325,8 +327,16 @@ Seguir esta ordem para evitar os problemas acima:
 
 ---
 
-## Conclusão
+## Conclusão (Resultado Final — v2)
 
-A adoção com melhor custo-benefício para o MedLog é a **migração para SQLite**, que eliminaria o servidor MariaDB externo — tornando o sistema verdadeiramente self-contained em um único container, simplificando o `docker-compose.yml`, reduzindo a imagem total e facilitando o backup (um único arquivo). O sistema ser **multi-usuário não é incompatível** com SQLite: a restrição do SQLite é de escrita concorrente em alta escala, não de múltiplos usuários cadastrados. Para o perfil de uso do MedLog, SQLite com WAL mode é mais do que adequado.
+Todas as adoções prioritárias foram implementadas no MedLog v2:
 
-Combinada com um **Dockerfile multi-stage mais enxuto**, essa mudança reduziria a imagem Docker de ~500 MB para ~150–200 MB sem reescrever nenhuma lógica de negócio. As demais adoções (Go, Svelte) trariam ganhos maiores de desempenho e tamanho, mas exigiriam reescrita total do projeto — algo a considerar apenas em uma eventual versão 2.0.
+| Adoção | Status | Resultado |
+|---|---|---|
+| SQLite no lugar de MariaDB | ✅ Concluído | Um único arquivo; sem serviço externo |
+| Docker multi-stage otimizado | ✅ Concluído | Imagem final ~30 MB (alpine:3.21) |
+| Go no lugar de Node.js/Next.js | ✅ Concluído | Binário estático; startup instantâneo |
+| Svelte 5 no lugar de React | ✅ Concluído | Bundle menor; sem virtual DOM |
+| SQLite FTS5 | Não adotado | Busca via `LIKE` é suficiente para o perfil de uso |
+
+A imagem Docker passou de ~500 MB estimados para ~30 MB — redução de ~94%. O sistema é **completamente self-contained**: um único binário Go com frontend embutido, sem dependências externas além do SQLite.
