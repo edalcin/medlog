@@ -38,7 +38,7 @@ func professionalLoadSpecialties(ctx context.Context, db *sql.DB, profID string)
 		return nil, err
 	}
 	defer rows.Close()
-	var list []Specialty
+	list := []Specialty{}
 	for rows.Next() {
 		var s Specialty
 		if err := rows.Scan(&s.ID, &s.Name, &s.CreatedAt); err != nil {

@@ -34,7 +34,7 @@ func fileLoadCategories(ctx context.Context, db *sql.DB, fileID string) ([]FileC
 		return nil, err
 	}
 	defer rows.Close()
-	var list []FileCategory
+	list := []FileCategory{}
 	for rows.Next() {
 		var c FileCategory
 		if err := rows.Scan(&c.ID, &c.Name, &c.CreatedAt); err != nil {
