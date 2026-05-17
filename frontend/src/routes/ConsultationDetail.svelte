@@ -283,7 +283,7 @@
       <FileUpload
         consultationId={consultation.id}
         professionalId={consultation.professionalId}
-        {onFileUploaded}
+        onUploaded={onFileUploaded}
       />
     </div>
   {/if}

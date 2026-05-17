@@ -77,7 +77,14 @@ func main() {
 
 	addr := ":" + port
 	log.Printf("MedLog v2 starting on %s", addr)
-	if err := http.ListenAndServe(addr, r); err != nil {
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      r,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
 }

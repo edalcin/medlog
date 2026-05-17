@@ -196,7 +196,7 @@ export const uploadFile = (
   fd.append('file', file)
   fd.append('consultationId', consultationId)
   if (professionalId) fd.append('professionalId', professionalId)
-  categoryIds.forEach(id => fd.append('categoryIds[]', id))
+  categoryIds.forEach(id => fd.append('categoryIds', id))
   return fetch(BASE + '/files', {
     method: 'POST',
     body: fd,
