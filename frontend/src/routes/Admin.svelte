@@ -48,8 +48,10 @@
   // Clinics tab
   let clinicsData = $state<Clinic[]>([])
   let newClinicName = $state('')
+  let newClinicAddress = $state('')
   let editingClinic = $state<Clinic | null>(null)
   let editClinicName = $state('')
+  let editClinicAddress = $state('')
   let clinicError = $state('')
 
   // Files tab
@@ -284,9 +286,10 @@
     e.preventDefault()
     clinicError = ''
     try {
-      const c = await api.createClinic(newClinicName)
+      const c = await api.createClinic(newClinicName, newClinicAddress)
       clinicsData = [...clinicsData, c]
       newClinicName = ''
+      newClinicAddress = ''
     } catch (err: unknown) {
       clinicError = err instanceof Error ? err.message : 'Erro ao criar'
     }
@@ -296,7 +299,7 @@
     if (!editingClinic) return
     clinicError = ''
     try {
-      const c = await api.updateClinic(editingClinic.id, editClinicName)
+      const c = await api.updateClinic(editingClinic.id, editClinicName, editClinicAddress)
       clinicsData = clinicsData.map(x => x.id === c.id ? c : x)
       editingClinic = null
     } catch (err: unknown) {
@@ -611,14 +614,15 @@
     {:else if activeTab === 'clinics'}
       <div class="tab-section">
         <form class="inline-form-row" onsubmit={createClinicItem}>
-          <input type="text" bind:value={newClinicName} placeholder="Nova clínica/hospital" required />
+          <input type="text" bind:value={newClinicName} placeholder="Nome da clínica/hospital" required />
+          <input type="text" bind:value={newClinicAddress} placeholder="Endereço (opcional)" />
           <button type="submit" class="btn btn-primary">Adicionar</button>
         </form>
         {#if clinicError}
           <p class="error-msg" style="margin-bottom:12px">{clinicError}</p>
         {/if}
         <table>
-          <thead><tr><th>Nome</th><th></th></tr></thead>
+          <thead><tr><th>Nome</th><th>Endereço</th><th></th></tr></thead>
           <tbody>
             {#each clinicsData as c (c.id)}
               <tr>
@@ -629,12 +633,19 @@
                     {c.name}
                   {/if}
                 </td>
+                <td>
+                  {#if editingClinic?.id === c.id}
+                    <input type="text" bind:value={editClinicAddress} placeholder="Endereço (opcional)" style="width:250px" />
+                  {:else}
+                    {c.address || '—'}
+                  {/if}
+                </td>
                 <td class="actions-cell">
                   {#if editingClinic?.id === c.id}
                     <button class="btn btn-primary btn-xs" onclick={saveClinic}>Salvar</button>
                     <button class="btn btn-ghost btn-xs" onclick={() => (editingClinic = null)}>Cancelar</button>
                   {:else}
-                    <button class="btn btn-ghost btn-xs" onclick={() => { editingClinic = c; editClinicName = c.name }}>Editar</button>
+                    <button class="btn btn-ghost btn-xs" onclick={() => { editingClinic = c; editClinicName = c.name; editClinicAddress = c.address ?? '' }}>Editar</button>
                     <button class="btn btn-danger btn-xs" onclick={() => deleteClinicItem(c.id)}>Excluir</button>
                   {/if}
                 </td>

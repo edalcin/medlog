@@ -243,11 +243,11 @@ export const deleteCategory = (id: string) =>
 export const getClinics = () =>
   request<{ data: Clinic[] }>('GET', '/clinics')
 
-export const createClinic = (name: string) =>
-  request<Clinic>('POST', '/clinics', { name })
+export const createClinic = (name: string, address?: string) =>
+  request<Clinic>('POST', '/clinics', { name, address: address || null })
 
-export const updateClinic = (id: string, name: string) =>
-  request<Clinic>('PUT', `/clinics/${id}`, { name })
+export const updateClinic = (id: string, name: string, address?: string) =>
+  request<Clinic>('PUT', `/clinics/${id}`, { name, address: address || null })
 
 export const deleteClinic = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/clinics/${id}`)
