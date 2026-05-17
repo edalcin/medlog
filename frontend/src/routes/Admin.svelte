@@ -5,6 +5,19 @@
 
   type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'logs' | 'backup'
 
+  interface AdminSection { key: Tab; label: string; icon: string; description: string }
+  const sections: AdminSection[] = [
+    { key: 'users', label: 'Usuários', icon: '👤', description: 'Gerenciar usuários do sistema' },
+    { key: 'consultations', label: 'Consultas', icon: '📋', description: 'Visualizar e excluir consultas' },
+    { key: 'professionals', label: 'Profissionais', icon: '🩺', description: 'Visualizar e excluir profissionais' },
+    { key: 'specialties', label: 'Especialidades', icon: '🏷️', description: 'Dicionário de especialidades' },
+    { key: 'categories', label: 'Categorias', icon: '📁', description: 'Categorias de arquivos' },
+    { key: 'clinics', label: 'Clínicas', icon: '🏥', description: 'Clínicas e hospitais' },
+    { key: 'files', label: 'Arquivos', icon: '📄', description: 'Arquivos enviados' },
+    { key: 'logs', label: 'Logs', icon: '📜', description: 'Registros de login' },
+    { key: 'backup', label: 'Backup', icon: '💾', description: 'Backup e restauração' },
+  ]
+
   let activeTab = $state<Tab>('users')
   let stats = $state<AdminStats | null>(null)
 
@@ -435,14 +448,16 @@
     </div>
   {/if}
 
-  <div class="tabs">
-    {#each [['users','Usuários'],['consultations','Consultas'],['professionals','Profissionais'],['specialties','Especialidades'],['categories','Categorias'],['clinics','Clínicas'],['files','Arquivos'],['logs','Logs de Acesso'],['backup','Backup & Restauração']] as [key, label]}
+  <div class="admin-nav-grid">
+    {#each sections as s}
       <button
-        class="tab-btn"
-        class:active={activeTab === key}
-        onclick={() => (activeTab = key as Tab)}
+        class="nav-card"
+        class:active={activeTab === s.key}
+        onclick={() => (activeTab = s.key)}
+        title={s.description}
       >
-        {label}
+        <span class="nav-card-icon">{s.icon}</span>
+        <span class="nav-card-label">{s.label}</span>
       </button>
     {/each}
   </div>
@@ -832,36 +847,53 @@
     margin-top: 4px;
   }
 
-  .tabs {
-    display: flex;
-    gap: 4px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 20px;
-    overflow-x: auto;
-    flex-wrap: nowrap;
+  .admin-nav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
   }
 
-  .tab-btn {
-    padding: 8px 16px;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
+  .nav-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 18px 12px;
+    background: var(--bg-surface);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, transform 0.15s;
+    font-family: inherit;
+    font-size: inherit;
     color: var(--text-muted);
+  }
+
+  .nav-card:hover {
+    border-color: var(--accent);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+
+  .nav-card.active {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .nav-card-icon {
+    font-size: 26px;
+    line-height: 1;
+  }
+
+  .nav-card-label {
     font-size: 13px;
     font-weight: 500;
-    cursor: pointer;
+    text-align: center;
     white-space: nowrap;
-    transition: color 0.2s, border-color 0.2s;
-    margin-bottom: -1px;
-  }
-
-  .tab-btn:hover {
-    color: var(--text);
-  }
-
-  .tab-btn.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
   }
 
   .tab-content {
