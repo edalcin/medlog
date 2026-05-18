@@ -87,3 +87,7 @@ internal/embed/dist/
 # SQLite WAL/SHM files
 *.sqlite-wal
 *.sqlite-shm
+
+# Development tooling (not project source)
+.specify/
+.claude/skills/
