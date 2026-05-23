@@ -33,12 +33,19 @@ func (h *FileHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 	page, limit := parsePagination(r)
 	offset := (page - 1) * limit
 
-	list, err := models.FileFindByOwner(r.Context(), h.DB, userID, limit, offset)
+	opts := models.FileListOptions{
+		CategoryID:     r.URL.Query().Get("categoryId"),
+		ProfessionalID: r.URL.Query().Get("professionalId"),
+		Sort:           r.URL.Query().Get("sort"),
+		Dir:            r.URL.Query().Get("dir"),
+	}
+
+	list, err := models.FileFindByOwner(r.Context(), h.DB, userID, limit, offset, opts)
 	if err != nil {
 		writeDBError(w, err)
 		return
 	}
-	total, err := models.FileCountByOwner(r.Context(), h.DB, userID)
+	total, err := models.FileCountByOwner(r.Context(), h.DB, userID, opts)
 	if err != nil {
 		writeDBError(w, err)
 		return

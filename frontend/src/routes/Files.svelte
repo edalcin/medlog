@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import * as api from '../lib/api'
-  import type { MedFile } from '../lib/api'
+  import type { MedFile, FileCategory, Professional } from '../lib/api'
   import FileUpload from '../components/FileUpload.svelte'
   import FileEditModal from '../components/FileEditModal.svelte'
 
@@ -15,13 +15,36 @@
   let showUpload = $state(false)
   let editing = $state<MedFile | null>(null)
 
-  onMount(load)
+  // Filters
+  let allCategories = $state<FileCategory[]>([])
+  let allProfessionals = $state<Professional[]>([])
+  let filterCategory = $state('')
+  let filterProfessional = $state('')
+
+  // Sort
+  let sortCol = $state('uploadedAt')
+  let sortDir = $state<'asc' | 'desc'>('desc')
+
+  onMount(async () => {
+    const [catRes, profRes] = await Promise.all([
+      api.getCategories(),
+      api.getProfessionals(false, 1, 1000),
+    ])
+    allCategories = catRes.data
+    allProfessionals = profRes.data
+    await load()
+  })
 
   async function load() {
     loading = true
     error = ''
     try {
-      const res = await api.getMyFiles(page, limit)
+      const res = await api.getMyFiles(page, limit, {
+        sort: sortCol,
+        dir: sortDir,
+        categoryId: filterCategory || undefined,
+        professionalId: filterProfessional || undefined,
+      })
       files = res.data
       total = res.total
     } catch (e: unknown) {
@@ -31,11 +54,40 @@
     }
   }
 
+  async function applyFilter() {
+    page = 1
+    await load()
+  }
+
+  async function clearFilters() {
+    filterCategory = ''
+    filterProfessional = ''
+    page = 1
+    await load()
+  }
+
   let totalPages = $derived(Math.max(1, Math.ceil(total / limit)))
+  let hasFilters = $derived(!!(filterCategory || filterProfessional))
 
   async function goTo(p: number) {
     page = p
     await load()
+  }
+
+  function sortBy(col: string) {
+    if (sortCol === col) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc'
+    } else {
+      sortCol = col
+      sortDir = col === 'uploadedAt' ? 'desc' : 'asc'
+    }
+    page = 1
+    load()
+  }
+
+  function sortIcon(col: string): string {
+    if (sortCol !== col) return ' ⇅'
+    return sortDir === 'asc' ? ' ↑' : ' ↓'
   }
 
   function onUploaded(f: MedFile) {
@@ -97,25 +149,67 @@
     </div>
   {/if}
 
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <select bind:value={filterCategory} onchange={applyFilter}>
+      <option value="">Todas as categorias</option>
+      {#each allCategories as cat}
+        <option value={cat.id}>{cat.name}</option>
+      {/each}
+    </select>
+
+    <select bind:value={filterProfessional} onchange={applyFilter}>
+      <option value="">Todos os profissionais</option>
+      {#each allProfessionals as p}
+        <option value={p.id}>{p.name}</option>
+      {/each}
+    </select>
+
+    {#if hasFilters}
+      <button class="btn btn-ghost btn-sm" onclick={clearFilters}>✕ Limpar filtros</button>
+    {/if}
+
+    {#if total > 0}
+      <span class="filter-count">{total} arquivo{total !== 1 ? 's' : ''}</span>
+    {/if}
+  </div>
+
   {#if loading}
     <div class="loading">Carregando...</div>
   {:else if error}
     <p class="error-msg">{error}</p>
   {:else if files.length === 0}
     <div class="empty-state">
-      <p>Nenhum arquivo encontrado.</p>
-      <p class="text-muted">Clique em "Adicionar Arquivo" para enviar seu primeiro arquivo.</p>
+      {#if hasFilters}
+        <p>Nenhum arquivo encontrado com os filtros selecionados.</p>
+        <button class="btn btn-ghost" onclick={clearFilters}>Limpar filtros</button>
+      {:else}
+        <p>Nenhum arquivo encontrado.</p>
+        <p class="text-muted">Clique em "Adicionar Arquivo" para enviar seu primeiro arquivo.</p>
+      {/if}
     </div>
   {:else}
     <div class="table-wrapper">
       <table>
         <thead>
           <tr>
-            <th>Nome</th>
+            <th>
+              <button class="sort-btn" onclick={() => sortBy('name')}>
+                Nome{sortIcon('name')}
+              </button>
+            </th>
             <th>Tipo</th>
             <th>Categorias</th>
-            <th>Data</th>
-            <th>Profissional</th>
+            <th>
+              <button class="sort-btn" onclick={() => sortBy('uploadedAt')}>
+                Data{sortIcon('uploadedAt')}
+              </button>
+            </th>
+            <th>
+              <button class="sort-btn" onclick={() => sortBy('professionalName')}>
+                Profissional{sortIcon('professionalName')}
+              </button>
+            </th>
             <th></th>
           </tr>
         </thead>
@@ -180,12 +274,49 @@
 {/if}
 
 <style>
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .filter-bar select {
+    font-size: 13px;
+    padding: 5px 10px;
+    min-width: 160px;
+  }
+
+  .filter-count {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
   .table-wrapper {
     overflow-x: auto;
   }
 
   .table-wrapper table {
     min-width: 700px;
+  }
+
+  .sort-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: inherit;
+    font-weight: 600;
+    color: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    letter-spacing: inherit;
+  }
+
+  .sort-btn:hover {
+    color: var(--accent);
   }
 
   .file-link {
@@ -212,10 +343,14 @@
     text-align: center;
     padding: 48px 24px;
     color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
   }
 
   .empty-state p {
-    margin: 4px 0;
+    margin: 0;
   }
 
   .text-muted {

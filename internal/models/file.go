@@ -171,10 +171,51 @@ func FileFindByID(ctx context.Context, db *sql.DB, id string) (*File, error) {
 	return &f, nil
 }
 
-func FileFindByOwner(ctx context.Context, db *sql.DB, userID string, limit, offset int) ([]File, error) {
-	rows, err := db.QueryContext(ctx,
-		fileSelectSQL+` WHERE f.user_id=? OR c.user_id=? ORDER BY f.uploaded_at DESC LIMIT ? OFFSET ?`,
-		userID, userID, limit, offset)
+// FileListOptions controls filtering and sorting for owner-scoped file queries.
+type FileListOptions struct {
+	CategoryID     string // empty = no filter
+	ProfessionalID string // empty = no filter
+	Sort           string // "uploadedAt" | "name" | "professionalName"
+	Dir            string // "asc" | "desc"
+}
+
+var fileSortCols = map[string]string{
+	"uploadedAt":      "f.uploaded_at",
+	"name":            "COALESCE(f.custom_name, f.filename)",
+	"professionalName": "COALESCE(p1.name, p2.name)",
+}
+
+func fileOwnerWhere(userID string, opts FileListOptions) (where string, args []any) {
+	where = `(f.user_id=? OR c.user_id=?)`
+	args = []any{userID, userID}
+	if opts.CategoryID != "" {
+		where += ` AND f.id IN (SELECT file_id FROM file_file_categories WHERE category_id=?)`
+		args = append(args, opts.CategoryID)
+	}
+	if opts.ProfessionalID != "" {
+		where += ` AND (f.professional_id=? OR c.professional_id=?)`
+		args = append(args, opts.ProfessionalID, opts.ProfessionalID)
+	}
+	return where, args
+}
+
+func fileOrderBy(opts FileListOptions) string {
+	col, ok := fileSortCols[opts.Sort]
+	if !ok {
+		col = "f.uploaded_at"
+	}
+	dir := "DESC"
+	if opts.Dir == "asc" {
+		dir = "ASC"
+	}
+	return col + " " + dir
+}
+
+func FileFindByOwner(ctx context.Context, db *sql.DB, userID string, limit, offset int, opts FileListOptions) ([]File, error) {
+	where, args := fileOwnerWhere(userID, opts)
+	args = append(args, limit, offset)
+	q := fileSelectSQL + ` WHERE ` + where + ` ORDER BY ` + fileOrderBy(opts) + ` LIMIT ? OFFSET ?`
+	rows, err := db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -194,14 +235,15 @@ func FileFindByOwner(ctx context.Context, db *sql.DB, userID string, limit, offs
 	return attachCategories(ctx, db, list), nil
 }
 
-func FileCountByOwner(ctx context.Context, db *sql.DB, userID string) (int, error) {
+func FileCountByOwner(ctx context.Context, db *sql.DB, userID string, opts FileListOptions) (int, error) {
+	where, args := fileOwnerWhere(userID, opts)
 	var n int
 	err := db.QueryRowContext(ctx,
 		`SELECT COUNT(DISTINCT f.id)
 		 FROM files f
 		 LEFT JOIN consultations c ON c.id = f.consultation_id
-		 WHERE f.user_id=? OR c.user_id=?`,
-		userID, userID).Scan(&n)
+		 WHERE `+where,
+		args...).Scan(&n)
 	return n, err
 }
 

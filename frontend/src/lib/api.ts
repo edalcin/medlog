@@ -233,8 +233,18 @@ export const uploadFile = (
   })
 }
 
-export const getMyFiles = (page = 1, limit = 20) =>
-  request<PagedResponse<MedFile>>('GET', `/files?page=${page}&limit=${limit}`)
+export const getMyFiles = (
+  page = 1,
+  limit = 20,
+  opts: { sort?: string; dir?: string; categoryId?: string; professionalId?: string } = {}
+) => {
+  const p = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (opts.sort) p.set('sort', opts.sort)
+  if (opts.dir) p.set('dir', opts.dir)
+  if (opts.categoryId) p.set('categoryId', opts.categoryId)
+  if (opts.professionalId) p.set('professionalId', opts.professionalId)
+  return request<PagedResponse<MedFile>>('GET', `/files?${p}`)
+}
 
 export const updateFile = (
   id: string,
