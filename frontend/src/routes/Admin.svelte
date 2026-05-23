@@ -808,8 +808,12 @@
                 <td>{f.professionalName ?? '—'}</td>
                 <td style="white-space:nowrap">{formatSize(f.size)}</td>
                 <td class="actions-cell">
-                  <button class="btn btn-ghost btn-xs" onclick={() => (fileEditing = f)}>Editar</button>
-                  <button class="btn btn-danger btn-xs" onclick={() => deleteAdminFile(f)}>Excluir</button>
+                  <button class="icon-btn" onclick={() => (fileEditing = f)} title="Editar">
+                    <i class="bx bx-edit-alt"></i>
+                  </button>
+                  <button class="icon-btn icon-btn-danger" onclick={() => deleteAdminFile(f)} title="Excluir">
+                    <i class="bx bx-trash"></i>
+                  </button>
                 </td>
               </tr>
             {/each}

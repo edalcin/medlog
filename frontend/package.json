@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@keenmate/svelte-spa-router": "^1.0.0",
+    "boxicons": "^2.1.4",
     "marked": "^18.0.3"
   }
 }
