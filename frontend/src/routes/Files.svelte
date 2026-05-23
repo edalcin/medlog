@@ -69,12 +69,6 @@
     })
   }
 
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-  }
-
   function fileBadgeClass(mime: string): string {
     if (mime === 'application/pdf') return 'badge badge-red'
     if (mime === 'image/png' || mime === 'image/jpeg') return 'badge badge-blue'
@@ -122,7 +116,6 @@
             <th>Categorias</th>
             <th>Data</th>
             <th>Profissional</th>
-            <th>Tamanho</th>
             <th></th>
           </tr>
         </thead>
@@ -154,7 +147,6 @@
               </td>
               <td class="nowrap">{f.uploadedAt ? formatDate(f.uploadedAt) : '—'}</td>
               <td>{f.professionalName ?? '—'}</td>
-              <td class="nowrap">{formatSize(f.size)}</td>
               <td class="actions-cell">
                 <button class="btn btn-ghost btn-xs" onclick={() => (editing = f)}>Editar</button>
                 <button class="btn btn-danger btn-xs" onclick={() => deleteFile(f)}>Excluir</button>
@@ -190,6 +182,10 @@
 <style>
   .table-wrapper {
     overflow-x: auto;
+  }
+
+  .table-wrapper table {
+    min-width: 700px;
   }
 
   .file-link {
