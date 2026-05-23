@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { push } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
   import type { MedFile, FileCategory, Professional } from '../lib/api'
   import FileUpload from '../components/FileUpload.svelte'
@@ -242,6 +243,14 @@
               <td class="nowrap">{formatDate(f.consultationDate ?? f.uploadedAt)}</td>
               <td>{f.professionalName ?? '—'}</td>
               <td class="actions-cell">
+                <button
+                  class="btn btn-ghost btn-xs"
+                  onclick={() => f.consultationId && push(`/consultations/${f.consultationId}`)}
+                  disabled={!f.consultationId}
+                  title={f.consultationId ? 'Ver consulta' : 'Sem consulta vinculada'}
+                >
+                  Ver consulta
+                </button>
                 <button class="btn btn-ghost btn-xs" onclick={() => (editing = f)}>Editar</button>
                 <button class="btn btn-danger btn-xs" onclick={() => deleteFile(f)}>Excluir</button>
               </td>
