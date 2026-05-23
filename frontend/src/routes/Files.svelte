@@ -244,15 +244,37 @@
               <td>{f.professionalName ?? '—'}</td>
               <td class="actions-cell">
                 <button
-                  class="btn btn-ghost btn-xs"
+                  class="icon-btn"
                   onclick={() => f.consultationId && push(`/consultations/${f.consultationId}`)}
                   disabled={!f.consultationId}
                   title={f.consultationId ? 'Ver consulta' : 'Sem consulta vinculada'}
                 >
-                  Ver consulta
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                    <polyline points="15 3 21 3 21 9"/>
+                    <line x1="10" y1="14" x2="21" y2="3"/>
+                  </svg>
                 </button>
-                <button class="btn btn-ghost btn-xs" onclick={() => (editing = f)}>Editar</button>
-                <button class="btn btn-danger btn-xs" onclick={() => deleteFile(f)}>Excluir</button>
+                <button
+                  class="icon-btn"
+                  onclick={() => (editing = f)}
+                  title="Editar"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button
+                  class="icon-btn icon-btn-danger"
+                  onclick={() => deleteFile(f)}
+                  title="Excluir"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
               </td>
             </tr>
           {/each}
@@ -365,5 +387,37 @@
   .text-muted {
     color: var(--text-muted);
     font-size: 13px;
+  }
+
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s, border-color 0.15s;
+  }
+
+  .icon-btn:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--bg-elevated);
+    border-color: var(--text-muted);
+  }
+
+  .icon-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .icon-btn-danger:hover:not(:disabled) {
+    color: var(--danger);
+    border-color: var(--danger);
+    background: rgba(231, 76, 60, 0.08);
   }
 </style>
