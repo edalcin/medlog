@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import * as api from '../lib/api'
-  import type { FileCategory, MedFile, Consultation, User } from '../lib/api'
+  import type { FileCategory, MedFile, Consultation, Professional, User } from '../lib/api'
 
   let {
     consultationId,
@@ -20,11 +20,13 @@
   let inputId = $state('')
   let categories = $state<FileCategory[]>([])
   let consultations = $state<Consultation[]>([])
+  let professionals = $state<Professional[]>([])
   let users = $state<User[]>([])
 
   let selectedCategoryIds = $state<string[]>([])
   let selectedConsultationId = $state('')
   $effect(() => { selectedConsultationId = consultationId ?? '' })
+  let selectedProfessionalId = $state('')
   let selectedOwnerUserId = $state('')
   let selectedFile = $state<File | null>(null)
   let customName = $state('')
@@ -42,8 +44,12 @@
     }
     if (showConsultationPicker) {
       try {
-        const res = await api.getConsultations(1, 1000)
-        consultations = res.data
+        const [consultRes, profRes] = await Promise.all([
+          api.getConsultations(1, 1000),
+          api.getProfessionals(false, 1, 1000),
+        ])
+        consultations = consultRes.data
+        professionals = profRes.data
       } catch {
         // ignore
       }
@@ -82,9 +88,10 @@
     success = ''
     try {
       const effectiveConsultationId = consultationId || selectedConsultationId || undefined
+      const effectiveProfessionalId = professionalId || selectedProfessionalId || undefined
       const uploaded = await api.uploadFile(selectedFile, {
         consultationId: effectiveConsultationId,
-        professionalId,
+        professionalId: effectiveProfessionalId,
         categoryIds: selectedCategoryIds,
         customName: customName || undefined,
         ownerUserId: selectedOwnerUserId || undefined,
@@ -94,6 +101,7 @@
       customName = ''
       selectedCategoryIds = []
       selectedConsultationId = ''
+      selectedProfessionalId = ''
       selectedOwnerUserId = ''
       const input = document.getElementById(inputId) as HTMLInputElement
       if (input) input.value = ''
@@ -165,6 +173,18 @@
         {/each}
       </select>
     </div>
+
+    {#if !professionalId && professionals.length > 0}
+      <div class="form-group">
+        <label for="prof-{inputId}">Vincular a profissional (opcional)</label>
+        <select id="prof-{inputId}" bind:value={selectedProfessionalId} disabled={uploading}>
+          <option value="">— Nenhum profissional —</option>
+          {#each professionals as p}
+            <option value={p.id}>{p.name}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
   {/if}
 
   {#if categories.length > 0}
