@@ -18,6 +18,7 @@ type File struct {
 	Hash             *string        `json:"hash,omitempty"`
 	ThumbnailPath    *string        `json:"thumbnailPath,omitempty"`
 	ConsultationID   *string        `json:"consultationId,omitempty"`
+	ConsultationDate *time.Time     `json:"consultationDate,omitempty"`
 	ProfessionalID   *string        `json:"professionalId,omitempty"`
 	UserID           *string        `json:"userId,omitempty"`
 	ProfessionalName *string        `json:"professionalName,omitempty"`
@@ -25,12 +26,13 @@ type File struct {
 	UploadedAt       time.Time      `json:"uploadedAt"`
 }
 
-// fileSelectSQL is the base SELECT with JOINs that populates ProfessionalName.
+// fileSelectSQL is the base SELECT with JOINs that populates ProfessionalName and ConsultationDate.
 // p1 = direct professional of the file; p2 = professional of the linked consultation.
 const fileSelectSQL = `
 SELECT f.id, f.filename, f.custom_name, f.path, f.mime_type, f.size,
        f.hash, f.thumbnail_path, f.consultation_id, f.professional_id, f.user_id, f.uploaded_at,
-       COALESCE(p1.name, p2.name) AS professional_name
+       COALESCE(p1.name, p2.name) AS professional_name,
+       c.date AS consultation_date
 FROM files f
 LEFT JOIN consultations c  ON c.id = f.consultation_id
 LEFT JOIN professionals p1 ON p1.id = f.professional_id
@@ -41,7 +43,7 @@ func scanFileRow(rows *sql.Rows) (File, error) {
 	err := rows.Scan(
 		&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
 		&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt,
-		&f.ProfessionalName,
+		&f.ProfessionalName, &f.ConsultationDate,
 	)
 	return f, err
 }
@@ -180,8 +182,8 @@ type FileListOptions struct {
 }
 
 var fileSortCols = map[string]string{
-	"uploadedAt":      "f.uploaded_at",
-	"name":            "COALESCE(f.custom_name, f.filename)",
+	"uploadedAt":       "COALESCE(c.date, f.uploaded_at)",
+	"name":             "COALESCE(f.custom_name, f.filename)",
 	"professionalName": "COALESCE(p1.name, p2.name)",
 }
 

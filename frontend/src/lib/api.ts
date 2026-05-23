@@ -44,6 +44,7 @@ export interface MedFile {
   mimeType: string
   size: number
   consultationId?: string
+  consultationDate?: string
   professionalId?: string
   userId?: string
   professionalName?: string
