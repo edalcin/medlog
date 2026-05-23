@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -27,8 +28,30 @@ var allowedMIMETypes = map[string]string{
 	"image/jpeg":      "jpg",
 }
 
+func (h *FileHandler) ListMine(w http.ResponseWriter, r *http.Request) {
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	page, limit := parsePagination(r)
+	offset := (page - 1) * limit
+
+	list, err := models.FileFindByOwner(r.Context(), h.DB, userID, limit, offset)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	total, err := models.FileCountByOwner(r.Context(), h.DB, userID)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	if list == nil {
+		list = []models.File{}
+	}
+	writePagedJSON(w, list, total, page, limit)
+}
+
 func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		writeError(w, "file too large or invalid form", http.StatusBadRequest)
@@ -59,6 +82,23 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		customName = &customNameStr
 	}
 
+	// Admin can upload on behalf of another user
+	ownerUserID := userID
+	if role == "ADMIN" {
+		if ou := r.FormValue("ownerUserId"); ou != "" {
+			ownerUserID = ou
+		}
+	}
+
+	// Non-admin: verify the supplied consultation belongs to them
+	if consultationID != nil && role != "ADMIN" {
+		c, err := models.ConsultationFindByID(r.Context(), h.DB, *consultationID)
+		if err != nil || c.UserID != userID {
+			writeError(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+
 	fileID := uuid.New().String()
 	filename := fmt.Sprintf("%s.%s", fileID, ext)
 	destPath := filepath.Join(h.FilesPath, filename)
@@ -86,7 +126,7 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		Size:           size,
 		ConsultationID: consultationID,
 		ProfessionalID: professionalID,
-		UserID:         &userID,
+		UserID:         &ownerUserID,
 		CategoryIDs:    categoryIDs,
 	}
 	f, err := models.FileCreate(r.Context(), h.DB, in)
@@ -100,10 +140,7 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 
 func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
-	if userID == "" {
-		writeError(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
+	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 
 	filename := filepath.Base(chi.URLParam(r, "filename"))
 	if filename == "." || filename == "/" || strings.Contains(filename, "..") {
@@ -112,9 +149,13 @@ func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var path, mimeType, origFilename string
+	var uploaderID, consultOwnerID sql.NullString
 	err := h.DB.QueryRowContext(r.Context(),
-		"SELECT path, mime_type, filename FROM files WHERE filename=?", filename).
-		Scan(&path, &mimeType, &origFilename)
+		`SELECT f.path, f.mime_type, f.filename, f.user_id, c.user_id
+		 FROM files f
+		 LEFT JOIN consultations c ON c.id = f.consultation_id
+		 WHERE f.filename=?`, filename).
+		Scan(&path, &mimeType, &origFilename, &uploaderID, &consultOwnerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, "not found", http.StatusNotFound)
@@ -122,6 +163,15 @@ func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 			writeDBError(w, err)
 		}
 		return
+	}
+
+	if role != "ADMIN" {
+		isOwner := (uploaderID.Valid && uploaderID.String == userID) ||
+			(consultOwnerID.Valid && consultOwnerID.String == userID)
+		if !isOwner {
+			writeError(w, "not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	f, err := os.Open(path)
@@ -147,8 +197,85 @@ func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 	http.ServeContent(w, r, origFilename, stat.ModTime(), f)
 }
 
-func (h *FileHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *FileHandler) Update(w http.ResponseWriter, r *http.Request) {
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 	id := chi.URLParam(r, "id")
+
+	if role != "ADMIN" {
+		owned, err := models.FileOwnerCheck(r.Context(), h.DB, id, userID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				writeError(w, "not found", http.StatusNotFound)
+			} else {
+				writeDBError(w, err)
+			}
+			return
+		}
+		if !owned {
+			writeError(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+
+	var req struct {
+		CustomName     *string  `json:"customName"`
+		ConsultationID *string  `json:"consultationId"`
+		ProfessionalID *string  `json:"professionalId"`
+		CategoryIDs    []string `json:"categoryIds"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	// Non-admin: verify the target consultation belongs to them
+	if req.ConsultationID != nil && role != "ADMIN" {
+		c, err := models.ConsultationFindByID(r.Context(), h.DB, *req.ConsultationID)
+		if err != nil || c.UserID != userID {
+			writeError(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+
+	if req.CategoryIDs == nil {
+		req.CategoryIDs = []string{}
+	}
+
+	f, err := models.FileUpdate(r.Context(), h.DB, id, models.UpdateFileInput{
+		CustomName:     req.CustomName,
+		ConsultationID: req.ConsultationID,
+		ProfessionalID: req.ProfessionalID,
+		CategoryIDs:    req.CategoryIDs,
+	})
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": f})
+}
+
+func (h *FileHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
+	id := chi.URLParam(r, "id")
+
+	if role != "ADMIN" {
+		owned, err := models.FileOwnerCheck(r.Context(), h.DB, id, userID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				writeError(w, "not found", http.StatusNotFound)
+			} else {
+				writeDBError(w, err)
+			}
+			return
+		}
+		if !owned {
+			writeError(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+
 	if err := models.FileDelete(r.Context(), h.DB, id); err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, "not found", http.StatusNotFound)
@@ -167,4 +294,3 @@ func formStringPtr(r *http.Request, key string) *string {
 	}
 	return &v
 }
-

@@ -13,6 +13,7 @@
   import Admin from './routes/Admin.svelte'
   import Dashboard from './routes/Dashboard.svelte'
   import Sharing from './routes/Sharing.svelte'
+  import Files from './routes/Files.svelte'
 
   import './app.css'
 
@@ -25,6 +26,7 @@
     '/consultations/:id': ConsultationDetail,
     '/professionals': ProfessionalList,
     '/professionals/:id': ProfessionalDetail,
+    '/files': Files,
     '/reports': Reports,
     '/sharing': Sharing,
     '/admin': Admin,

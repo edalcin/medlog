@@ -9,23 +9,43 @@ import (
 )
 
 type File struct {
-	ID             string         `json:"id"`
-	Filename       string         `json:"filename"`
-	CustomName     *string        `json:"customName,omitempty"`
-	Path           string         `json:"path"`
-	MimeType       string         `json:"mimeType"`
-	Size           int64          `json:"size"`
-	Hash           *string        `json:"hash,omitempty"`
-	ThumbnailPath  *string        `json:"thumbnailPath,omitempty"`
-	ConsultationID *string        `json:"consultationId,omitempty"`
-	ProfessionalID *string        `json:"professionalId,omitempty"`
-	UserID         *string        `json:"userId,omitempty"`
-	Categories     []FileCategory `json:"categories"`
-	UploadedAt     time.Time      `json:"uploadedAt"`
+	ID               string         `json:"id"`
+	Filename         string         `json:"filename"`
+	CustomName       *string        `json:"customName,omitempty"`
+	Path             string         `json:"path"`
+	MimeType         string         `json:"mimeType"`
+	Size             int64          `json:"size"`
+	Hash             *string        `json:"hash,omitempty"`
+	ThumbnailPath    *string        `json:"thumbnailPath,omitempty"`
+	ConsultationID   *string        `json:"consultationId,omitempty"`
+	ProfessionalID   *string        `json:"professionalId,omitempty"`
+	UserID           *string        `json:"userId,omitempty"`
+	ProfessionalName *string        `json:"professionalName,omitempty"`
+	Categories       []FileCategory `json:"categories"`
+	UploadedAt       time.Time      `json:"uploadedAt"`
 }
 
-// fileLoadCategoriesBatch loads categories for multiple files in a single query.
-// Returns a map from file ID to its categories.
+// fileSelectSQL is the base SELECT with JOINs that populates ProfessionalName.
+// p1 = direct professional of the file; p2 = professional of the linked consultation.
+const fileSelectSQL = `
+SELECT f.id, f.filename, f.custom_name, f.path, f.mime_type, f.size,
+       f.hash, f.thumbnail_path, f.consultation_id, f.professional_id, f.user_id, f.uploaded_at,
+       COALESCE(p1.name, p2.name) AS professional_name
+FROM files f
+LEFT JOIN consultations c  ON c.id = f.consultation_id
+LEFT JOIN professionals p1 ON p1.id = f.professional_id
+LEFT JOIN professionals p2 ON p2.id = c.professional_id`
+
+func scanFileRow(rows *sql.Rows) (File, error) {
+	var f File
+	err := rows.Scan(
+		&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
+		&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt,
+		&f.ProfessionalName,
+	)
+	return f, err
+}
+
 func fileLoadCategoriesBatch(ctx context.Context, db *sql.DB, fileIDs []string) map[string][]FileCategory {
 	result := map[string][]FileCategory{}
 	if len(fileIDs) == 0 {
@@ -55,39 +75,43 @@ func fileLoadCategoriesBatch(ctx context.Context, db *sql.DB, fileIDs []string) 
 	return result
 }
 
+func attachCategories(ctx context.Context, db *sql.DB, list []File) []File {
+	if len(list) == 0 {
+		return list
+	}
+	ids := make([]string, len(list))
+	for i, f := range list {
+		ids[i] = f.ID
+	}
+	catMap := fileLoadCategoriesBatch(ctx, db, ids)
+	for i, f := range list {
+		if cats, ok := catMap[f.ID]; ok {
+			list[i].Categories = cats
+		}
+	}
+	return list
+}
+
 func FileFindByConsultationID(ctx context.Context, db *sql.DB, consultationID string) ([]File, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, filename, custom_name, path, mime_type, size, hash, thumbnail_path,
-		        consultation_id, professional_id, user_id, uploaded_at
-		 FROM files WHERE consultation_id=? ORDER BY uploaded_at DESC`, consultationID)
+		fileSelectSQL+` WHERE f.consultation_id=? ORDER BY f.uploaded_at DESC`, consultationID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var list []File
-	var fileIDs []string
 	for rows.Next() {
-		var f File
-		if err := rows.Scan(&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
-			&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt); err != nil {
+		f, err := scanFileRow(rows)
+		if err != nil {
 			return nil, err
 		}
 		f.Categories = []FileCategory{}
 		list = append(list, f)
-		fileIDs = append(fileIDs, f.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	if len(fileIDs) > 0 {
-		catMap := fileLoadCategoriesBatch(ctx, db, fileIDs)
-		for i, f := range list {
-			if cats, ok := catMap[f.ID]; ok {
-				list[i].Categories = cats
-			}
-		}
-	}
-	return list, nil
+	return attachCategories(ctx, db, list), nil
 }
 
 func FileCount(ctx context.Context, db *sql.DB) (int, error) {
@@ -97,9 +121,7 @@ func FileCount(ctx context.Context, db *sql.DB) (int, error) {
 }
 
 func FileFindAll(ctx context.Context, db *sql.DB, limit, offset int) ([]File, error) {
-	q := `SELECT id, filename, custom_name, path, mime_type, size, hash, thumbnail_path,
-	             consultation_id, professional_id, user_id, uploaded_at
-	      FROM files ORDER BY uploaded_at DESC`
+	q := fileSelectSQL + ` ORDER BY f.uploaded_at DESC`
 	var args []any
 	if limit > 0 {
 		q += " LIMIT ? OFFSET ?"
@@ -112,34 +134,92 @@ func FileFindAll(ctx context.Context, db *sql.DB, limit, offset int) ([]File, er
 	defer rows.Close()
 	var list []File
 	for rows.Next() {
-		var f File
-		if err := rows.Scan(&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
-			&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt); err != nil {
+		f, err := scanFileRow(rows)
+		if err != nil {
 			return nil, err
 		}
+		f.Categories = []FileCategory{}
 		list = append(list, f)
 	}
-	return list, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attachCategories(ctx, db, list), nil
 }
 
 func FileFindByID(ctx context.Context, db *sql.DB, id string) (*File, error) {
-	var f File
-	err := db.QueryRowContext(ctx,
-		`SELECT id, filename, custom_name, path, mime_type, size, hash, thumbnail_path,
-		        consultation_id, professional_id, user_id, uploaded_at
-		 FROM files WHERE id=?`, id).
-		Scan(&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
-			&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt)
+	rows, err := db.QueryContext(ctx, fileSelectSQL+` WHERE f.id=?`, id)
 	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		return nil, sql.ErrNoRows
+	}
+	f, err := scanFileRow(rows)
+	if err != nil {
+		return nil, err
+	}
+	f.Categories = []FileCategory{}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	catMap := fileLoadCategoriesBatch(ctx, db, []string{f.ID})
 	if cats, ok := catMap[f.ID]; ok {
 		f.Categories = cats
-	} else {
-		f.Categories = []FileCategory{}
 	}
 	return &f, nil
+}
+
+func FileFindByOwner(ctx context.Context, db *sql.DB, userID string, limit, offset int) ([]File, error) {
+	rows, err := db.QueryContext(ctx,
+		fileSelectSQL+` WHERE f.user_id=? OR c.user_id=? ORDER BY f.uploaded_at DESC LIMIT ? OFFSET ?`,
+		userID, userID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []File
+	for rows.Next() {
+		f, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		f.Categories = []FileCategory{}
+		list = append(list, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attachCategories(ctx, db, list), nil
+}
+
+func FileCountByOwner(ctx context.Context, db *sql.DB, userID string) (int, error) {
+	var n int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT f.id)
+		 FROM files f
+		 LEFT JOIN consultations c ON c.id = f.consultation_id
+		 WHERE f.user_id=? OR c.user_id=?`,
+		userID, userID).Scan(&n)
+	return n, err
+}
+
+// FileOwnerCheck returns true if the user is the uploader or the consultation owner of the file.
+// Returns sql.ErrNoRows if the file does not exist.
+func FileOwnerCheck(ctx context.Context, db *sql.DB, fileID, userID string) (bool, error) {
+	var uploaderID, consultOwnerID sql.NullString
+	err := db.QueryRowContext(ctx,
+		`SELECT f.user_id, c.user_id
+		 FROM files f
+		 LEFT JOIN consultations c ON c.id = f.consultation_id
+		 WHERE f.id=?`, fileID).
+		Scan(&uploaderID, &consultOwnerID)
+	if err != nil {
+		return false, err
+	}
+	return (uploaderID.Valid && uploaderID.String == userID) ||
+		(consultOwnerID.Valid && consultOwnerID.String == userID), nil
 }
 
 type CreateFileInput struct {
@@ -181,6 +261,50 @@ func FileCreate(ctx context.Context, db *sql.DB, in CreateFileInput) (*File, err
 		return nil, err
 	}
 	return FileFindByID(ctx, db, in.ID)
+}
+
+type UpdateFileInput struct {
+	CustomName     *string  // nil = set NULL in DB
+	ConsultationID *string  // nil = set NULL in DB
+	ProfessionalID *string  // nil = set NULL in DB
+	CategoryIDs    []string // replaces all existing categories
+}
+
+func FileUpdate(ctx context.Context, db *sql.DB, id string, in UpdateFileInput) (*File, error) {
+	// Normalize empty string custom_name to nil (store as NULL)
+	if in.CustomName != nil && *in.CustomName == "" {
+		in.CustomName = nil
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE files SET custom_name=?, consultation_id=?, professional_id=? WHERE id=?`,
+		in.CustomName, in.ConsultationID, in.ProfessionalID, id); err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`DELETE FROM file_file_categories WHERE file_id=?`, id); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	for _, cid := range in.CategoryIDs {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT OR IGNORE INTO file_file_categories (id, file_id, category_id, created_at) VALUES (?, ?, ?, ?)`,
+			newID(), id, cid, now); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return FileFindByID(ctx, db, id)
 }
 
 func FileDelete(ctx context.Context, db *sql.DB, id string) error {

@@ -141,8 +141,10 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Put("/consultations/{id}", consultH.Update)
 		r.Delete("/consultations/{id}", consultH.Delete)
 
+		r.Get("/files", fileH.ListMine)
 		r.Post("/files", fileH.Upload)
 		r.Get("/files/{filename}", fileH.Serve)
+		r.Patch("/files/{id}", fileH.Update)
 		r.Delete("/files/{id}", fileH.Delete)
 
 		r.Get("/professionals/{id}/phones", phoneH.ListByProfessional)

@@ -2,6 +2,8 @@
   import { onMount } from 'svelte'
   import * as api from '../lib/api'
   import type { User, Consultation, Professional, MedFile, Specialty, FileCategory, Clinic, AdminStats, LoginLog } from '../lib/api'
+  import FileUpload from '../components/FileUpload.svelte'
+  import FileEditModal from '../components/FileEditModal.svelte'
 
   type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'logs' | 'backup'
 
@@ -76,6 +78,8 @@
   let filePage = $state(1)
   let fileTotal = $state(0)
   const adminLimit = 20
+  let fileEditing = $state<MedFile | null>(null)
+  let showAdminUpload = $state(false)
 
   // Login logs tab
   let logsData = $state<LoginLog[]>([])
@@ -420,6 +424,34 @@
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
   }
+
+  function onAdminFileUploaded(f: MedFile) {
+    showAdminUpload = false
+    loadFiles(1)
+  }
+
+  function onAdminEditSaved(updated: MedFile) {
+    filesData = filesData.map(f => (f.id === updated.id ? updated : f))
+    fileEditing = null
+  }
+
+  async function deleteAdminFile(f: MedFile) {
+    const name = f.customName || f.filename
+    if (!confirm(`Excluir "${name}"?`)) return
+    try {
+      await api.deleteFile(f.id)
+      loadFiles(filePage)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Erro ao excluir arquivo.')
+    }
+  }
+
+  function fileMimeLabel(mime: string): string {
+    if (mime === 'application/pdf') return 'PDF'
+    if (mime === 'image/png') return 'PNG'
+    if (mime === 'image/jpeg') return 'JPG'
+    return mime
+  }
 </script>
 
 <div class="page">
@@ -725,9 +757,33 @@
     <!-- Files Tab -->
     {:else if activeTab === 'files'}
       <div class="tab-section">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+          <button class="btn btn-primary" onclick={() => (showAdminUpload = !showAdminUpload)}>
+            {showAdminUpload ? 'Cancelar' : 'Adicionar Arquivo'}
+          </button>
+        </div>
+
+        {#if showAdminUpload}
+          <div style="margin-bottom:16px">
+            <FileUpload
+              showConsultationPicker={true}
+              showOwnerPicker={true}
+              onUploaded={onAdminFileUploaded}
+            />
+          </div>
+        {/if}
+
         <table>
           <thead>
-            <tr><th>Arquivo</th><th>Tipo</th><th>Tamanho</th><th>Consulta ID</th></tr>
+            <tr>
+              <th>Nome</th>
+              <th>Tipo</th>
+              <th>Categorias</th>
+              <th>Data</th>
+              <th>Profissional</th>
+              <th>Tamanho</th>
+              <th></th>
+            </tr>
           </thead>
           <tbody>
             {#each filesData as f (f.id)}
@@ -737,9 +793,24 @@
                     {f.customName || f.filename}
                   </a>
                 </td>
-                <td><span class="badge badge-blue">{f.mimeType}</span></td>
-                <td>{formatSize(f.size)}</td>
-                <td class="truncate">{f.consultationId ?? '—'}</td>
+                <td><span class="badge badge-blue">{fileMimeLabel(f.mimeType)}</span></td>
+                <td>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px">
+                    {#each f.categories as cat}
+                      <span class="badge badge-gray">{cat.name}</span>
+                    {/each}
+                    {#if f.categories.length === 0}
+                      <span style="color:var(--text-muted)">—</span>
+                    {/if}
+                  </div>
+                </td>
+                <td style="white-space:nowrap">{f.uploadedAt ? new Date(f.uploadedAt).toLocaleDateString('pt-BR') : '—'}</td>
+                <td>{f.professionalName ?? '—'}</td>
+                <td style="white-space:nowrap">{formatSize(f.size)}</td>
+                <td class="actions-cell">
+                  <button class="btn btn-ghost btn-xs" onclick={() => (fileEditing = f)}>Editar</button>
+                  <button class="btn btn-danger btn-xs" onclick={() => deleteAdminFile(f)}>Excluir</button>
+                </td>
               </tr>
             {/each}
           </tbody>
@@ -818,6 +889,14 @@
 
   </div>
 </div>
+
+{#if fileEditing}
+  <FileEditModal
+    file={fileEditing}
+    onSaved={onAdminEditSaved}
+    onClose={() => (fileEditing = null)}
+  />
+{/if}
 
 <style>
   .stats-row {

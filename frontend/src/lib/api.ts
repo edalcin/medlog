@@ -45,6 +45,9 @@ export interface MedFile {
   size: number
   consultationId?: string
   professionalId?: string
+  userId?: string
+  professionalName?: string
+  uploadedAt: string
   categories: FileCategory[]
 }
 
@@ -202,15 +205,21 @@ export const deleteProfessional = (id: string) =>
 // Files
 export const uploadFile = (
   file: File,
-  consultationId: string,
-  professionalId?: string,
-  categoryIds: string[] = []
+  opts: {
+    consultationId?: string
+    professionalId?: string
+    categoryIds?: string[]
+    customName?: string
+    ownerUserId?: string
+  } = {}
 ) => {
   const fd = new FormData()
   fd.append('file', file)
-  fd.append('consultationId', consultationId)
-  if (professionalId) fd.append('professionalId', professionalId)
-  categoryIds.forEach(id => fd.append('categoryIds', id))
+  if (opts.consultationId) fd.append('consultationId', opts.consultationId)
+  if (opts.professionalId) fd.append('professionalId', opts.professionalId)
+  if (opts.customName) fd.append('customName', opts.customName)
+  if (opts.ownerUserId) fd.append('ownerUserId', opts.ownerUserId)
+  ;(opts.categoryIds ?? []).forEach(id => fd.append('categoryIds', id))
   return fetch(BASE + '/files', {
     method: 'POST',
     body: fd,
@@ -223,6 +232,19 @@ export const uploadFile = (
     return (res.json() as Promise<{ data: MedFile }>).then(r => r.data)
   })
 }
+
+export const getMyFiles = (page = 1, limit = 20) =>
+  request<PagedResponse<MedFile>>('GET', `/files?page=${page}&limit=${limit}`)
+
+export const updateFile = (
+  id: string,
+  body: {
+    customName: string | null
+    consultationId: string | null
+    professionalId: string | null
+    categoryIds: string[]
+  }
+) => request<{ data: MedFile }>('PATCH', `/files/${id}`, body).then(r => r.data)
 
 export const deleteFile = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/files/${id}`)

@@ -1,31 +1,60 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import * as api from '../lib/api'
-  import type { FileCategory, MedFile } from '../lib/api'
+  import type { FileCategory, MedFile, Consultation, User } from '../lib/api'
 
   let {
     consultationId,
     professionalId,
+    showConsultationPicker = false,
+    showOwnerPicker = false,
     onUploaded,
   } = $props<{
-    consultationId: string
+    consultationId?: string
     professionalId?: string
+    showConsultationPicker?: boolean
+    showOwnerPicker?: boolean
     onUploaded?: (file: MedFile) => void
   }>()
 
+  let inputId = $state('')
   let categories = $state<FileCategory[]>([])
+  let consultations = $state<Consultation[]>([])
+  let users = $state<User[]>([])
+
   let selectedCategoryIds = $state<string[]>([])
+  let selectedConsultationId = $state('')
+  $effect(() => { selectedConsultationId = consultationId ?? '' })
+  let selectedOwnerUserId = $state('')
   let selectedFile = $state<File | null>(null)
+  let customName = $state('')
   let uploading = $state(false)
   let error = $state('')
   let success = $state('')
 
   onMount(async () => {
+    inputId = crypto.randomUUID()
     try {
       const res = await api.getCategories()
       categories = res.data
     } catch {
       // Categories are optional — silently ignore load failure
+    }
+    if (showConsultationPicker) {
+      try {
+        const res = await api.getConsultations(1, 1000)
+        consultations = res.data
+      } catch {
+        // ignore
+      }
+    }
+    if (showOwnerPicker) {
+      try {
+        const res = await api.getUsers()
+        users = res.data
+      } catch {
+        // ignore
+      }
     }
   })
 
@@ -40,6 +69,9 @@
   function onFileChange(e: Event) {
     const input = e.currentTarget as HTMLInputElement
     selectedFile = input.files?.[0] ?? null
+    if (selectedFile && !customName) {
+      customName = selectedFile.name.replace(/\.[^.]+$/, '')
+    }
     error = ''
   }
 
@@ -49,17 +81,21 @@
     error = ''
     success = ''
     try {
-      const uploaded = await api.uploadFile(
-        selectedFile,
-        consultationId,
+      const effectiveConsultationId = consultationId || selectedConsultationId || undefined
+      const uploaded = await api.uploadFile(selectedFile, {
+        consultationId: effectiveConsultationId,
         professionalId,
-        selectedCategoryIds
-      )
+        categoryIds: selectedCategoryIds,
+        customName: customName || undefined,
+        ownerUserId: selectedOwnerUserId || undefined,
+      })
       success = `Arquivo "${selectedFile.name}" enviado com sucesso.`
       selectedFile = null
+      customName = ''
       selectedCategoryIds = []
-      // Reset file input
-      const input = document.getElementById('file-input-' + consultationId) as HTMLInputElement
+      selectedConsultationId = ''
+      selectedOwnerUserId = ''
+      const input = document.getElementById(inputId) as HTMLInputElement
       if (input) input.value = ''
       onUploaded?.(uploaded)
     } catch (e: unknown) {
@@ -80,16 +116,56 @@
 <div class="file-upload">
   <h4>Adicionar Arquivo</h4>
 
+  {#if showOwnerPicker && users.length > 0}
+    <div class="form-group">
+      <label for="owner-{inputId}">Proprietário</label>
+      <select id="owner-{inputId}" bind:value={selectedOwnerUserId} disabled={uploading}>
+        <option value="">— Selecionar usuário —</option>
+        {#each users as u}
+          <option value={u.id}>{u.name} ({u.email})</option>
+        {/each}
+      </select>
+    </div>
+  {/if}
+
   <div class="form-group">
-    <label for="file-input-{consultationId}">Arquivo (PDF, PNG, JPG — máx 10MB)</label>
+    <label for={inputId}>Arquivo (PDF, PNG, JPG — máx 10MB)</label>
     <input
       type="file"
-      id="file-input-{consultationId}"
+      id={inputId}
       accept=".pdf,.png,.jpg,.jpeg"
       onchange={onFileChange}
       disabled={uploading}
     />
   </div>
+
+  {#if selectedFile}
+    <div class="form-group">
+      <label for="name-{inputId}">Nome personalizado</label>
+      <input
+        type="text"
+        id="name-{inputId}"
+        bind:value={customName}
+        placeholder="Nome do arquivo (sem extensão)"
+        disabled={uploading}
+      />
+    </div>
+  {/if}
+
+  {#if showConsultationPicker && !consultationId}
+    <div class="form-group">
+      <label for="consult-{inputId}">Vincular a consulta (opcional)</label>
+      <select id="consult-{inputId}" bind:value={selectedConsultationId} disabled={uploading}>
+        <option value="">— Nenhuma consulta —</option>
+        {#each consultations as c}
+          <option value={c.id}>
+            {new Date(c.date).toLocaleDateString('pt-BR')}
+            {c.professional?.name ? ' · ' + c.professional.name : ''}
+          </option>
+        {/each}
+      </select>
+    </div>
+  {/if}
 
   {#if categories.length > 0}
     <div class="form-group">

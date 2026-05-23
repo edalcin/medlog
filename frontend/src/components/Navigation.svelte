@@ -29,6 +29,9 @@
     <a href="/professionals" use:link class:active={$location.startsWith('/professionals')}>
       Profissionais
     </a>
+    <a href="/files" use:link class:active={$location === '/files'}>
+      Arquivos
+    </a>
     <a href="/reports" use:link class:active={$location === '/reports'}>
       Relatórios
     </a>
