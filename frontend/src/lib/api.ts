@@ -35,6 +35,7 @@ export interface Professional {
   clinicId?: string
   clinic?: Clinic
   specialties: Specialty[]
+  consultationCount: number
 }
 
 export interface MedFile {
@@ -177,8 +178,13 @@ export const deleteConsultation = (id: string) =>
   request<{ ok: boolean }>('DELETE', `/consultations/${id}`)
 
 // Professionals
-export const getProfessionals = (activeOnly = false, page = 1, limit = 20, search = '') =>
-  request<PagedResponse<Professional>>('GET', `/professionals?active=${activeOnly}&page=${page}&limit=${limit}${search ? `&search=${encodeURIComponent(search)}` : ''}`)
+export const getProfessionals = (activeOnly = false, page = 1, limit = 20, search = '', specialtyId = '', clinicId = '') => {
+  let url = `/professionals?active=${activeOnly}&page=${page}&limit=${limit}`
+  if (search) url += `&search=${encodeURIComponent(search)}`
+  if (specialtyId) url += `&specialtyId=${encodeURIComponent(specialtyId)}`
+  if (clinicId) url += `&clinicId=${encodeURIComponent(clinicId)}`
+  return request<PagedResponse<Professional>>('GET', url)
+}
 
 export const createProfessional = (body: {
   name: string

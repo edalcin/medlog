@@ -67,12 +67,12 @@ func (h *AdminHandler) BulkDeleteConsultations(w http.ResponseWriter, r *http.Re
 func (h *AdminHandler) ListProfessionals(w http.ResponseWriter, r *http.Request) {
 	page, limit := parsePagination(r)
 	offset := (page - 1) * limit
-	list, err := models.ProfessionalFindAll(r.Context(), h.DB, "", true, false, "", limit, offset)
+	list, err := models.ProfessionalFindAll(r.Context(), h.DB, "", true, false, "", "", "", limit, offset)
 	if err != nil {
 		writeDBError(w, err)
 		return
 	}
-	total, err := models.ProfessionalCount(r.Context(), h.DB, "", true, false, "")
+	total, err := models.ProfessionalCount(r.Context(), h.DB, "", true, false, "", "", "")
 	if err != nil {
 		writeDBError(w, err)
 		return

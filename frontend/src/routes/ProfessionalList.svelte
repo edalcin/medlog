@@ -2,27 +2,37 @@
   import { onMount } from 'svelte'
   import { push } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
-  import type { Professional } from '../lib/api'
+  import type { Professional, Specialty, Clinic } from '../lib/api'
 
   let all = $state<Professional[]>([])
+  let specialties = $state<Specialty[]>([])
+  let clinics = $state<Clinic[]>([])
   let loading = $state(true)
   let error = $state('')
   let activeOnly = $state(true)
   let page = $state(1)
   let total = $state(0)
   let search = $state('')
+  let filterSpecialty = $state('')
+  let filterClinic = $state('')
   let searchDebounce: ReturnType<typeof setTimeout>
   const limit = 20
 
   onMount(async () => {
-    await load()
+    const [, specsRes, clinicsRes] = await Promise.all([
+      load(),
+      api.getSpecialties().catch(() => ({ data: [] as Specialty[] })),
+      api.getClinics().catch(() => ({ data: [] as Clinic[] })),
+    ])
+    specialties = specsRes.data
+    clinics = clinicsRes.data
   })
 
   async function load() {
     loading = true
     error = ''
     try {
-      const res = await api.getProfessionals(activeOnly, page, limit, search)
+      const res = await api.getProfessionals(activeOnly, page, limit, search, filterSpecialty, filterClinic)
       all = res.data
       total = res.total
     } catch (e: unknown) {
@@ -52,12 +62,37 @@
       load()
     }, 300)
   }
+
+  async function onFilterChange() {
+    page = 1
+    await load()
+  }
 </script>
 
 <div class="page">
   <div class="page-header">
     <h1>Profissionais</h1>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select
+        bind:value={filterSpecialty}
+        onchange={onFilterChange}
+        style="padding:6px 10px;font-size:13px"
+      >
+        <option value="">Todas especialidades</option>
+        {#each specialties as s}
+          <option value={s.id}>{s.name}</option>
+        {/each}
+      </select>
+      <select
+        bind:value={filterClinic}
+        onchange={onFilterChange}
+        style="padding:6px 10px;font-size:13px"
+      >
+        <option value="">Todas clínicas</option>
+        {#each clinics as c}
+          <option value={c.id}>{c.name}</option>
+        {/each}
+      </select>
       <input
         type="search"
         bind:value={search}
@@ -102,6 +137,10 @@
             {:else}
               <span class="badge badge-green">Ativo</span>
             {/if}
+            <span class="consult-count" title="Consultas registradas">
+              <i class="bx bx-calendar-check"></i>
+              {p.consultationCount}
+            </span>
           </div>
           <div class="pro-meta">
             {#if p.specialties.length > 0}
@@ -112,7 +151,7 @@
               </div>
             {/if}
             {#if p.clinic}
-              <span class="clinic">{p.clinic.name}</span>
+              <span class="clinic"><i class="bx bx-building-house"></i> {p.clinic.name}</span>
             {/if}
           </div>
         </div>
@@ -162,6 +201,15 @@
     font-size: 15px;
   }
 
+  .consult-count {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
   .pro-meta {
     display: flex;
     align-items: center;
@@ -178,6 +226,9 @@
   .clinic {
     font-size: 13px;
     color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 
   .pagination {

@@ -23,16 +23,18 @@ func (h *ProfessionalHandler) List(w http.ResponseWriter, r *http.Request) {
 	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 	activeOnly := r.URL.Query().Get("active") == "true"
 	search := r.URL.Query().Get("search")
+	specialtyID := r.URL.Query().Get("specialtyId")
+	clinicID := r.URL.Query().Get("clinicId")
 	isAdmin := role == "ADMIN"
 	page, limit := parsePagination(r)
 	offset := (page - 1) * limit
 
-	list, err := models.ProfessionalFindAll(r.Context(), h.DB, userID, isAdmin, activeOnly, search, limit, offset)
+	list, err := models.ProfessionalFindAll(r.Context(), h.DB, userID, isAdmin, activeOnly, search, specialtyID, clinicID, limit, offset)
 	if err != nil {
 		writeDBError(w, err)
 		return
 	}
-	total, err := models.ProfessionalCount(r.Context(), h.DB, userID, isAdmin, activeOnly, search)
+	total, err := models.ProfessionalCount(r.Context(), h.DB, userID, isAdmin, activeOnly, search, specialtyID, clinicID)
 	if err != nil {
 		writeDBError(w, err)
 		return
