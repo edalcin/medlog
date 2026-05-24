@@ -9,21 +9,26 @@ import (
 	"github.com/google/uuid"
 )
 
+type ConsultationRef struct {
+	ID   string    `json:"id"`
+	Date time.Time `json:"date"`
+}
+
 type Professional struct {
-	ID                string      `json:"id"`
-	Name              string      `json:"name"`
-	CRM               *string     `json:"crm,omitempty"`
-	Address           *string     `json:"address,omitempty"`
-	Notes             *string     `json:"notes,omitempty"`
-	IsActive          bool        `json:"isActive"`
-	IsShared          bool        `json:"isShared"`
-	UserID            *string     `json:"userId,omitempty"`
-	ClinicID          *string     `json:"clinicId,omitempty"`
-	Clinic            *Clinic     `json:"clinic,omitempty"`
-	Specialties       []Specialty `json:"specialties"`
-	ConsultationCount int         `json:"consultationCount"`
-	CreatedAt         time.Time   `json:"createdAt"`
-	UpdatedAt         time.Time   `json:"updatedAt"`
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	CRM           *string           `json:"crm,omitempty"`
+	Address       *string           `json:"address,omitempty"`
+	Notes         *string           `json:"notes,omitempty"`
+	IsActive      bool              `json:"isActive"`
+	IsShared      bool              `json:"isShared"`
+	UserID        *string           `json:"userId,omitempty"`
+	ClinicID      *string           `json:"clinicId,omitempty"`
+	Clinic        *Clinic           `json:"clinic,omitempty"`
+	Specialties   []Specialty       `json:"specialties"`
+	Consultations []ConsultationRef `json:"consultations"`
+	CreatedAt     time.Time         `json:"createdAt"`
+	UpdatedAt     time.Time         `json:"updatedAt"`
 }
 
 func newID() string {
@@ -83,8 +88,37 @@ func professionalLoadClinicsBatch(ctx context.Context, db *sql.DB, clinicIDs []s
 	return result
 }
 
-// professionalAttachRelations batch-loads specialties and clinics for a list of professionals.
-func professionalAttachRelations(ctx context.Context, db *sql.DB, list []Professional, profIDs []string) []Professional {
+func professionalLoadConsultationsBatch(ctx context.Context, db *sql.DB, profIDs []string, userID string, isAdmin bool) map[string][]ConsultationRef {
+	result := map[string][]ConsultationRef{}
+	if len(profIDs) == 0 {
+		return result
+	}
+	q := `SELECT professional_id, id, date FROM consultations WHERE professional_id IN ` + inClause(len(profIDs))
+	args := anySlice(profIDs)
+	if !isAdmin && userID != "" {
+		q += ` AND user_id=?`
+		args = append(args, userID)
+	}
+	q += ` ORDER BY date ASC`
+	rows, err := db.QueryContext(ctx, q, args...)
+	if err != nil {
+		slog.Error("batch load consultations", "err", err)
+		return result
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var profID string
+		var c ConsultationRef
+		if err := rows.Scan(&profID, &c.ID, &c.Date); err != nil {
+			slog.Error("scan consultation ref", "err", err)
+			continue
+		}
+		result[profID] = append(result[profID], c)
+	}
+	return result
+}
+
+func professionalAttachRelations(ctx context.Context, db *sql.DB, list []Professional, profIDs []string, userID string, isAdmin bool) []Professional {
 	if len(profIDs) == 0 {
 		return list
 	}
@@ -99,6 +133,7 @@ func professionalAttachRelations(ctx context.Context, db *sql.DB, list []Profess
 		}
 	}
 	clinicMap := professionalLoadClinicsBatch(ctx, db, clinicIDs)
+	consultMap := professionalLoadConsultationsBatch(ctx, db, profIDs, userID, isAdmin)
 
 	for i := range list {
 		if specs, ok := specMap[list[i].ID]; ok {
@@ -108,6 +143,11 @@ func professionalAttachRelations(ctx context.Context, db *sql.DB, list []Profess
 			if c, ok := clinicMap[*list[i].ClinicID]; ok {
 				list[i].Clinic = c
 			}
+		}
+		if consults, ok := consultMap[list[i].ID]; ok {
+			list[i].Consultations = consults
+		} else {
+			list[i].Consultations = []ConsultationRef{}
 		}
 	}
 	return list
@@ -195,17 +235,15 @@ func ProfessionalFindAll(ctx context.Context, db *sql.DB, userID string, isAdmin
 		clinicFilterP = " AND p.clinic_id=?"
 	}
 
-	countSub := `(SELECT COUNT(*) FROM consultations WHERE professional_id=id) AS consultation_count`
-	countSubP := `(SELECT COUNT(*) FROM consultations WHERE professional_id=p.id) AS consultation_count`
-
 	scanRow := func(rows *sql.Rows) (Professional, error) {
 		var p Professional
 		var isActive, isShared int
 		err := rows.Scan(&p.ID, &p.Name, &p.CRM, &p.Address, &p.Notes, &isActive,
-			&p.UserID, &p.ClinicID, &p.CreatedAt, &p.UpdatedAt, &p.ConsultationCount, &isShared)
+			&p.UserID, &p.ClinicID, &p.CreatedAt, &p.UpdatedAt, &isShared)
 		p.IsActive = isActive == 1
 		p.IsShared = isShared == 1
 		p.Specialties = []Specialty{}
+		p.Consultations = []ConsultationRef{}
 		return p, err
 	}
 
@@ -227,8 +265,7 @@ func ProfessionalFindAll(ctx context.Context, db *sql.DB, userID string, isAdmin
 	}
 
 	if isAdmin {
-		q = `SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at, ` +
-			countSub + `, 0 AS is_shared
+		q = `SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at, 0 AS is_shared
 			FROM professionals WHERE 1=1` + activeFilter + searchFilter + specialtyFilter + clinicFilter
 		args = buildBranchArgs("")
 		q += " ORDER BY name"
@@ -241,12 +278,10 @@ func ProfessionalFindAll(ctx context.Context, db *sql.DB, userID string, isAdmin
 		a2 := buildBranchArgs(userID)
 		args = append(a1, a2...)
 
-		inner := `SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at, ` +
-			countSub + `, 0 AS is_shared
+		inner := `SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at, 0 AS is_shared
 			FROM professionals WHERE (user_id=? OR user_id IS NULL)` + activeFilter + searchFilter + specialtyFilter + clinicFilter + `
 			UNION ALL
-			SELECT p.id, p.name, p.crm, p.address, p.notes, p.is_active, p.user_id, p.clinic_id, p.created_at, p.updated_at, ` +
-			countSubP + `, 1 AS is_shared
+			SELECT p.id, p.name, p.crm, p.address, p.notes, p.is_active, p.user_id, p.clinic_id, p.created_at, p.updated_at, 1 AS is_shared
 			FROM professionals p
 			JOIN user_professional_sharing s ON s.sharing_from_user_id = p.user_id
 			WHERE s.sharing_to_user_id=?` + activeFilter + searchFilter + specialtyFilterP + clinicFilterP
@@ -279,7 +314,7 @@ func ProfessionalFindAll(ctx context.Context, db *sql.DB, userID string, isAdmin
 		return nil, err
 	}
 
-	list = professionalAttachRelations(ctx, db, list, profIDs)
+	list = professionalAttachRelations(ctx, db, list, profIDs, userID, isAdmin)
 	return list, nil
 }
 
@@ -287,21 +322,20 @@ func ProfessionalFindByID(ctx context.Context, db *sql.DB, id string) (*Professi
 	var p Professional
 	var isActive int
 	err := db.QueryRowContext(ctx,
-		`SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at,
-		 (SELECT COUNT(*) FROM consultations WHERE professional_id=id) AS consultation_count
+		`SELECT id, name, crm, address, notes, is_active, user_id, clinic_id, created_at, updated_at
 		 FROM professionals WHERE id=?`, id).
 		Scan(&p.ID, &p.Name, &p.CRM, &p.Address, &p.Notes, &isActive,
-			&p.UserID, &p.ClinicID, &p.CreatedAt, &p.UpdatedAt, &p.ConsultationCount)
+			&p.UserID, &p.ClinicID, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
 	p.IsActive = isActive == 1
+	p.Specialties = []Specialty{}
+	p.Consultations = []ConsultationRef{}
 
 	specMap := professionalLoadSpecialtiesBatch(ctx, db, []string{p.ID})
 	if specs, ok := specMap[p.ID]; ok {
 		p.Specialties = specs
-	} else {
-		p.Specialties = []Specialty{}
 	}
 
 	if p.ClinicID != nil {

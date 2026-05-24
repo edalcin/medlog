@@ -24,6 +24,11 @@ export interface Clinic {
   isShared: boolean
 }
 
+export interface ConsultationRef {
+  id: string
+  date: string
+}
+
 export interface Professional {
   id: string
   name: string
@@ -35,7 +40,7 @@ export interface Professional {
   clinicId?: string
   clinic?: Clinic
   specialties: Specialty[]
-  consultationCount: number
+  consultations: ConsultationRef[]
 }
 
 export interface MedFile {

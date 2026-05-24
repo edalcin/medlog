@@ -67,6 +67,10 @@
     page = 1
     await load()
   }
+
+  function fmtDate(iso: string) {
+    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  }
 </script>
 
 <div class="page">
@@ -109,44 +113,64 @@
       Nenhum profissional {activeOnly ? 'ativo ' : ''}encontrado.
     </div>
   {:else}
-    <div class="list">
-      {#each all as p (p.id)}
-        <div
-          class="pro-item"
-          class:shared={p.isShared}
-          onclick={() => !p.isShared && push(`/professionals/${p.id}`)}
-          role="button"
-          tabindex={p.isShared ? -1 : 0}
-          onkeydown={(e) => !p.isShared && e.key === 'Enter' && push(`/professionals/${p.id}`)}
-        >
-          <div class="pro-main">
-            <span class="pro-name">{p.name}</span>
-            {#if p.isShared}
-              <span class="badge badge-yellow" title="Compartilhado por outro usuário">Compartilhado</span>
-            {:else if !p.isActive}
-              <span class="badge badge-red">Inativo</span>
-            {:else}
-              <span class="badge badge-green">Ativo</span>
-            {/if}
-            <span class="consult-count" title="Consultas registradas">
-              <i class="bx bx-calendar-check"></i>
-              {p.consultationCount}
-            </span>
-          </div>
-          <div class="pro-meta">
-            {#if p.specialties.length > 0}
-              <div class="specialties">
-                {#each p.specialties as s}
-                  <span class="badge badge-blue">{s.name}</span>
-                {/each}
-              </div>
-            {/if}
-            {#if p.clinic}
-              <span class="clinic"><i class="bx bx-building-house"></i> {p.clinic.name}</span>
-            {/if}
-          </div>
-        </div>
-      {/each}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-pro">Profissional</th>
+            <th class="col-consults">Consultas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each all as p (p.id)}
+            <tr class:shared={p.isShared}>
+              <td class="col-pro">
+                <div class="pro-name-row">
+                  <button
+                    class="pro-name-btn"
+                    disabled={p.isShared}
+                    onclick={() => !p.isShared && push(`/professionals/${p.id}`)}
+                  >{p.name}</button>
+                  {#if p.isShared}
+                    <span class="badge badge-yellow" title="Compartilhado por outro usuário">Compartilhado</span>
+                  {:else if !p.isActive}
+                    <span class="badge badge-red">Inativo</span>
+                  {:else}
+                    <span class="badge badge-green">Ativo</span>
+                  {/if}
+                </div>
+                <div class="pro-meta">
+                  {#if p.specialties.length > 0}
+                    <div class="specialties">
+                      {#each p.specialties as s}
+                        <span class="badge badge-blue">{s.name}</span>
+                      {/each}
+                    </div>
+                  {/if}
+                  {#if p.clinic}
+                    <span class="clinic"><i class="bx bx-building-house"></i> {p.clinic.name}</span>
+                  {/if}
+                </div>
+              </td>
+              <td class="col-consults">
+                {#if p.consultations.length === 0}
+                  <span class="no-consults">—</span>
+                {:else}
+                  <div class="consult-tags">
+                    {#each p.consultations as c}
+                      <button
+                        class="consult-tag"
+                        onclick={() => push(`/consultations/${c.id}`)}
+                        title="Ver consulta de {fmtDate(c.date)}"
+                      >{fmtDate(c.date)}</button>
+                    {/each}
+                  </div>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     </div>
     {#if totalPages > 1}
       <div class="pagination">
@@ -177,67 +201,128 @@
     min-width: 180px;
   }
 
-  .list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  .table-wrap {
+    overflow-x: auto;
   }
 
-  .pro-item {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding: 14px 18px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    transition: border-color 0.2s;
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
   }
 
-  .pro-item:hover {
-    border-color: var(--accent);
-  }
-
-  .pro-main {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .pro-name {
-    font-weight: 500;
-    font-size: 15px;
-  }
-
-  .consult-count {
-    margin-left: auto;
-    font-size: 13px;
+  thead th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 600;
     color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 2px solid var(--border);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover {
+    background: var(--bg-hover, rgba(0,0,0,0.03));
+  }
+
+  tbody tr.shared {
+    opacity: 0.75;
+  }
+
+  td {
+    padding: 12px 14px;
+    vertical-align: top;
+  }
+
+  .col-pro {
+    width: 40%;
+    min-width: 220px;
+  }
+
+  .col-consults {
+    width: 60%;
+  }
+
+  .pro-name-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .pro-name-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .pro-name-btn:hover:not(:disabled) {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
+  .pro-name-btn:disabled {
+    cursor: default;
   }
 
   .pro-meta {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
   }
 
   .specialties {
     display: flex;
-    gap: 6px;
+    gap: 4px;
     flex-wrap: wrap;
   }
 
   .clinic {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-muted);
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
+  }
+
+  .consult-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .consult-tag {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+
+  .consult-tag:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .no-consults {
+    color: var(--text-muted);
+    font-size: 13px;
   }
 
   .pagination {
