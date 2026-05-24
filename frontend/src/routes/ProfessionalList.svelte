@@ -72,41 +72,32 @@
 <div class="page">
   <div class="page-header">
     <h1>Profissionais</h1>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <select
-        bind:value={filterSpecialty}
-        onchange={onFilterChange}
-        style="padding:6px 10px;font-size:13px"
-      >
-        <option value="">Todas especialidades</option>
-        {#each specialties as s}
-          <option value={s.id}>{s.name}</option>
-        {/each}
-      </select>
-      <select
-        bind:value={filterClinic}
-        onchange={onFilterChange}
-        style="padding:6px 10px;font-size:13px"
-      >
-        <option value="">Todas clínicas</option>
-        {#each clinics as c}
-          <option value={c.id}>{c.name}</option>
-        {/each}
-      </select>
-      <input
-        type="search"
-        bind:value={search}
-        oninput={onSearchInput}
-        placeholder="Buscar por nome..."
-        style="padding:6px 12px;font-size:13px;min-width:180px"
-      />
-      <button class="btn btn-ghost" onclick={toggleFilter}>
-        {activeOnly ? 'Ver todos' : 'Apenas ativos'}
-      </button>
-      <button class="btn btn-primary" onclick={() => push('/professionals/new')}>
-        Novo Profissional
-      </button>
-    </div>
+    <button class="btn btn-primary" onclick={() => push('/professionals/new')}>
+      Novo Profissional
+    </button>
+  </div>
+  <div class="filters">
+    <select bind:value={filterSpecialty} onchange={onFilterChange}>
+      <option value="">Todas especialidades</option>
+      {#each specialties as s}
+        <option value={s.id}>{s.name}</option>
+      {/each}
+    </select>
+    <select bind:value={filterClinic} onchange={onFilterChange}>
+      <option value="">Todas clínicas</option>
+      {#each clinics as c}
+        <option value={c.id}>{c.name}</option>
+      {/each}
+    </select>
+    <input
+      type="search"
+      bind:value={search}
+      oninput={onSearchInput}
+      placeholder="Buscar por nome..."
+    />
+    <button class="btn btn-ghost" onclick={toggleFilter}>
+      {activeOnly ? 'Ver todos' : 'Apenas ativos'}
+    </button>
   </div>
 
   {#if loading}
@@ -168,6 +159,24 @@
 </div>
 
 <style>
+  .filters {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .filters select,
+  .filters input {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .filters input {
+    min-width: 180px;
+  }
+
   .list {
     display: flex;
     flex-direction: column;
