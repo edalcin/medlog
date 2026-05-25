@@ -3,6 +3,7 @@
   import { push } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
   import type { MedFile, FileCategory, Professional } from '../lib/api'
+  import { isAdmin } from '../lib/auth'
   import FileUpload from '../components/FileUpload.svelte'
   import FileEditModal from '../components/FileEditModal.svelte'
 
@@ -146,12 +147,12 @@
 
   {#if showUpload}
     <div style="margin-bottom: 24px">
-      <FileUpload showConsultationPicker={true} onUploaded={onUploaded} />
+      <FileUpload showConsultationPicker={true} showOwnerPicker={$isAdmin} onUploaded={onUploaded} />
     </div>
   {/if}
 
   <!-- Filter bar -->
-  <div class="filter-bar">
+  <div class="filter-bar" class:hidden={showUpload}>
     <select bind:value={filterCategory} onchange={applyFilter}>
       <option value="">Todas as categorias</option>
       {#each allCategories as cat}
@@ -295,6 +296,10 @@
 {/if}
 
 <style>
+  .filter-bar.hidden {
+    display: none;
+  }
+
   .filter-bar {
     display: flex;
     align-items: center;

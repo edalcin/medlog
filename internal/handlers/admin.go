@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"medlog/internal/models"
 )
 
@@ -106,6 +108,32 @@ func (h *AdminHandler) BulkDeleteProfessionals(w http.ResponseWriter, r *http.Re
 		models.ProfessionalDelete(r.Context(), h.DB, id)
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+func (h *AdminHandler) GetUserConsultations(w http.ResponseWriter, r *http.Request) {
+	targetUserID := chi.URLParam(r, "userId")
+	list, err := models.ConsultationFindByUserID(r.Context(), h.DB, targetUserID, 1000, 0)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	if list == nil {
+		list = []models.Consultation{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+}
+
+func (h *AdminHandler) GetUserProfessionals(w http.ResponseWriter, r *http.Request) {
+	targetUserID := chi.URLParam(r, "userId")
+	list, err := models.ProfessionalFindAll(r.Context(), h.DB, targetUserID, false, false, "", "", "", 1000, 0)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	if list == nil {
+		list = []models.Professional{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": list})
 }
 
 func (h *AdminHandler) ListLoginLogs(w http.ResponseWriter, r *http.Request) {

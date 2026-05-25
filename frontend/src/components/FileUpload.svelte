@@ -42,7 +42,7 @@
     } catch {
       // Categories are optional — silently ignore load failure
     }
-    if (showConsultationPicker) {
+    if (showConsultationPicker && !showOwnerPicker) {
       try {
         const [consultRes, profRes] = await Promise.all([
           api.getConsultations(1, 1000),
@@ -62,6 +62,23 @@
         // ignore
       }
     }
+  })
+
+  $effect(() => {
+    if (!showOwnerPicker || !showConsultationPicker) return
+    const uid = selectedOwnerUserId
+    consultations = []
+    professionals = []
+    selectedConsultationId = ''
+    selectedProfessionalId = ''
+    if (!uid) return
+    Promise.all([
+      api.getAdminUserConsultations(uid),
+      api.getAdminUserProfessionals(uid),
+    ]).then(([cs, ps]) => {
+      consultations = cs
+      professionals = ps
+    }).catch(() => {})
   })
 
   function toggleCategory(id: string) {
@@ -163,8 +180,10 @@
   {#if showConsultationPicker && !consultationId}
     <div class="form-group">
       <label for="consult-{inputId}">Vincular a consulta (opcional)</label>
-      <select id="consult-{inputId}" bind:value={selectedConsultationId} disabled={uploading}>
-        <option value="">— Nenhuma consulta —</option>
+      <select id="consult-{inputId}" bind:value={selectedConsultationId} disabled={uploading || (showOwnerPicker && !selectedOwnerUserId)}>
+        <option value="">
+          {showOwnerPicker && !selectedOwnerUserId ? '— Selecione um usuário primeiro —' : '— Nenhuma consulta —'}
+        </option>
         {#each consultations as c}
           <option value={c.id}>
             {new Date(c.date).toLocaleDateString('pt-BR')}
@@ -174,11 +193,13 @@
       </select>
     </div>
 
-    {#if !professionalId && professionals.length > 0}
+    {#if !professionalId}
       <div class="form-group">
         <label for="prof-{inputId}">Vincular a profissional (opcional)</label>
-        <select id="prof-{inputId}" bind:value={selectedProfessionalId} disabled={uploading}>
-          <option value="">— Nenhum profissional —</option>
+        <select id="prof-{inputId}" bind:value={selectedProfessionalId} disabled={uploading || (showOwnerPicker && !selectedOwnerUserId)}>
+          <option value="">
+            {showOwnerPicker && !selectedOwnerUserId ? '— Selecione um usuário primeiro —' : '— Nenhum profissional —'}
+          </option>
           {#each professionals as p}
             <option value={p.id}>{p.name}</option>
           {/each}

@@ -362,6 +362,12 @@ export const bulkDeleteProfessionals = (ids: string[]) =>
 export const getAdminFiles = (page = 1, limit = 20) =>
   request<PagedResponse<MedFile>>('GET', `/admin/files?page=${page}&limit=${limit}`)
 
+export const getAdminUserConsultations = (userId: string) =>
+  request<{ data: Consultation[] }>('GET', `/admin/users/${userId}/consultations`).then(r => r.data)
+
+export const getAdminUserProfessionals = (userId: string) =>
+  request<{ data: Professional[] }>('GET', `/admin/users/${userId}/professionals`).then(r => r.data)
+
 export interface LoginLog {
   id: string
   userId: string

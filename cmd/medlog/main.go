@@ -186,6 +186,8 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Get("/admin/professionals", adminH.ListProfessionals)
 		r.Post("/admin/professionals/bulk-delete", adminH.BulkDeleteProfessionals)
 		r.Get("/admin/files", adminH.ListFiles)
+		r.Get("/admin/users/{userId}/consultations", adminH.GetUserConsultations)
+		r.Get("/admin/users/{userId}/professionals", adminH.GetUserProfessionals)
 		r.Get("/admin/login-logs", adminH.ListLoginLogs)
 		r.Get("/admin/backup", adminH.Backup)
 		r.Post("/admin/restore", adminH.Restore)
