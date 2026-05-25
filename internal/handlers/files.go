@@ -30,6 +30,7 @@ var allowedMIMETypes = map[string]string{
 
 func (h *FileHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
 	page, limit := parsePagination(r)
 	offset := (page - 1) * limit
 
@@ -40,12 +41,21 @@ func (h *FileHandler) ListMine(w http.ResponseWriter, r *http.Request) {
 		Dir:            r.URL.Query().Get("dir"),
 	}
 
-	list, err := models.FileFindByOwner(r.Context(), h.DB, userID, limit, offset, opts)
-	if err != nil {
-		writeDBError(w, err)
-		return
+	var list []models.File
+	var total int
+	var err error
+
+	if role == "ADMIN" {
+		list, err = models.FileFindAllWithOpts(r.Context(), h.DB, limit, offset, opts)
+		if err == nil {
+			total, err = models.FileCountAllWithOpts(r.Context(), h.DB, opts)
+		}
+	} else {
+		list, err = models.FileFindByOwner(r.Context(), h.DB, userID, limit, offset, opts)
+		if err == nil {
+			total, err = models.FileCountByOwner(r.Context(), h.DB, userID, opts)
+		}
 	}
-	total, err := models.FileCountByOwner(r.Context(), h.DB, userID, opts)
 	if err != nil {
 		writeDBError(w, err)
 		return

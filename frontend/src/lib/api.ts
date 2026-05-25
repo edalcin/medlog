@@ -53,6 +53,7 @@ export interface MedFile {
   consultationDate?: string
   professionalId?: string
   userId?: string
+  userName?: string
   professionalName?: string
   uploadedAt: string
   categories: FileCategory[]

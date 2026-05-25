@@ -212,6 +212,9 @@
                 Profissional{sortIcon('professionalName')}
               </button>
             </th>
+            {#if $isAdmin}
+              <th>Usuário</th>
+            {/if}
             <th></th>
           </tr>
         </thead>
@@ -243,6 +246,9 @@
               </td>
               <td class="nowrap">{formatDate(f.consultationDate ?? f.uploadedAt)}</td>
               <td>{f.professionalName ?? '—'}</td>
+              {#if $isAdmin}
+                <td class="nowrap">{f.userName ?? '—'}</td>
+              {/if}
               <td class="actions-cell">
                 <button
                   class="icon-btn"

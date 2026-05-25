@@ -21,6 +21,7 @@ type File struct {
 	ConsultationDate *time.Time     `json:"consultationDate,omitempty"`
 	ProfessionalID   *string        `json:"professionalId,omitempty"`
 	UserID           *string        `json:"userId,omitempty"`
+	UserName         *string        `json:"userName,omitempty"`
 	ProfessionalName *string        `json:"professionalName,omitempty"`
 	Categories       []FileCategory `json:"categories"`
 	UploadedAt       time.Time      `json:"uploadedAt"`
@@ -32,11 +33,13 @@ const fileSelectSQL = `
 SELECT f.id, f.filename, f.custom_name, f.path, f.mime_type, f.size,
        f.hash, f.thumbnail_path, f.consultation_id, f.professional_id, f.user_id, f.uploaded_at,
        COALESCE(p1.name, p2.name) AS professional_name,
-       c.date AS consultation_date
+       c.date AS consultation_date,
+       u.name AS user_name
 FROM files f
 LEFT JOIN consultations c  ON c.id = f.consultation_id
 LEFT JOIN professionals p1 ON p1.id = f.professional_id
-LEFT JOIN professionals p2 ON p2.id = c.professional_id`
+LEFT JOIN professionals p2 ON p2.id = c.professional_id
+LEFT JOIN users u          ON u.id = f.user_id`
 
 func scanFileRow(rows *sql.Rows) (File, error) {
 	var f File
@@ -44,6 +47,7 @@ func scanFileRow(rows *sql.Rows) (File, error) {
 		&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
 		&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt,
 		&f.ProfessionalName, &f.ConsultationDate,
+		&f.UserName,
 	)
 	return f, err
 }
@@ -239,6 +243,55 @@ func FileFindByOwner(ctx context.Context, db *sql.DB, userID string, limit, offs
 
 func FileCountByOwner(ctx context.Context, db *sql.DB, userID string, opts FileListOptions) (int, error) {
 	where, args := fileOwnerWhere(userID, opts)
+	var n int
+	err := db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT f.id)
+		 FROM files f
+		 LEFT JOIN consultations c ON c.id = f.consultation_id
+		 WHERE `+where,
+		args...).Scan(&n)
+	return n, err
+}
+
+func fileAllWhere(opts FileListOptions) (where string, args []any) {
+	where = "1=1"
+	if opts.CategoryID != "" {
+		where += ` AND f.id IN (SELECT file_id FROM file_file_categories WHERE category_id=?)`
+		args = append(args, opts.CategoryID)
+	}
+	if opts.ProfessionalID != "" {
+		where += ` AND (f.professional_id=? OR c.professional_id=?)`
+		args = append(args, opts.ProfessionalID, opts.ProfessionalID)
+	}
+	return where, args
+}
+
+func FileFindAllWithOpts(ctx context.Context, db *sql.DB, limit, offset int, opts FileListOptions) ([]File, error) {
+	where, args := fileAllWhere(opts)
+	args = append(args, limit, offset)
+	q := fileSelectSQL + ` WHERE ` + where + ` ORDER BY ` + fileOrderBy(opts) + ` LIMIT ? OFFSET ?`
+	rows, err := db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var list []File
+	for rows.Next() {
+		f, err := scanFileRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		f.Categories = []FileCategory{}
+		list = append(list, f)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return attachCategories(ctx, db, list), nil
+}
+
+func FileCountAllWithOpts(ctx context.Context, db *sql.DB, opts FileListOptions) (int, error) {
+	where, args := fileAllWhere(opts)
 	var n int
 	err := db.QueryRowContext(ctx,
 		`SELECT COUNT(DISTINCT f.id)
