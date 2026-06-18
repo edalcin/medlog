@@ -4,6 +4,7 @@
   import * as api from '../lib/api'
   import type { Professional, Specialty, Clinic } from '../lib/api'
   import StarRating from '../components/StarRating.svelte'
+  import { localDate } from '../lib/date'
 
   let all = $state<Professional[]>([])
   let specialties = $state<Specialty[]>([])
@@ -70,7 +71,7 @@
   }
 
   function fmtDate(iso: string) {
-    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return localDate(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   }
 </script>
 

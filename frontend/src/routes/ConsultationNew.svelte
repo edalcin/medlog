@@ -7,13 +7,14 @@
   import InlineCreate from '../components/InlineCreate.svelte'
   import StarRating from '../components/StarRating.svelte'
   import TipTapEditor from '../components/TipTapEditor.svelte'
+  import { todayISO } from '../lib/date'
 
   let professionals = $state<Professional[]>([])
   let loading = $state(true)
   let submitting = $state(false)
   let error = $state('')
 
-  let date = $state(new Date().toISOString().split('T')[0])
+  let date = $state(todayISO())
   let type = $state('CONSULTATION')
   let proposito = $state('')
   let notes = $state('')
@@ -60,7 +61,7 @@
 
   function resetForm() {
     createdId = null
-    date = new Date().toISOString().split('T')[0]
+    date = todayISO()
     type = 'CONSULTATION'
     proposito = ''
     notes = ''

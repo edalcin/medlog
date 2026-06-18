@@ -3,6 +3,7 @@
   import { push } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
   import type { Consultation, Professional, Specialty } from '../lib/api'
+  import { localDate } from '../lib/date'
 
   let consultations = $state<Consultation[]>([])
   let professionals = $state<Professional[]>([])
@@ -81,8 +82,7 @@
   )
 
   function formatDate(iso: string): string {
-    const d = new Date(iso)
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+    return localDate(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
   }
 </script>
 

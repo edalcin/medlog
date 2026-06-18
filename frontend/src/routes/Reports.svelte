@@ -3,6 +3,7 @@
   import { push } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
   import type { Consultation } from '../lib/api'
+  import { localDate } from '../lib/date'
 
   type GroupedMonth = { monthLabel: string; consultations: Consultation[] }
   type GroupedYear = { year: number; months: GroupedMonth[] }
@@ -26,7 +27,7 @@
     const byYear = new Map<number, Map<string, Consultation[]>>()
 
     for (const c of consultations) {
-      const d = new Date(c.date)
+      const d = localDate(c.date)
       const year = d.getFullYear()
       const monthKey = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 
@@ -42,8 +43,8 @@
         year,
         months: Array.from(months.entries())
           .sort((a, b) => {
-            const da = new Date(b[1][0].date)
-            const db = new Date(a[1][0].date)
+            const da = localDate(b[1][0].date)
+            const db = localDate(a[1][0].date)
             return da.getTime() - db.getTime()
           })
           .map(([monthLabel, consultations]) => ({ monthLabel, consultations })),
@@ -51,7 +52,7 @@
   }
 
   function formatDay(iso: string): string {
-    return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', weekday: 'short' })
+    return localDate(iso).toLocaleDateString('pt-BR', { day: '2-digit', weekday: 'short' })
   }
 </script>
 

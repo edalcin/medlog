@@ -6,6 +6,7 @@
   import { isAdmin } from '../lib/auth'
   import FileUpload from '../components/FileUpload.svelte'
   import FileEditModal from '../components/FileEditModal.svelte'
+  import { localDate } from '../lib/date'
 
   let files = $state<MedFile[]>([])
   let loading = $state(true)
@@ -116,11 +117,7 @@
   }
 
   function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    })
+    return localDate(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
   }
 
   function fileBadgeClass(mime: string): string {

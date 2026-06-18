@@ -4,6 +4,7 @@
   import type { User, Consultation, Professional, MedFile, Specialty, FileCategory, Clinic, AdminStats, LoginLog } from '../lib/api'
   import FileUpload from '../components/FileUpload.svelte'
   import FileEditModal from '../components/FileEditModal.svelte'
+  import { localDate } from '../lib/date'
 
   type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'logs' | 'backup'
 
@@ -416,7 +417,7 @@
   }
 
   function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('pt-BR')
+    return localDate(iso).toLocaleDateString('pt-BR')
   }
 
   function formatSize(bytes: number): string {

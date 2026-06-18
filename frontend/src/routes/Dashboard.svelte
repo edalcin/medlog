@@ -4,6 +4,7 @@
   import { currentUser } from '../lib/auth'
   import * as api from '../lib/api'
   import type { DashboardStats } from '../lib/api'
+  import { localDate } from '../lib/date'
 
   let stats = $state<DashboardStats | null>(null)
   let loading = $state(true)
@@ -20,8 +21,7 @@
   })
 
   function formatDate(iso: string): string {
-    const d = new Date(iso)
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+    return localDate(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
   }
 
   function formatMonth(m: string): string {

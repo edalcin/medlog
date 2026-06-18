@@ -7,6 +7,7 @@
   import FileUpload from '../components/FileUpload.svelte'
   import StarRating from '../components/StarRating.svelte'
   import TipTapEditor from '../components/TipTapEditor.svelte'
+  import { localDate } from '../lib/date'
 
   let { params } = $props<{ params: Record<string, string> }>()
 
@@ -109,8 +110,7 @@
   }
 
   function formatDate(iso: string): string {
-    const d = new Date(iso)
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+    return localDate(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
   }
 
   function formatFileSize(bytes: number): string {
