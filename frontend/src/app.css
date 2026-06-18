@@ -232,6 +232,12 @@ tr:hover td {
   color: var(--text-muted);
 }
 
+.form-group .form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
 .form-group input,
 .form-group select,
 .form-group textarea {
@@ -323,4 +329,48 @@ code {
   border-radius: 3px;
   font-size: 12px;
   font-family: 'Courier New', monospace;
+}
+
+/* ── Mobile ───────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .page {
+    padding: 20px 16px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .card {
+    padding: 16px;
+  }
+
+  /* Larger touch targets for inputs and buttons */
+  input, select, textarea {
+    padding: 10px 12px;
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
+
+  .btn {
+    min-height: 44px;
+    padding: 10px 16px;
+  }
+
+  /* Forms: single-column on mobile */
+  .form-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tables: allow horizontal scroll */
+  .table-wrap {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Safe area for notched phones (bottom) */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

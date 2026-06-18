@@ -5,6 +5,8 @@
   import type { Professional } from '../lib/api'
   import FileUpload from '../components/FileUpload.svelte'
   import InlineCreate from '../components/InlineCreate.svelte'
+  import StarRating from '../components/StarRating.svelte'
+  import TipTapEditor from '../components/TipTapEditor.svelte'
 
   let professionals = $state<Professional[]>([])
   let loading = $state(true)
@@ -16,7 +18,7 @@
   let proposito = $state('')
   let notes = $state('')
   let professionalId = $state('')
-  let rating = $state('')
+  let rating = $state<number | undefined>(undefined)
 
   // Created consultation ID — enables file upload section after save
   let createdId = $state<string | null>(null)
@@ -43,7 +45,7 @@
         proposito: proposito || undefined,
         notes: notes || undefined,
         professionalId: professionalId || undefined,
-        rating: rating ? Number(rating) : undefined,
+        rating,
       })
       createdId = c.id
     } catch (e: unknown) {
@@ -63,13 +65,13 @@
     proposito = ''
     notes = ''
     professionalId = ''
-    rating = ''
+    rating = undefined
     error = ''
     submitting = false
   }
 
   function onProfessionalCreated(item: { id: string; name: string }) {
-    professionals = [...professionals, { id: item.id, name: item.name, isActive: true, isShared: false, specialties: [] }]
+    professionals = [...professionals, { id: item.id, name: item.name, isActive: true, isShared: false, specialties: [], consultations: [], totalRatings: 0 }]
     professionalId = item.id
   }
 </script>
@@ -111,11 +113,10 @@
           </select>
         </div>
         <div class="form-group">
-          <label for="rating">Avaliação (1-5)</label>
-          <input id="rating" type="number" min="1" max="5" bind:value={rating} placeholder="Opcional" disabled={submitting} />
+          <span class="form-label">Avaliação</span>
+          <StarRating bind:value={rating} />
         </div>
       </div>
-
       <div class="form-group">
         <label for="professional">Profissional</label>
         {#if loading}
@@ -137,8 +138,8 @@
       </div>
 
       <div class="form-group">
-        <label for="notes">Notas (Markdown)</label>
-        <textarea id="notes" rows="6" bind:value={notes} placeholder="Anotações da consulta..." disabled={submitting}></textarea>
+        <span class="form-label">Notas</span>
+        <TipTapEditor bind:value={notes} disabled={submitting} />
       </div>
 
       {#if error}

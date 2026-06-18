@@ -5,6 +5,8 @@
   import type { Consultation, Professional } from '../lib/api'
   import MarkdownPreview from '../components/MarkdownPreview.svelte'
   import FileUpload from '../components/FileUpload.svelte'
+  import StarRating from '../components/StarRating.svelte'
+  import TipTapEditor from '../components/TipTapEditor.svelte'
 
   let { params } = $props<{ params: Record<string, string> }>()
 
@@ -168,8 +170,8 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="edit-rating">Avaliação (1-5)</label>
-            <input id="edit-rating" type="number" min="1" max="5" bind:value={editRating} placeholder="Opcional" />
+            <span class="form-label">Avaliação</span>
+            <StarRating bind:value={editRating} />
           </div>
           <div class="form-group">
             <label for="edit-professional">Profissional</label>
@@ -185,10 +187,12 @@
           <label for="edit-proposito">Propósito</label>
           <input id="edit-proposito" type="text" bind:value={editProposito} placeholder="Motivo da consulta" />
         </div>
+        {#key editing}
         <div class="form-group">
-          <label for="edit-notes">Notas (Markdown)</label>
-          <textarea id="edit-notes" rows="6" bind:value={editNotes}></textarea>
+          <span class="form-label">Notas</span>
+          <TipTapEditor bind:value={editNotes} disabled={saving} />
         </div>
+        {/key}
         {#if saveError}
           <p class="error-msg" style="margin-bottom:12px">{saveError}</p>
         {/if}

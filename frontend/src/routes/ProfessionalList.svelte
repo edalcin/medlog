@@ -3,6 +3,7 @@
   import { push } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
   import type { Professional, Specialty, Clinic } from '../lib/api'
+  import StarRating from '../components/StarRating.svelte'
 
   let all = $state<Professional[]>([])
   let specialties = $state<Specialty[]>([])
@@ -118,6 +119,7 @@
         <thead>
           <tr>
             <th class="col-pro">Profissional</th>
+            <th class="col-rating">Avaliação</th>
             <th class="col-consults">Consultas</th>
           </tr>
         </thead>
@@ -151,6 +153,16 @@
                     <span class="clinic"><i class="bx bx-building-house"></i> {p.clinic.name}</span>
                   {/if}
                 </div>
+              </td>
+              <td class="col-rating">
+                {#if p.totalRatings}
+                  <div class="rating-cell">
+                    <StarRating value={p.avgRating} readonly />
+                    <span class="rating-count">({p.totalRatings})</span>
+                  </div>
+                {:else}
+                  <span class="no-consults">—</span>
+                {/if}
               </td>
               <td class="col-consults">
                 {#if p.consultations.length === 0}
@@ -245,8 +257,25 @@
     min-width: 220px;
   }
 
+  .col-rating {
+    width: 130px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
   .col-consults {
     width: 60%;
+  }
+
+  .rating-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rating-count {
+    font-size: 12px;
+    color: var(--text-muted);
   }
 
   .pro-name-row {

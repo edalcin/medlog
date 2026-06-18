@@ -41,6 +41,8 @@ export interface Professional {
   clinic?: Clinic
   specialties: Specialty[]
   consultations: ConsultationRef[]
+  avgRating?: number
+  totalRatings?: number
 }
 
 export interface MedFile {

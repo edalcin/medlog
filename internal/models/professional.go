@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -27,6 +28,8 @@ type Professional struct {
 	Clinic        *Clinic           `json:"clinic,omitempty"`
 	Specialties   []Specialty       `json:"specialties"`
 	Consultations []ConsultationRef `json:"consultations"`
+	AvgRating    *float64          `json:"avgRating,omitempty"`
+	TotalRatings int               `json:"totalRatings"`
 	CreatedAt     time.Time         `json:"createdAt"`
 	UpdatedAt     time.Time         `json:"updatedAt"`
 }
@@ -117,6 +120,34 @@ func professionalLoadConsultationsBatch(ctx context.Context, db *sql.DB, profIDs
 	}
 	return result
 }
+func professionalLoadRatingsBatch(ctx context.Context, db *sql.DB, profIDs []string) map[string][2]float64 {
+	if len(profIDs) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(profIDs))
+	args := make([]any, len(profIDs))
+	for i, id := range profIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	q := "SELECT professional_id, AVG(CAST(rating AS REAL)), COUNT(*) FROM consultations WHERE professional_id IN (" + strings.Join(placeholders, ",") + ") AND rating IS NOT NULL GROUP BY professional_id"
+	rows, err := db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	result := make(map[string][2]float64)
+	for rows.Next() {
+		var pid string
+		var avg float64
+		var count float64
+		if err := rows.Scan(&pid, &avg, &count); err != nil {
+			continue
+		}
+		result[pid] = [2]float64{avg, count}
+	}
+	return result
+}
 
 func professionalAttachRelations(ctx context.Context, db *sql.DB, list []Professional, profIDs []string, userID string, isAdmin bool) []Professional {
 	if len(profIDs) == 0 {
@@ -148,6 +179,14 @@ func professionalAttachRelations(ctx context.Context, db *sql.DB, list []Profess
 			list[i].Consultations = consults
 		} else {
 			list[i].Consultations = []ConsultationRef{}
+		}
+	}
+	ratingsMap := professionalLoadRatingsBatch(ctx, db, profIDs)
+	for i, p := range list {
+		if r, ok := ratingsMap[p.ID]; ok {
+			avg := r[0]
+			list[i].AvgRating = &avg
+			list[i].TotalRatings = int(r[1])
 		}
 	}
 	return list
