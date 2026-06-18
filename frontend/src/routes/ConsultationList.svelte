@@ -4,6 +4,7 @@
   import * as api from '../lib/api'
   import type { Consultation, Professional, Specialty } from '../lib/api'
   import { localDate } from '../lib/date'
+  import StarRating from '../components/StarRating.svelte'
 
   const LIMIT = 20
 
@@ -177,6 +178,9 @@
             {/if}
           </div>
           <div class="item-meta">
+            {#if c.rating}
+              <StarRating value={c.rating} readonly />
+            {/if}
             {#if c.files.length > 0}
               <span class="file-count">{c.files.length} arq.</span>
             {/if}
@@ -275,7 +279,10 @@
 
   .item-meta {
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    flex-shrink: 0;
   }
 
   .file-count {
