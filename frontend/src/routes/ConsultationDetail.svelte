@@ -32,7 +32,7 @@
     try {
       const [c, pros] = await Promise.all([
         api.getConsultation(params.id),
-        api.getProfessionals(),
+        api.getProfessionalsAll(),
       ])
       consultation = c
       professionals = pros.data

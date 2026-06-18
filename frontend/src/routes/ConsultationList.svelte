@@ -37,7 +37,7 @@
   onMount(async () => {
     const [, prosRes, specsRes] = await Promise.all([
       load(),
-      api.getProfessionals(false, 1, 1000).catch(() => ({ data: [] as Professional[] })),
+      api.getProfessionalsAll().catch(() => ({ data: [] as Professional[] })),
       api.getSpecialties().catch(() => ({ data: [] as Specialty[] })),
     ])
     professionals = prosRes.data

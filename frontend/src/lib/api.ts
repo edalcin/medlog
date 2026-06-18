@@ -203,6 +203,14 @@ export const getProfessionals = (activeOnly = false, page = 1, limit = 20, searc
   return request<PagedResponse<Professional>>('GET', url)
 }
 
+/** Fetch ALL professionals without pagination — for dropdown/select use only. */
+export const getProfessionalsAll = (activeOnly = false, specialtyId = '', clinicId = '') => {
+  let url = `/professionals?active=${activeOnly}&all=true`
+  if (specialtyId) url += `&specialtyId=${encodeURIComponent(specialtyId)}`
+  if (clinicId) url += `&clinicId=${encodeURIComponent(clinicId)}`
+  return request<PagedResponse<Professional>>('GET', url)
+}
+
 export const createProfessional = (body: {
   name: string
   notes?: string

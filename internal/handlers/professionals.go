@@ -26,8 +26,16 @@ func (h *ProfessionalHandler) List(w http.ResponseWriter, r *http.Request) {
 	specialtyID := r.URL.Query().Get("specialtyId")
 	clinicID := r.URL.Query().Get("clinicId")
 	isAdmin := role == "ADMIN"
-	page, limit := parsePagination(r)
-	offset := (page - 1) * limit
+
+	var page, limit, offset int
+	if r.URL.Query().Get("all") == "true" {
+		// Dropdown/select use-case: return all matching records, no pagination cap.
+		// limit=0 bypasses the SQL LIMIT clause in ProfessionalFindAll.
+		page = 1
+	} else {
+		page, limit = parsePagination(r)
+		offset = (page - 1) * limit
+	}
 
 	list, err := models.ProfessionalFindAll(r.Context(), h.DB, userID, isAdmin, activeOnly, search, specialtyID, clinicID, limit, offset)
 	if err != nil {

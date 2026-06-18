@@ -26,7 +26,7 @@
 
   onMount(async () => {
     try {
-      const res = await api.getProfessionals(true)
+      const res = await api.getProfessionalsAll(true)
       professionals = res.data
     } catch {
       // Non-critical — user can still create without professional
