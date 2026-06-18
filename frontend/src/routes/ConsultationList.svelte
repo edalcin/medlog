@@ -5,28 +5,35 @@
   import type { Consultation, Professional, Specialty } from '../lib/api'
   import { localDate } from '../lib/date'
 
+  const LIMIT = 20
+
   let consultations = $state<Consultation[]>([])
   let professionals = $state<Professional[]>([])
   let specialties = $state<Specialty[]>([])
   let loading = $state(true)
+  let loadingMore = $state(false)
   let error = $state('')
   let page = $state(1)
   let total = $state(0)
-  const limit = 20
+  let sentinel = $state<HTMLElement | undefined>(undefined)
+  let hasMore = $derived(consultations.length < total)
 
   // Filters
   let filterProfessional = $state('')
   let filterSpecialty = $state('')
   let search = $state('')
-  let searchDebounce: ReturnType<typeof setTimeout>
 
-  async function load() {
+  async function reload() {
     loading = true
+    page = 1
+    consultations = []
+    total = 0
     error = ''
     try {
-      const res = await api.getConsultations(page, limit, filterProfessional, filterSpecialty)
+      const res = await api.getConsultations(1, LIMIT, filterProfessional, filterSpecialty)
       consultations = res.data
       total = res.total
+      page = 2
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao carregar consultas'
     } finally {
@@ -34,9 +41,32 @@
     }
   }
 
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    loadingMore = true
+    try {
+      const res = await api.getConsultations(page, LIMIT, filterProfessional, filterSpecialty)
+      consultations = [...consultations, ...res.data]
+      total = res.total
+      page++
+    } catch { /* silent */ } finally {
+      loadingMore = false
+    }
+  }
+
+  $effect(() => {
+    if (!sentinel) return
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore() },
+      { rootMargin: '300px' }
+    )
+    obs.observe(sentinel)
+    return () => obs.disconnect()
+  })
+
   onMount(async () => {
     const [, prosRes, specsRes] = await Promise.all([
-      load(),
+      reload(),
       api.getProfessionalsAll().catch(() => ({ data: [] as Professional[] })),
       api.getSpecialties().catch(() => ({ data: [] as Specialty[] })),
     ])
@@ -44,16 +74,13 @@
     specialties = specsRes.data
   })
 
-  let totalPages = $derived(Math.max(1, Math.ceil(total / limit)))
-
-  // When specialty changes, reset professional if that professional no longer matches
+  // When specialty changes, reset professional if no longer in filtered set
   let filteredProfessionals = $derived(
     filterSpecialty
       ? professionals.filter(p => p.specialties.some(s => s.id === filterSpecialty))
       : professionals
   )
 
-  // If the currently selected professional isn't in the filtered list, clear it
   $effect(() => {
     if (filterProfessional && filteredProfessionals.length > 0 &&
         !filteredProfessionals.find(p => p.id === filterProfessional)) {
@@ -61,17 +88,11 @@
     }
   })
 
-  async function goTo(p: number) {
-    page = p
-    await load()
-  }
-
   async function onFilterChange() {
-    page = 1
-    await load()
+    await reload()
   }
 
-  // Client-side text search on the already-loaded page
+  // Client-side text search on all loaded items
   let filtered = $derived(
     search.trim()
       ? consultations.filter(c =>
@@ -114,7 +135,7 @@
     />
   </div>
 
-  {#if loading}
+  {#if loading && consultations.length === 0}
     <div class="loading">Carregando...</div>
   {:else if error}
     <p class="error-msg">{error}</p>
@@ -163,12 +184,11 @@
         </div>
       {/each}
     </div>
-    {#if totalPages > 1}
-      <div class="pagination">
-        <button class="btn btn-ghost" disabled={page <= 1} onclick={() => goTo(page - 1)}>‹ Anterior</button>
-        <span class="page-info">Página {page} de {totalPages} · {total} total</span>
-        <button class="btn btn-ghost" disabled={page >= totalPages} onclick={() => goTo(page + 1)}>Próxima ›</button>
-      </div>
+    {#if hasMore}
+      <div class="sentinel" bind:this={sentinel}></div>
+      {#if loadingMore}<div class="loading-more">Carregando mais...</div>{/if}
+    {:else if !loading && consultations.length > 0}
+      <p class="list-end">— {total} consulta{total !== 1 ? 's' : ''} —</p>
     {/if}
   {/if}
 </div>
@@ -266,16 +286,17 @@
     border-radius: 12px;
   }
 
-  .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    margin-top: 24px;
-  }
-
-  .page-info {
-    font-size: 13px;
+  .sentinel { height: 1px; }
+  .loading-more {
+    text-align: center;
+    padding: 16px;
     color: var(--text-muted);
+    font-size: 13px;
+  }
+  .list-end {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 12px;
   }
 </style>

@@ -6,10 +6,13 @@
   import StarRating from '../components/StarRating.svelte'
   import { localDate } from '../lib/date'
 
+  const LIMIT = 20
+
   let all = $state<Professional[]>([])
   let specialties = $state<Specialty[]>([])
   let clinics = $state<Clinic[]>([])
   let loading = $state(true)
+  let loadingMore = $state(false)
   let error = $state('')
   let activeOnly = $state(true)
   let page = $state(1)
@@ -18,25 +21,20 @@
   let filterSpecialty = $state('')
   let filterClinic = $state('')
   let searchDebounce: ReturnType<typeof setTimeout>
-  const limit = 20
+  let sentinel = $state<HTMLElement | undefined>(undefined)
+  let hasMore = $derived(all.length < total)
 
-  onMount(async () => {
-    const [, specsRes, clinicsRes] = await Promise.all([
-      load(),
-      api.getSpecialties().catch(() => ({ data: [] as Specialty[] })),
-      api.getClinics().catch(() => ({ data: [] as Clinic[] })),
-    ])
-    specialties = specsRes.data
-    clinics = clinicsRes.data
-  })
-
-  async function load() {
+  async function reload() {
     loading = true
+    page = 1
+    all = []
+    total = 0
     error = ''
     try {
-      const res = await api.getProfessionals(activeOnly, page, limit, search, filterSpecialty, filterClinic)
+      const res = await api.getProfessionals(activeOnly, 1, LIMIT, search, filterSpecialty, filterClinic)
       all = res.data
       total = res.total
+      page = 2
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao carregar profissionais'
     } finally {
@@ -44,30 +42,51 @@
     }
   }
 
-  let totalPages = $derived(Math.max(1, Math.ceil(total / limit)))
-
-  async function goTo(p: number) {
-    page = p
-    await load()
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    loadingMore = true
+    try {
+      const res = await api.getProfessionals(activeOnly, page, LIMIT, search, filterSpecialty, filterClinic)
+      all = [...all, ...res.data]
+      total = res.total
+      page++
+    } catch { /* silent */ } finally {
+      loadingMore = false
+    }
   }
+
+  $effect(() => {
+    if (!sentinel) return
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore() },
+      { rootMargin: '300px' }
+    )
+    obs.observe(sentinel)
+    return () => obs.disconnect()
+  })
+
+  onMount(async () => {
+    const [, specsRes, clinicsRes] = await Promise.all([
+      reload(),
+      api.getSpecialties().catch(() => ({ data: [] as Specialty[] })),
+      api.getClinics().catch(() => ({ data: [] as Clinic[] })),
+    ])
+    specialties = specsRes.data
+    clinics = clinicsRes.data
+  })
 
   async function toggleFilter() {
     activeOnly = !activeOnly
-    page = 1
-    await load()
+    await reload()
   }
 
   function onSearchInput() {
     clearTimeout(searchDebounce)
-    searchDebounce = setTimeout(() => {
-      page = 1
-      load()
-    }, 300)
+    searchDebounce = setTimeout(() => reload(), 300)
   }
 
   async function onFilterChange() {
-    page = 1
-    await load()
+    await reload()
   }
 
   function fmtDate(iso: string) {
@@ -106,7 +125,7 @@
     </button>
   </div>
 
-  {#if loading}
+  {#if loading && all.length === 0}
     <div class="loading">Carregando...</div>
   {:else if error}
     <p class="error-msg">{error}</p>
@@ -184,14 +203,13 @@
           {/each}
         </tbody>
       </table>
+      {#if hasMore}
+        <div class="sentinel" bind:this={sentinel}></div>
+        {#if loadingMore}<div class="loading-more">Carregando mais...</div>{/if}
+      {:else if !loading && all.length > 0}
+        <p class="list-end">— {total} profissional{total !== 1 ? 'is' : ''} —</p>
+      {/if}
     </div>
-    {#if totalPages > 1}
-      <div class="pagination">
-        <button class="btn btn-ghost" disabled={page <= 1} onclick={() => goTo(page - 1)}>‹ Anterior</button>
-        <span class="page-info">Página {page} de {totalPages} · {total} total</span>
-        <button class="btn btn-ghost" disabled={page >= totalPages} onclick={() => goTo(page + 1)}>Próxima ›</button>
-      </div>
-    {/if}
   {/if}
 </div>
 
@@ -355,16 +373,17 @@
     font-size: 13px;
   }
 
-  .pagination {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    margin-top: 24px;
-  }
-
-  .page-info {
-    font-size: 13px;
+  .sentinel { height: 1px; }
+  .loading-more {
+    text-align: center;
+    padding: 16px;
     color: var(--text-muted);
+    font-size: 13px;
+  }
+  .list-end {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 12px;
   }
 </style>
