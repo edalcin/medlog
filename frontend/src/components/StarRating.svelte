@@ -84,13 +84,17 @@
   .star-rating {
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 0;
   }
 
-  /* Readonly */
+  /* Readonly — fixed width so every star occupies the same space */
   .star {
+    display: inline-flex;
+    justify-content: center;
+    width: 26px;
     font-size: 22px;
     line-height: 1;
+    flex-shrink: 0;
   }
 
   .star.filled {
