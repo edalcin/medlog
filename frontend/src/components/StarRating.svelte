@@ -87,12 +87,12 @@
     gap: 0;
   }
 
-  /* Readonly — fixed width so every star occupies the same space */
+  /* Readonly — compact, fixed width so every star occupies the same space */
   .star {
     display: inline-flex;
     justify-content: center;
-    width: 26px;
-    font-size: 22px;
+    width: 18px;
+    font-size: 16px;
     line-height: 1;
     flex-shrink: 0;
   }
