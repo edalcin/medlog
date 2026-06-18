@@ -212,7 +212,7 @@
             {consultation.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}
           </span>
           {#if consultation.rating}
-            <span class="rating">{'★'.repeat(consultation.rating)}{'☆'.repeat(5 - consultation.rating)}</span>
+            <StarRating value={consultation.rating} readonly />
           {/if}
         </div>
 

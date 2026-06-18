@@ -44,9 +44,7 @@
   <span class="star-rating readonly" aria-label={value !== undefined ? `${Math.round(value)} de ${TOTAL} estrelas` : 'sem avaliação'}>
     {#if value !== undefined}
       {#each { length: TOTAL } as _, i}
-        <span class="star {isFilled(i + 1) ? 'filled' : 'empty'}">
-          {isFilled(i + 1) ? '★' : '☆'}
-        </span>
+        <span class="star {isFilled(i + 1) ? 'filled' : 'empty'}">★</span>
       {/each}
     {:else}
       <span class="no-value">—</span>
@@ -65,7 +63,7 @@
         onmouseenter={() => handleMouseEnter(idx)}
         onmouseleave={handleMouseLeave}
       >
-        {isFilled(idx) ? '★' : '☆'}
+        {isFilled(idx) ? '★' : '★'}
       </button>
     {/each}
     {#if value !== undefined}
@@ -96,11 +94,11 @@
   }
 
   .star.filled {
-    color: var(--accent);
+    color: var(--warning);
   }
 
   .star.empty {
-    color: var(--text-muted);
+    color: var(--border);
   }
 
   .no-value {
@@ -131,11 +129,11 @@
   }
 
   .star-btn.filled {
-    color: var(--accent);
+    color: var(--warning);
   }
 
   .star-btn.empty {
-    color: var(--text-muted);
+    color: var(--border);
   }
 
   .star-btn:hover {
