@@ -22,24 +22,20 @@ type ConsultationHandler struct {
 func (h *ConsultationHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
 	role := auth.Manager.GetString(r.Context(), auth.SessionKeyRole)
+	isAdmin := role == "ADMIN"
+
+	professionalID := r.URL.Query().Get("professionalId")
+	specialtyID := r.URL.Query().Get("specialtyId")
 
 	page, limit := parsePagination(r)
 	offset := (page - 1) * limit
 
-	var list []models.Consultation
-	var total int
-	var err error
-	if role == "ADMIN" {
-		list, err = models.ConsultationFindAll(r.Context(), h.DB, limit, offset)
-		if err == nil {
-			total, err = models.ConsultationCountAll(r.Context(), h.DB)
-		}
-	} else {
-		list, err = models.ConsultationFindByUserID(r.Context(), h.DB, userID, limit, offset)
-		if err == nil {
-			total, err = models.ConsultationCountByUserID(r.Context(), h.DB, userID)
-		}
+	list, err := models.ConsultationFindFiltered(r.Context(), h.DB, userID, isAdmin, professionalID, specialtyID, limit, offset)
+	if err != nil {
+		writeDBError(w, err)
+		return
 	}
+	total, err := models.ConsultationCountFiltered(r.Context(), h.DB, userID, isAdmin, professionalID, specialtyID)
 	if err != nil {
 		writeDBError(w, err)
 		return

@@ -158,8 +158,17 @@ export const getDashboard = () =>
   request<{ data: DashboardStats }>('GET', '/dashboard').then(r => r.data)
 
 // Consultations
-export const getConsultations = (page = 1, limit = 20) =>
-  request<PagedResponse<Consultation>>('GET', `/consultations?page=${page}&limit=${limit}`)
+export const getConsultations = (
+  page = 1,
+  limit = 20,
+  professionalId = '',
+  specialtyId = ''
+) => {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (professionalId) params.set('professionalId', professionalId)
+  if (specialtyId) params.set('specialtyId', specialtyId)
+  return request<PagedResponse<Consultation>>('GET', `/consultations?${params}`)
+}
 
 export const createConsultation = (body: {
   date: string

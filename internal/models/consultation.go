@@ -186,6 +186,41 @@ func ConsultationCountAll(ctx context.Context, db *sql.DB) (int, error) {
 	return n, err
 }
 
+// buildConsultationFilter constructs the WHERE clause and args for filtered queries.
+func buildConsultationFilter(userID string, isAdmin bool, professionalID, specialtyID string) (string, []any) {
+	var conds []string
+	var args []any
+	if !isAdmin {
+		conds = append(conds, "user_id=?")
+		args = append(args, userID)
+	}
+	if professionalID != "" {
+		conds = append(conds, "professional_id=?")
+		args = append(args, professionalID)
+	}
+	if specialtyID != "" {
+		conds = append(conds, "professional_id IN (SELECT professional_id FROM professional_specialties WHERE specialty_id=?)")
+		args = append(args, specialtyID)
+	}
+	if len(conds) == 0 {
+		return "", nil
+	}
+	return "WHERE " + strings.Join(conds, " AND "), args
+}
+
+func ConsultationFindFiltered(ctx context.Context, db *sql.DB, userID string, isAdmin bool, professionalID, specialtyID string, limit, offset int) ([]Consultation, error) {
+	where, args := buildConsultationFilter(userID, isAdmin, professionalID, specialtyID)
+	return consultationBase(ctx, db, where, args, limit, offset)
+}
+
+func ConsultationCountFiltered(ctx context.Context, db *sql.DB, userID string, isAdmin bool, professionalID, specialtyID string) (int, error) {
+	where, args := buildConsultationFilter(userID, isAdmin, professionalID, specialtyID)
+	var n int
+	q := "SELECT COUNT(*) FROM consultations " + where
+	err := db.QueryRowContext(ctx, q, args...).Scan(&n)
+	return n, err
+}
+
 type CreateConsultationInput struct {
 	Date           time.Time
 	Proposito      *string
