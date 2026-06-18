@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"time"
@@ -10,7 +11,7 @@ import (
 
 type Consultation struct {
 	ID             string        `json:"id"`
-	Date           time.Time     `json:"date"`
+	Date           time.Time     `json:"-"` // serialised as YYYY-MM-DD via MarshalJSON
 	Proposito      *string       `json:"proposito,omitempty"`
 	Notes          *string       `json:"notes,omitempty"`
 	Type           string        `json:"type"`
@@ -21,6 +22,41 @@ type Consultation struct {
 	Files          []File        `json:"files"`
 	CreatedAt      time.Time     `json:"createdAt"`
 	UpdatedAt      time.Time     `json:"updatedAt"`
+}
+
+// consultationJSON is the wire format for Consultation.
+// Date is emitted as "YYYY-MM-DD" so the client never needs to handle
+// the UTC→local timezone shift that would occur with a full RFC3339 timestamp.
+type consultationJSON struct {
+	ID             string        `json:"id"`
+	Date           string        `json:"date"`
+	Proposito      *string       `json:"proposito,omitempty"`
+	Notes          *string       `json:"notes,omitempty"`
+	Type           string        `json:"type"`
+	Rating         *int          `json:"rating,omitempty"`
+	UserID         string        `json:"userId"`
+	ProfessionalID *string       `json:"professionalId,omitempty"`
+	Professional   *Professional `json:"professional,omitempty"`
+	Files          []File        `json:"files"`
+	CreatedAt      time.Time     `json:"createdAt"`
+	UpdatedAt      time.Time     `json:"updatedAt"`
+}
+
+func (c Consultation) MarshalJSON() ([]byte, error) {
+	return json.Marshal(consultationJSON{
+		ID:             c.ID,
+		Date:           c.Date.UTC().Format("2006-01-02"),
+		Proposito:      c.Proposito,
+		Notes:          c.Notes,
+		Type:           c.Type,
+		Rating:         c.Rating,
+		UserID:         c.UserID,
+		ProfessionalID: c.ProfessionalID,
+		Professional:   c.Professional,
+		Files:          c.Files,
+		CreatedAt:      c.CreatedAt,
+		UpdatedAt:      c.UpdatedAt,
+	})
 }
 
 func consultationBase(ctx context.Context, db *sql.DB, where string, args []any, limit, offset int) ([]Consultation, error) {

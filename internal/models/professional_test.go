@@ -99,7 +99,7 @@ func TestProfessionalFindAll_BatchSpecialties(t *testing.T) {
 		}, specs)
 	}
 
-	list, err := models.ProfessionalFindAll(ctx, database, userID, false, false, "", 0, 0)
+	list, err := models.ProfessionalFindAll(ctx, database, userID, false, false, "", "", "", 0, 0)
 	if err != nil {
 		t.Fatalf("ProfessionalFindAll: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestProfessionalCount(t *testing.T) {
 		}, nil)
 	}
 
-	n, err := models.ProfessionalCount(ctx, database, userID, false, false, "")
+	n, err := models.ProfessionalCount(ctx, database, userID, false, false, "", "", "")
 	if err != nil {
 		t.Fatalf("ProfessionalCount: %v", err)
 	}

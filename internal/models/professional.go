@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"log/slog"
 	"strings"
 	"time"
@@ -12,7 +13,17 @@ import (
 
 type ConsultationRef struct {
 	ID   string    `json:"id"`
-	Date time.Time `json:"date"`
+	Date time.Time `json:"-"` // serialised as YYYY-MM-DD via MarshalJSON
+}
+
+func (c ConsultationRef) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		ID   string `json:"id"`
+		Date string `json:"date"`
+	}{
+		ID:   c.ID,
+		Date: c.Date.UTC().Format("2006-01-02"),
+	})
 }
 
 type Professional struct {
