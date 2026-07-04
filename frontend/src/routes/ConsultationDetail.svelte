@@ -92,9 +92,9 @@
     }
   }
 
-  async function deleteFile(fileId: string) {
+  async function unlinkFile(fileId: string) {
     if (!consultation) return
-    if (!confirm('Excluir este arquivo?')) return
+    if (!confirm('Remover este arquivo da consulta? O arquivo continua disponível em Arquivos, apenas deixa de estar vinculado a esta consulta.')) return
     try {
       await api.deleteFile(fileId)
       consultation = {
@@ -102,7 +102,7 @@
         files: consultation.files.filter(f => f.id !== fileId),
       }
     } catch (e: unknown) {
-      error = e instanceof Error ? e.message : 'Erro ao excluir arquivo'
+      error = e instanceof Error ? e.message : 'Erro ao remover arquivo da consulta'
     }
   }
 
@@ -281,9 +281,9 @@
                 <span class="file-size">{formatFileSize(f.size)}</span>
                 <button
                   class="btn btn-ghost btn-xs"
-                  onclick={() => deleteFile(f.id)}
+                  onclick={() => unlinkFile(f.id)}
                 >
-                  Excluir
+                  Remover
                 </button>
               </div>
             </div>

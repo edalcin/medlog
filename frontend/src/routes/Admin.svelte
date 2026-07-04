@@ -438,7 +438,10 @@
 
   async function deleteAdminFile(f: MedFile) {
     const name = f.customName || f.filename
-    if (!confirm(`Excluir "${name}"?`)) return
+    const prompt = f.consultationId
+      ? `"${name}" está vinculado a uma consulta e não pode ser excluído — deseja apenas desvincular?`
+      : `Excluir "${name}"?`
+    if (!confirm(prompt)) return
     try {
       await api.deleteFile(f.id)
       loadFiles(filePage)
@@ -812,7 +815,7 @@
                   <button class="icon-btn" onclick={() => (fileEditing = f)} title="Editar">
                     <i class="bx bx-edit-alt"></i>
                   </button>
-                  <button class="icon-btn icon-btn-danger" onclick={() => deleteAdminFile(f)} title="Excluir">
+                  <button class="icon-btn icon-btn-danger" onclick={() => deleteAdminFile(f)} title={f.consultationId ? 'Desvincular da consulta' : 'Excluir'}>
                     <i class="bx bx-trash"></i>
                   </button>
                 </td>

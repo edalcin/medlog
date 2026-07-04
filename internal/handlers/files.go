@@ -293,7 +293,8 @@ func (h *FileHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := models.FileDelete(r.Context(), h.DB, id); err != nil {
+	disassociated, err := models.FileDelete(r.Context(), h.DB, id)
+	if err != nil {
 		if err == sql.ErrNoRows {
 			writeError(w, "not found", http.StatusNotFound)
 		} else {
@@ -301,7 +302,7 @@ func (h *FileHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "disassociated": disassociated})
 }
 
 func formStringPtr(r *http.Request, key string) *string {

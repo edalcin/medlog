@@ -408,20 +408,35 @@ func FileUpdate(ctx context.Context, db *sql.DB, id string, in UpdateFileInput) 
 	return FileFindByID(ctx, db, id)
 }
 
-func FileDelete(ctx context.Context, db *sql.DB, id string) error {
+// FileDelete removes a file, unless it is linked to a consultation — a file
+// must never be destroyed while that link exists, so it is disassociated
+// (consultation_id cleared) instead and the record/disk file are kept. The
+// bool return reports which of the two happened.
+func FileDelete(ctx context.Context, db *sql.DB, id string) (disassociated bool, err error) {
+	var consultationID sql.NullString
+	if err := db.QueryRowContext(ctx, "SELECT consultation_id FROM files WHERE id=?", id).Scan(&consultationID); err != nil {
+		return false, err
+	}
+	if consultationID.Valid {
+		if _, err := db.ExecContext(ctx, "UPDATE files SET consultation_id = NULL WHERE id=?", id); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
 	var path string
 	if err := db.QueryRowContext(ctx, "SELECT path FROM files WHERE id=?", id).Scan(&path); err != nil {
 		slog.Error("FileDelete: get path", "id", id, "err", err)
 	}
 	if _, err := db.ExecContext(ctx, "DELETE FROM files WHERE id=?", id); err != nil {
-		return err
+		return false, err
 	}
 	if path != "" {
 		if err := removeFile(path); err != nil {
 			slog.Error("FileDelete: remove file", "path", path, "err", err)
 		}
 	}
-	return nil
+	return false, nil
 }
 
 func removeFile(path string) error {

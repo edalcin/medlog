@@ -290,7 +290,7 @@ export const updateFile = (
 ) => request<{ data: MedFile }>('PATCH', `/files/${id}`, body).then(r => r.data)
 
 export const deleteFile = (id: string) =>
-  request<{ ok: boolean }>('DELETE', `/files/${id}`)
+  request<{ ok: boolean; disassociated: boolean }>('DELETE', `/files/${id}`)
 
 // Specialties dictionary
 export const getSpecialties = () =>

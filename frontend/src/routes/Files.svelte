@@ -132,11 +132,18 @@
 
   async function deleteFile(f: MedFile) {
     const name = f.customName || f.filename
-    if (!confirm(`Excluir "${name}"?`)) return
+    const prompt = f.consultationId
+      ? `"${name}" está vinculado a uma consulta e não pode ser excluído — deseja apenas desvincular?`
+      : `Excluir "${name}"?`
+    if (!confirm(prompt)) return
     try {
-      await api.deleteFile(f.id)
-      files = files.filter(x => x.id !== f.id)
-      total -= 1
+      const res = await api.deleteFile(f.id)
+      if (res.disassociated) {
+        files = files.map(x => (x.id === f.id ? { ...x, consultationId: undefined, consultationDate: undefined } : x))
+      } else {
+        files = files.filter(x => x.id !== f.id)
+        total -= 1
+      }
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Erro ao excluir arquivo.')
     }
@@ -291,7 +298,7 @@
                 <button
                   class="icon-btn icon-btn-danger"
                   onclick={() => deleteFile(f)}
-                  title="Excluir"
+                  title={f.consultationId ? 'Desvincular da consulta' : 'Excluir'}
                 >
                   <i class="bx bx-trash"></i>
                 </button>
