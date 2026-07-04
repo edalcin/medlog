@@ -71,6 +71,7 @@ nul
 # Go binary
 /medlog
 medlog.exe
+*.msi
 
 # Go build artifacts
 *.test
@@ -91,3 +92,4 @@ internal/embed/dist/
 # Development tooling (not project source)
 .specify/
 .claude/skills/
+graphify-out/
