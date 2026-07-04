@@ -21,6 +21,7 @@ import (
 	embedfs "medlog/internal/embed"
 	"medlog/internal/handlers"
 	appmiddleware "medlog/internal/middleware"
+	"medlog/internal/models"
 )
 
 func main() {
@@ -54,6 +55,12 @@ func main() {
 
 	if err := db.Migrate(database); err != nil {
 		log.Fatalf("run migrations: %v", err)
+	}
+
+	// One-time (idempotent) backfill so upload-time dedup also catches
+	// files stored before content hashing existed.
+	if err := models.FileBackfillHashes(context.Background(), database); err != nil {
+		log.Printf("file hash backfill: %v", err)
 	}
 
 	if err := bootstrapAdmin(database, adminEmail, adminPassword); err != nil {

@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -116,20 +118,32 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeError(w, "could not read file", http.StatusInternalServerError)
+		return
+	}
+	sum := sha256.Sum256(data)
+	hashHex := hex.EncodeToString(sum[:])
+
+	// Never accept a file whose content already exists for this owner —
+	// avoid duplicate uploads outright rather than storing a second copy.
+	if existing, err := models.FileFindByHash(r.Context(), h.DB, hashHex, ownerUserID); err == nil {
+		writeJSON(w, http.StatusConflict, map[string]any{
+			"error":        "duplicate file",
+			"existingFile": existing,
+		})
+		return
+	} else if err != sql.ErrNoRows {
+		writeDBError(w, err)
+		return
+	}
+
 	fileID := uuid.New().String()
 	filename := fmt.Sprintf("%s.%s", fileID, ext)
 	destPath := filepath.Join(h.FilesPath, filename)
 
-	dest, err := os.Create(destPath)
-	if err != nil {
-		writeError(w, "could not save file", http.StatusInternalServerError)
-		return
-	}
-	defer dest.Close()
-
-	size, err := io.Copy(dest, file)
-	if err != nil {
-		os.Remove(destPath)
+	if err := os.WriteFile(destPath, data, 0644); err != nil {
 		writeError(w, "could not save file", http.StatusInternalServerError)
 		return
 	}
@@ -140,7 +154,8 @@ func (h *FileHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		CustomName:     customName,
 		Path:           destPath,
 		MimeType:       mimeType,
-		Size:           size,
+		Size:           int64(len(data)),
+		Hash:           hashHex,
 		ConsultationID: consultationID,
 		ProfessionalID: professionalID,
 		UserID:         &ownerUserID,

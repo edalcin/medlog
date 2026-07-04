@@ -260,7 +260,7 @@ export const uploadFile = (
   }).then(async res => {
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }))
-      throw Object.assign(new Error(err.error || 'Upload failed'), { status: res.status })
+      throw Object.assign(new Error(err.error || 'Upload failed'), { status: res.status, existingFile: err.existingFile as MedFile | undefined })
     }
     return (res.json() as Promise<{ data: MedFile }>).then(r => r.data)
   })

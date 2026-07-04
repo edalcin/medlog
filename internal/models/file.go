@@ -2,7 +2,10 @@ package models
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"io"
 	"log/slog"
 	"os"
 	"time"
@@ -181,6 +184,38 @@ func FileFindByID(ctx context.Context, db *sql.DB, id string) (*File, error) {
 	return &f, nil
 }
 
+// FileFindByHash looks up an existing file by content hash, scoped to the
+// given owner — dedup boundaries follow file ownership, same as everywhere
+// else in this codebase (a user only ever sees/attaches their own files;
+// admin's "on behalf of" uploads are scoped to the chosen owner).
+func FileFindByHash(ctx context.Context, db *sql.DB, hash, ownerUserID string) (*File, error) {
+	rows, err := db.QueryContext(ctx, fileSelectSQL+` WHERE f.hash=? AND f.user_id=?`, hash, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	if !rows.Next() {
+		rows.Close()
+		return nil, sql.ErrNoRows
+	}
+	f, err := scanFileRow(rows)
+	if err != nil {
+		rows.Close()
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return nil, err
+	}
+	// See FileFindByID: must close before the nested batch query below.
+	rows.Close()
+	f.Categories = []FileCategory{}
+	catMap := fileLoadCategoriesBatch(ctx, db, []string{f.ID})
+	if cats, ok := catMap[f.ID]; ok {
+		f.Categories = cats
+	}
+	return &f, nil
+}
+
 // FileListOptions controls filtering and sorting for owner-scoped file queries.
 type FileListOptions struct {
 	CategoryID     string // empty = no filter
@@ -330,6 +365,7 @@ type CreateFileInput struct {
 	Path           string
 	MimeType       string
 	Size           int64
+	Hash           string
 	ConsultationID *string
 	ProfessionalID *string
 	UserID         *string
@@ -344,9 +380,9 @@ func FileCreate(ctx context.Context, db *sql.DB, in CreateFileInput) (*File, err
 	}
 	defer tx.Rollback()
 	_, err = tx.ExecContext(ctx,
-		`INSERT INTO files (id, filename, custom_name, path, mime_type, size, consultation_id, professional_id, user_id, uploaded_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		in.ID, in.Filename, in.CustomName, in.Path, in.MimeType, in.Size,
+		`INSERT INTO files (id, filename, custom_name, path, mime_type, size, hash, consultation_id, professional_id, user_id, uploaded_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		in.ID, in.Filename, in.CustomName, in.Path, in.MimeType, in.Size, in.Hash,
 		in.ConsultationID, in.ProfessionalID, in.UserID, now)
 	if err != nil {
 		return nil, err
@@ -441,4 +477,51 @@ func FileDelete(ctx context.Context, db *sql.DB, id string) (disassociated bool,
 
 func removeFile(path string) error {
 	return os.Remove(path)
+}
+
+// FileBackfillHashes computes and stores the content hash for every file
+// row that predates hash-based dedup (hash IS NULL) — a one-time,
+// idempotent pass safe to run on every startup, so upload-time duplicate
+// detection also catches files already on disk before this feature
+// existed. A missing/unreadable file is logged and skipped, not fatal.
+func FileBackfillHashes(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, "SELECT id, path FROM files WHERE hash IS NULL")
+	if err != nil {
+		return err
+	}
+	type pending struct{ id, path string }
+	var list []pending
+	for rows.Next() {
+		var p pending
+		if err := rows.Scan(&p.id, &p.path); err != nil {
+			rows.Close()
+			return err
+		}
+		list = append(list, p)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return err
+	}
+	rows.Close()
+
+	for _, p := range list {
+		f, err := os.Open(p.path)
+		if err != nil {
+			slog.Warn("FileBackfillHashes: skip unreadable file", "id", p.id, "path", p.path, "err", err)
+			continue
+		}
+		h := sha256.New()
+		_, copyErr := io.Copy(h, f)
+		f.Close()
+		if copyErr != nil {
+			slog.Warn("FileBackfillHashes: hash read failed", "id", p.id, "err", copyErr)
+			continue
+		}
+		sum := hex.EncodeToString(h.Sum(nil))
+		if _, err := db.ExecContext(ctx, "UPDATE files SET hash=? WHERE id=?", sum, p.id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
