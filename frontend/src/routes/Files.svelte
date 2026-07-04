@@ -8,12 +8,16 @@
   import FileEditModal from '../components/FileEditModal.svelte'
   import { localDate } from '../lib/date'
 
+  const LIMIT = 20
+
   let files = $state<MedFile[]>([])
   let loading = $state(true)
+  let loadingMore = $state(false)
   let error = $state('')
   let page = $state(1)
   let total = $state(0)
-  const limit = 20
+  let sentinel = $state<HTMLElement | undefined>(undefined)
+  let hasMore = $derived(files.length < total)
 
   let showUpload = $state(false)
   let editing = $state<MedFile | null>(null)
@@ -28,21 +32,16 @@
   let sortCol = $state('uploadedAt')
   let sortDir = $state<'asc' | 'desc'>('desc')
 
-  onMount(async () => {
-    const [catRes, profRes] = await Promise.all([
-      api.getCategories(),
-      api.getProfessionals(false, 1, 1000),
-    ])
-    allCategories = catRes.data
-    allProfessionals = profRes.data
-    await load()
-  })
+  let hasFilters = $derived(!!(filterCategory || filterProfessional))
 
-  async function load() {
+  async function reload() {
     loading = true
+    page = 1
+    files = []
+    total = 0
     error = ''
     try {
-      const res = await api.getMyFiles(page, limit, {
+      const res = await api.getMyFiles(1, LIMIT, {
         sort: sortCol,
         dir: sortDir,
         categoryId: filterCategory || undefined,
@@ -50,6 +49,7 @@
       })
       files = res.data
       total = res.total
+      page = 2
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao carregar arquivos'
     } finally {
@@ -57,24 +57,52 @@
     }
   }
 
+  async function loadMore() {
+    if (loadingMore || !hasMore) return
+    loadingMore = true
+    try {
+      const res = await api.getMyFiles(page, LIMIT, {
+        sort: sortCol,
+        dir: sortDir,
+        categoryId: filterCategory || undefined,
+        professionalId: filterProfessional || undefined,
+      })
+      files = [...files, ...res.data]
+      total = res.total
+      page++
+    } catch { /* silent */ } finally {
+      loadingMore = false
+    }
+  }
+
+  $effect(() => {
+    if (!sentinel) return
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) loadMore() },
+      { rootMargin: '300px' }
+    )
+    obs.observe(sentinel)
+    return () => obs.disconnect()
+  })
+
+  onMount(async () => {
+    const [catRes, profRes] = await Promise.all([
+      api.getCategories(),
+      api.getProfessionals(false, 1, 1000),
+    ])
+    allCategories = catRes.data
+    allProfessionals = profRes.data
+    await reload()
+  })
+
   async function applyFilter() {
-    page = 1
-    await load()
+    await reload()
   }
 
   async function clearFilters() {
     filterCategory = ''
     filterProfessional = ''
-    page = 1
-    await load()
-  }
-
-  let totalPages = $derived(Math.max(1, Math.ceil(total / limit)))
-  let hasFilters = $derived(!!(filterCategory || filterProfessional))
-
-  async function goTo(p: number) {
-    page = p
-    await load()
+    await reload()
   }
 
   function sortBy(col: string) {
@@ -84,8 +112,7 @@
       sortCol = col
       sortDir = col === 'uploadedAt' ? 'desc' : 'asc'
     }
-    page = 1
-    load()
+    reload()
   }
 
   function sortIcon(col: string): string {
@@ -95,8 +122,7 @@
 
   function onUploaded(f: MedFile) {
     showUpload = false
-    page = 1
-    load()
+    reload()
   }
 
   function onEditSaved(updated: MedFile) {
@@ -151,14 +177,14 @@
   <!-- Filter bar -->
   <div class="filter-bar" class:hidden={showUpload}>
     <select bind:value={filterCategory} onchange={applyFilter}>
-      <option value="">Todas as categorias</option>
+      <option value="">Todas categorias</option>
       {#each allCategories as cat}
         <option value={cat.id}>{cat.name}</option>
       {/each}
     </select>
 
     <select bind:value={filterProfessional} onchange={applyFilter}>
-      <option value="">Todos os profissionais</option>
+      <option value="">Todos profissionais</option>
       {#each allProfessionals as p}
         <option value={p.id}>{p.name}</option>
       {/each}
@@ -173,7 +199,7 @@
     {/if}
   </div>
 
-  {#if loading}
+  {#if loading && files.length === 0}
     <div class="loading">Carregando...</div>
   {:else if error}
     <p class="error-msg">{error}</p>
@@ -275,17 +301,11 @@
         </tbody>
       </table>
     </div>
-
-    {#if totalPages > 1}
-      <div class="pagination">
-        <button class="btn btn-ghost" disabled={page <= 1} onclick={() => goTo(page - 1)}>
-          ‹ Anterior
-        </button>
-        <span class="page-info">Página {page} de {totalPages} · {total} total</span>
-        <button class="btn btn-ghost" disabled={page >= totalPages} onclick={() => goTo(page + 1)}>
-          Próxima ›
-        </button>
-      </div>
+    {#if hasMore}
+      <div class="sentinel" bind:this={sentinel}></div>
+      {#if loadingMore}<div class="loading-more">Carregando mais...</div>{/if}
+    {:else if !loading && files.length > 0}
+      <p class="list-end">— {total} arquivo{total !== 1 ? 's' : ''} —</p>
     {/if}
   {/if}
 </div>
@@ -387,4 +407,17 @@
     font-size: 13px;
   }
 
+  .sentinel { height: 1px; }
+  .loading-more {
+    text-align: center;
+    padding: 16px;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .list-end {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
 </style>
