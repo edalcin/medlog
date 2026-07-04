@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import * as api from '../lib/api'
+  import CategorySelect from './CategorySelect.svelte'
   import type { FileCategory, MedFile, Consultation, Professional, User } from '../lib/api'
 
   let {
@@ -80,14 +81,6 @@
       professionals = ps
     }).catch(() => {})
   })
-
-  function toggleCategory(id: string) {
-    if (selectedCategoryIds.includes(id)) {
-      selectedCategoryIds = selectedCategoryIds.filter(c => c !== id)
-    } else {
-      selectedCategoryIds = [...selectedCategoryIds, id]
-    }
-  }
 
   function onFileChange(e: Event) {
     const input = e.currentTarget as HTMLInputElement
@@ -211,19 +204,7 @@
   {#if categories.length > 0}
     <div class="form-group">
       <span class="field-label">Categorias</span>
-      <div class="category-grid">
-        {#each categories as cat}
-          <label class="checkbox-label">
-            <input
-              type="checkbox"
-              checked={selectedCategoryIds.includes(cat.id)}
-              onchange={() => toggleCategory(cat.id)}
-              disabled={uploading}
-            />
-            {cat.name}
-          </label>
-        {/each}
-      </div>
+      <CategorySelect bind:categories bind:selectedIds={selectedCategoryIds} disabled={uploading} />
     </div>
   {/if}
 
@@ -266,35 +247,5 @@
     font-weight: 500;
     color: var(--text-muted);
     margin-bottom: 6px;
-  }
-
-  .category-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    transition: border-color 0.2s;
-  }
-
-  .checkbox-label:hover {
-    border-color: var(--accent);
-  }
-
-  .checkbox-label input[type="checkbox"] {
-    width: auto;
-    padding: 0;
-    margin: 0;
-    border: none;
-    accent-color: var(--accent);
   }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import * as api from '../lib/api'
+  import CategorySelect from './CategorySelect.svelte'
   import type { MedFile, FileCategory, Consultation, Professional } from '../lib/api'
 
   let {
@@ -31,8 +32,6 @@
 
   let saving = $state(false)
   let error = $state('')
-  let newCategoryName = $state('')
-  let addingCategory = $state(false)
 
   onMount(async () => {
     try {
@@ -48,29 +47,6 @@
       // ignore load errors
     }
   })
-
-  function toggleCategory(id: string) {
-    if (selectedCategoryIds.includes(id)) {
-      selectedCategoryIds = selectedCategoryIds.filter(c => c !== id)
-    } else {
-      selectedCategoryIds = [...selectedCategoryIds, id]
-    }
-  }
-
-  async function addCategory() {
-    if (!newCategoryName.trim()) return
-    addingCategory = true
-    try {
-      const cat = await api.createCategory(newCategoryName.trim())
-      categories = [...categories, cat]
-      selectedCategoryIds = [...selectedCategoryIds, cat.id]
-      newCategoryName = ''
-    } catch {
-      // ignore
-    } finally {
-      addingCategory = false
-    }
-  }
 
   async function save() {
     saving = true
@@ -144,35 +120,7 @@
 
       <div class="form-group">
         <span class="field-label">Categorias</span>
-        <div class="category-grid">
-          {#each categories as cat}
-            <label class="checkbox-label">
-              <input
-                type="checkbox"
-                checked={selectedCategoryIds.includes(cat.id)}
-                onchange={() => toggleCategory(cat.id)}
-                disabled={saving}
-              />
-              {cat.name}
-            </label>
-          {/each}
-        </div>
-        <div class="add-category-row">
-          <input
-            type="text"
-            bind:value={newCategoryName}
-            placeholder="Nova categoria..."
-            disabled={addingCategory || saving}
-            onkeydown={(e) => e.key === 'Enter' && addCategory()}
-          />
-          <button
-            class="btn btn-ghost btn-xs"
-            onclick={addCategory}
-            disabled={!newCategoryName.trim() || addingCategory || saving}
-          >
-            {addingCategory ? '...' : '+ Adicionar'}
-          </button>
-        </div>
+        <CategorySelect bind:categories bind:selectedIds={selectedCategoryIds} disabled={saving} />
       </div>
 
       {#if error}
@@ -247,48 +195,5 @@
     font-weight: 500;
     color: var(--text-muted);
     margin-bottom: 6px;
-  }
-
-  .category-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    transition: border-color 0.2s;
-  }
-
-  .checkbox-label:hover {
-    border-color: var(--accent);
-  }
-
-  .checkbox-label input[type="checkbox"] {
-    width: auto;
-    padding: 0;
-    margin: 0;
-    border: none;
-    accent-color: var(--accent);
-  }
-
-  .add-category-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .add-category-row input {
-    flex: 1;
-    font-size: 13px;
-    padding: 4px 8px;
   }
 </style>
