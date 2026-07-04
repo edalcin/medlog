@@ -128,6 +128,26 @@
         {/if}
       </div>
 
+      <!-- By Professional -->
+      <div class="panel">
+        <h2>Por Profissional</h2>
+        {#if stats.byProfessional.length > 0}
+          <div class="bar-list">
+            {#each stats.byProfessional.slice(0, 8) as item}
+              <div class="bar-row">
+                <span class="bar-label">{item.name}</span>
+                <div class="bar-track">
+                  <div class="bar bar-orange" style="width: {(item.count / maxCount(stats.byProfessional)) * 100}%"></div>
+                </div>
+                <span class="bar-count">{item.count}</span>
+              </div>
+            {/each}
+          </div>
+        {:else}
+          <p class="empty-hint">Nenhum dado disponível</p>
+        {/if}
+      </div>
+
       <!-- By Month -->
       <div class="panel panel-wide">
         <h2>Evolução Mensal (12 meses)</h2>
@@ -286,7 +306,7 @@
 
   .bottom-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 1fr 1fr 1.3fr;
     gap: 16px;
   }
 
@@ -361,6 +381,7 @@
   .bar-blue   { background: #3b82f6; }
   .bar-green  { background: #22c55e; }
   .bar-purple { background: #a855f7; }
+  .bar-orange { background: #f97316; }
 
   .bar-count {
     font-size: 12px;
@@ -517,9 +538,17 @@
     background: rgba(74, 158, 255, 0.1);
   }
 
+  .recent-info {
+    flex: 1;
+    min-width: 0;
+  }
+
   .recent-name {
     font-size: 13px;
     font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .recent-sub {

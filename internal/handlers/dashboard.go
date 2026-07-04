@@ -135,13 +135,17 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- By Specialty ---
-	q = `SELECT s.name, COUNT(c.id) as cnt
-	     FROM consultations c
-	     JOIN professionals p ON p.id = c.professional_id
-	     JOIN professional_specialties ps ON ps.professional_id = p.id
-	     JOIN specialties s ON s.id = ps.specialty_id
-	     WHERE 1=1 ` + userFilter + `
-	     GROUP BY s.id, s.name ORDER BY cnt DESC LIMIT 10`
+	q = `SELECT specialty_name, COUNT(*) as cnt FROM (
+	       SELECT c.id,
+	         (SELECT s.name FROM professional_specialties ps2
+	          JOIN specialties s ON s.id = ps2.specialty_id
+	          WHERE ps2.professional_id = p.id ORDER BY s.name LIMIT 1) as specialty_name
+	       FROM consultations c
+	       JOIN professionals p ON p.id = c.professional_id
+	       WHERE c.type = 'CONSULTATION' ` + userFilter + `
+	     ) sub
+	     WHERE specialty_name IS NOT NULL
+	     GROUP BY specialty_name ORDER BY cnt DESC LIMIT 10`
 	rows, err := h.DB.QueryContext(ctx, q, userArg...)
 	if err == nil {
 		defer rows.Close()
@@ -161,7 +165,7 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	     FROM consultations c
 	     JOIN professionals p ON p.id = c.professional_id
 	     JOIN clinics cl ON cl.id = p.clinic_id
-	     WHERE c.professional_id IS NOT NULL AND p.clinic_id IS NOT NULL ` + userFilter + `
+	     WHERE c.type = 'CONSULTATION' AND c.professional_id IS NOT NULL AND p.clinic_id IS NOT NULL ` + userFilter + `
 	     GROUP BY cl.id, cl.name ORDER BY cnt DESC LIMIT 10`
 	rows2, err := h.DB.QueryContext(ctx, q, userArg...)
 	if err == nil {
@@ -179,7 +183,7 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 	// --- By Year ---
 	q = `SELECT strftime('%Y', c.date) as yr, COUNT(*) as cnt
-	     FROM consultations c WHERE 1=1 ` + userFilter + `
+	     FROM consultations c WHERE c.type = 'CONSULTATION' ` + userFilter + `
 	     GROUP BY yr ORDER BY yr DESC`
 	rows3, err := h.DB.QueryContext(ctx, q, userArg...)
 	if err == nil {
@@ -203,7 +207,7 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	       COUNT(c.id) as cnt
 	     FROM consultations c
 	     JOIN professionals p ON p.id = c.professional_id
-	     WHERE c.professional_id IS NOT NULL ` + userFilter + `
+	     WHERE c.type = 'CONSULTATION' AND c.professional_id IS NOT NULL ` + userFilter + `
 	     GROUP BY c.professional_id, p.name ORDER BY cnt DESC LIMIT 10`
 	rows4, err := h.DB.QueryContext(ctx, q, userArg...)
 	if err == nil {
@@ -222,7 +226,7 @@ func (h *DashboardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// --- By Month (last 12 months) ---
 	q = `SELECT strftime('%Y-%m', c.date) as mo, COUNT(*) as cnt
 	     FROM consultations c
-	     WHERE c.date >= date('now', '-12 months') ` + userFilter + `
+	     WHERE c.type = 'CONSULTATION' AND c.date >= date('now', '-12 months') ` + userFilter + `
 	     GROUP BY mo ORDER BY mo ASC`
 	rows5, err := h.DB.QueryContext(ctx, q, userArg...)
 	if err == nil {
