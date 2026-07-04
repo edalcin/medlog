@@ -5,6 +5,7 @@
   import type { Consultation, Professional } from '../lib/api'
   import MarkdownPreview from '../components/MarkdownPreview.svelte'
   import FileUpload from '../components/FileUpload.svelte'
+  import FileAttachModal from '../components/FileAttachModal.svelte'
   import StarRating from '../components/StarRating.svelte'
   import TipTapEditor from '../components/TipTapEditor.svelte'
   import { localDate } from '../lib/date'
@@ -19,6 +20,7 @@
   let saving = $state(false)
   let saveError = $state('')
   let deleting = $state(false)
+  let attachOpen = $state(false)
 
   // Edit form state
   let editDate = $state('')
@@ -107,6 +109,13 @@
   function onFileUploaded(file: import('../lib/api').MedFile) {
     if (!consultation) return
     consultation = { ...consultation, files: [...consultation.files, file] }
+  }
+
+  function onFilesAttached(newFiles: import('../lib/api').MedFile[]) {
+    if (!consultation) return
+    const existing = new Set(consultation.files.map(f => f.id))
+    consultation = { ...consultation, files: [...consultation.files, ...newFiles.filter(f => !existing.has(f.id))] }
+    attachOpen = false
   }
 
   function formatDate(iso: string): string {
@@ -289,6 +298,16 @@
         professionalId={consultation.professionalId}
         onUploaded={onFileUploaded}
       />
+      <button class="btn btn-ghost" onclick={() => attachOpen = true}>
+        Anexar arquivo existente
+      </button>
+      {#if attachOpen}
+        <FileAttachModal
+          consultationId={consultation.id}
+          onAttached={onFilesAttached}
+          onClose={() => attachOpen = false}
+        />
+      {/if}
     </div>
   {/if}
 </div>

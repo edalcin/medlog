@@ -80,10 +80,12 @@ func TestConsultationList_Pagination(t *testing.T) {
 	}
 
 	var resp struct {
-		Data  []any `json:"data"`
-		Total int   `json:"total"`
-		Page  int   `json:"page"`
-		Limit int   `json:"limit"`
+		Data  []struct {
+			UserName string `json:"userName"`
+		} `json:"data"`
+		Total int `json:"total"`
+		Page  int `json:"page"`
+		Limit int `json:"limit"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -96,6 +98,11 @@ func TestConsultationList_Pagination(t *testing.T) {
 	}
 	if resp.Page != 1 {
 		t.Errorf("page = %d, want 1", resp.Page)
+	}
+	for i, item := range resp.Data {
+		if item.UserName != "Test User" {
+			t.Errorf("data[%d].userName = %q, want %q", i, item.UserName, "Test User")
+		}
 	}
 }
 

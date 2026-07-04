@@ -5,6 +5,7 @@
   import type { Consultation, Professional, Specialty } from '../lib/api'
   import { localDate } from '../lib/date'
   import StarRating from '../components/StarRating.svelte'
+  import { isAdmin } from '../lib/auth'
 
   const LIMIT = 20
 
@@ -163,6 +164,9 @@
           onkeydown={(e) => e.key === 'Enter' && push(`/consultations/${c.id}`)}
         >
           <div class="item-date">{formatDate(c.date)}</div>
+          {#if $isAdmin && c.userName}
+            <div class="item-user">{c.userName}</div>
+          {/if}
           <div class="item-body">
             <div class="item-top">
               <span class="badge {c.type === 'CONSULTATION' ? 'badge-blue' : 'badge-yellow'}">{c.type === 'CONSULTATION' ? 'Consulta' : 'Evento'}</span>
@@ -245,6 +249,12 @@
     font-size: 13px;
     color: var(--text-muted);
     padding-top: 2px;
+  }
+
+  .item-user {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 2px;
   }
 
   .item-body {

@@ -17,6 +17,7 @@ type Consultation struct {
 	Type           string        `json:"type"`
 	Rating         *int          `json:"rating,omitempty"`
 	UserID         string        `json:"userId"`
+	UserName       *string       `json:"userName,omitempty"`
 	ProfessionalID *string       `json:"professionalId,omitempty"`
 	Professional   *Professional `json:"professional,omitempty"`
 	Files          []File        `json:"files"`
@@ -35,6 +36,7 @@ type consultationJSON struct {
 	Type           string        `json:"type"`
 	Rating         *int          `json:"rating,omitempty"`
 	UserID         string        `json:"userId"`
+	UserName       *string       `json:"userName,omitempty"`
 	ProfessionalID *string       `json:"professionalId,omitempty"`
 	Professional   *Professional `json:"professional,omitempty"`
 	Files          []File        `json:"files"`
@@ -51,6 +53,7 @@ func (c Consultation) MarshalJSON() ([]byte, error) {
 		Type:           c.Type,
 		Rating:         c.Rating,
 		UserID:         c.UserID,
+		UserName:       c.UserName,
 		ProfessionalID: c.ProfessionalID,
 		Professional:   c.Professional,
 		Files:          c.Files,
@@ -60,8 +63,8 @@ func (c Consultation) MarshalJSON() ([]byte, error) {
 }
 
 func consultationBase(ctx context.Context, db *sql.DB, where string, args []any, limit, offset int) ([]Consultation, error) {
-	q := `SELECT id, date, proposito, notes, type, rating, user_id, professional_id, created_at, updated_at
-	      FROM consultations ` + where + ` ORDER BY date DESC`
+	q := `SELECT c.id, c.date, c.proposito, c.notes, c.type, c.rating, c.user_id, c.professional_id, u.name, c.created_at, c.updated_at
+	      FROM consultations c LEFT JOIN users u ON u.id = c.user_id ` + where + ` ORDER BY c.date DESC`
 	if limit > 0 {
 		q += " LIMIT ? OFFSET ?"
 		args = append(args, limit, offset)
@@ -79,7 +82,7 @@ func consultationBase(ctx context.Context, db *sql.DB, where string, args []any,
 	for rows.Next() {
 		var c Consultation
 		if err := rows.Scan(&c.ID, &c.Date, &c.Proposito, &c.Notes, &c.Type, &c.Rating,
-			&c.UserID, &c.ProfessionalID, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			&c.UserID, &c.ProfessionalID, &c.UserName, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		c.Files = []File{}
@@ -192,7 +195,7 @@ func consultationBase(ctx context.Context, db *sql.DB, where string, args []any,
 }
 
 func ConsultationFindByUserID(ctx context.Context, db *sql.DB, userID string, limit, offset int) ([]Consultation, error) {
-	return consultationBase(ctx, db, "WHERE user_id=?", []any{userID}, limit, offset)
+	return consultationBase(ctx, db, "WHERE c.user_id=?", []any{userID}, limit, offset)
 }
 
 func ConsultationFindAll(ctx context.Context, db *sql.DB, limit, offset int) ([]Consultation, error) {
@@ -200,7 +203,7 @@ func ConsultationFindAll(ctx context.Context, db *sql.DB, limit, offset int) ([]
 }
 
 func ConsultationFindByID(ctx context.Context, db *sql.DB, id string) (*Consultation, error) {
-	list, err := consultationBase(ctx, db, "WHERE id=?", []any{id}, 1, 0)
+	list, err := consultationBase(ctx, db, "WHERE c.id=?", []any{id}, 1, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -227,15 +230,15 @@ func buildConsultationFilter(userID string, isAdmin bool, professionalID, specia
 	var conds []string
 	var args []any
 	if !isAdmin {
-		conds = append(conds, "user_id=?")
+		conds = append(conds, "c.user_id=?")
 		args = append(args, userID)
 	}
 	if professionalID != "" {
-		conds = append(conds, "professional_id=?")
+		conds = append(conds, "c.professional_id=?")
 		args = append(args, professionalID)
 	}
 	if specialtyID != "" {
-		conds = append(conds, "professional_id IN (SELECT professional_id FROM professional_specialties WHERE specialty_id=?)")
+		conds = append(conds, "c.professional_id IN (SELECT professional_id FROM professional_specialties WHERE specialty_id=?)")
 		args = append(args, specialtyID)
 	}
 	if len(conds) == 0 {
@@ -252,7 +255,7 @@ func ConsultationFindFiltered(ctx context.Context, db *sql.DB, userID string, is
 func ConsultationCountFiltered(ctx context.Context, db *sql.DB, userID string, isAdmin bool, professionalID, specialtyID string) (int, error) {
 	where, args := buildConsultationFilter(userID, isAdmin, professionalID, specialtyID)
 	var n int
-	q := "SELECT COUNT(*) FROM consultations " + where
+	q := "SELECT COUNT(*) FROM consultations c " + where
 	err := db.QueryRowContext(ctx, q, args...).Scan(&n)
 	return n, err
 }

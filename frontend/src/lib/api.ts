@@ -69,6 +69,7 @@ export interface Consultation {
   type: string
   rating?: number
   userId: string
+  userName?: string
   professionalId?: string
   professional?: Professional
   files: MedFile[]
