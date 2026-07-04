@@ -51,14 +51,19 @@
     error = ''
     try {
       const selected = files.filter(f => selectedIds.includes(f.id))
-      const updated = await Promise.all(selected.map(f =>
-        api.updateFile(f.id, {
+      // Sequential, not Promise.all: SQLite serializes writes anyway, and this
+      // way a failure partway through leaves a clear, reportable boundary
+      // (files before it attached, files from it on untouched) instead of an
+      // all-or-nothing race across N concurrent transactions.
+      const updated: MedFile[] = []
+      for (const f of selected) {
+        updated.push(await api.updateFile(f.id, {
           customName: f.customName ?? null,
           consultationId,
           professionalId: f.professionalId ?? null,
           categoryIds: f.categories.map(c => c.id),
-        })
-      ))
+        }))
+      }
       onAttached(updated)
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao anexar.'

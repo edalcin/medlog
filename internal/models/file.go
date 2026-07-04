@@ -170,6 +170,10 @@ func FileFindByID(ctx context.Context, db *sql.DB, id string) (*File, error) {
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+	// Must close before the nested query below acquires a connection — the
+	// pool is pinned to 1 (see internal/db.Open), so a still-open Rows here
+	// would starve fileLoadCategoriesBatch of a connection forever (deadlock).
+	rows.Close()
 	catMap := fileLoadCategoriesBatch(ctx, db, []string{f.ID})
 	if cats, ok := catMap[f.ID]; ok {
 		f.Categories = cats
