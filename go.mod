@@ -1,13 +1,13 @@
 module medlog
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/alexedwards/scs/v2 v2.9.0
-	github.com/go-chi/chi/v5 v5.2.1
+	github.com/go-chi/chi/v5 v5.3.2
 	github.com/google/uuid v1.6.0
 	github.com/pressly/goose/v3 v3.24.3
-	golang.org/x/crypto v0.38.0
+	golang.org/x/crypto v0.55.0
 	modernc.org/sqlite v1.37.1
 )
 
@@ -22,7 +22,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6 // indirect
 	golang.org/x/sync v0.14.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
 	modernc.org/libc v1.65.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
