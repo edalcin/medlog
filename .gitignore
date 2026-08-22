@@ -93,3 +93,6 @@ internal/embed/dist/
 .specify/
 .claude/skills/
 graphify-out/
+
+# Dados sensíveis - PDFs de sangue (nunca enviar para o repositório remoto)
+docs/pdfSangue/
