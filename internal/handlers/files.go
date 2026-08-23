@@ -206,14 +206,10 @@ func (h *FileHandler) Serve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	f, err := os.Open(path)
+	f, err := os.Open(resolveFilePath(h.FilesPath, path))
 	if err != nil {
-		// Migrated files store bare filename in path column — try FilesPath prefix
-		f, err = os.Open(filepath.Join(h.FilesPath, filepath.Base(path)))
-		if err != nil {
-			writeError(w, "file not found", http.StatusNotFound)
-			return
-		}
+		writeError(w, "file not found", http.StatusNotFound)
+		return
 	}
 	defer f.Close()
 
@@ -326,4 +322,14 @@ func formStringPtr(r *http.Request, key string) *string {
 		return nil
 	}
 	return &v
+}
+
+// resolveFilePath returns the on-disk path for a file row's path column.
+// Files migrated before uploads recorded a full path have only the bare
+// filename stored — fall back to that filename under FilesPath.
+func resolveFilePath(filesPath, path string) string {
+	if _, err := os.Stat(path); err == nil {
+		return path
+	}
+	return filepath.Join(filesPath, filepath.Base(path))
 }

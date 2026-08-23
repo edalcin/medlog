@@ -169,7 +169,7 @@ func (h *ExtractionHandler) Create(w http.ResponseWriter, r *http.Request) {
 func (h *ExtractionHandler) run(ctx context.Context, e models.Extraction, path string) {
 	log := slog.With("extraction", e.ID, "file", e.FileID, "model", e.Model)
 
-	pdf, err := os.ReadFile(path)
+	pdf, err := os.ReadFile(resolveFilePath(h.FilesPath, path))
 	if err != nil {
 		h.fail(ctx, e.ID, "documento ilegível no disco: "+err.Error(), "", nil, nil)
 		log.Error("read pdf", "err", err)

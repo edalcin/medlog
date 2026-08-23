@@ -82,6 +82,26 @@ func seedPDF(t *testing.T, ctx context.Context, database *sql.DB, filesPath, use
 	return f
 }
 
+// seedMigratedPDF mirrors a file row from before uploads stored an absolute
+// path: the DB path column holds only the bare filename, while the bytes
+// live under filesPath. Regression coverage for resolveFilePath.
+func seedMigratedPDF(t *testing.T, ctx context.Context, database *sql.DB, filesPath, userID string) *models.File {
+	t.Helper()
+	id := uuid.New().String()
+	filename := id + ".pdf"
+	if err := os.WriteFile(filepath.Join(filesPath, filename), []byte("%PDF-1.7 fake report"), 0o600); err != nil {
+		t.Fatalf("write pdf: %v", err)
+	}
+	f, err := models.FileCreate(ctx, database, models.CreateFileInput{
+		ID: id, Filename: filename, Path: filename,
+		MimeType: "application/pdf", Size: 20, UserID: &userID,
+	})
+	if err != nil {
+		t.Fatalf("FileCreate: %v", err)
+	}
+	return f
+}
+
 func seedAdmin(t *testing.T, ctx context.Context, database *sql.DB) string {
 	t.Helper()
 	id := uuid.New().String()
@@ -337,6 +357,40 @@ func TestExtraction_EndToEnd(t *testing.T) {
 	}
 	if len(series) != 0 {
 		t.Errorf("confirmed series = %d, want 0 before review", len(series))
+	}
+}
+
+// TestExtraction_MigratedBareFilenamePath covers files uploaded before the
+// path column stored a resolvable path — regression for the "documento
+// ilegível no disco" failure when only the bare filename is on record.
+func TestExtraction_MigratedBareFilenamePath(t *testing.T) {
+	database := appdb.SetupTestDB(t)
+	auth.InitSessions(database, false)
+	ctx := context.Background()
+	filesPath := t.TempDir()
+
+	adminID := seedAdmin(t, ctx, database)
+	file := seedMigratedPDF(t, ctx, database, filesPath, adminID)
+	provider := newFakeProvider(t, answerFixture)
+	h := &handlers.ExtractionHandler{DB: database, FilesPath: filesPath, Client: provider.client()}
+	router := extractionRouter(h, adminID)
+
+	body, _ := json.Marshal(map[string]any{"fileId": file.ID, "consent": true})
+	req := httptest.NewRequest(http.MethodPost, "/api/extractions", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, want 202; body: %s", w.Code, w.Body.String())
+	}
+	var created struct{ Data models.Extraction }
+	if err := json.NewDecoder(w.Body).Decode(&created); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	done := waitForStatus(t, database, created.Data.ID, models.ExtractionSucceeded)
+	if done.Error != nil {
+		t.Errorf("error = %v, want nil", *done.Error)
 	}
 }
 
