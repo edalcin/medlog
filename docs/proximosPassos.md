@@ -3,7 +3,7 @@
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
 **Última atualização:** 2026-08-23
-**Fase atual:** fase 1 concluída. **Fase 2 implementada e verificada contra provedor falso; a prova com a API real ainda não foi executada**, porque enviar o laudo ao Google exige consentimento explícito do usuário (ADR 0005). Próximo passo: autorizar a chamada real, ou seguir para a fase 3.
+**Fase atual:** fases 1, 2 e 3 concluídas e verificadas. **A prova com a API real do Gemini continua pendente de autorização** do usuário (ADR 0005). Próximo passo: autorizar a chamada real, ou seguir para a fase 4 (visualização).
 
 ---
 
@@ -148,4 +148,24 @@ Comportamentos que o código garante, cada um coberto por teste: sem consentimen
 
 **Pendente, e é uma decisão do usuário, não técnica:** a prova definida no plano é extrair o PDF de referência com a chave real. Ela envia o laudo, com nome completo e data de nascimento, ao Google, e gasta cerca de US$ 0,02. O ADR 0005 exige consentimento explícito por documento, e esse consentimento é do usuário. `GEMINI_API_KEY` está presente no ambiente, então basta autorizar.
 
-Fases 3 e 4 conforme `docs/v3/plano.md`. Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
+### Fase 3 — Revisão: **concluída**
+
+Backend: `Review`, `Confirm`, `Reject`, `ListIndicators` e `PromoteIndicator` em `internal/handlers/extractions.go`; `FileApplyExtractedMetadata` em `internal/models/file.go`. Frontend: `frontend/src/routes/ExtractionReview.svelte` (novo), rota `/extractions/:id/review` em `App.svelte`, disparo em `Files.svelte` e aba "Extração por IA" em `Admin.svelte`.
+
+O payload de revisão vem numa só chamada e as pendências e sugestões de metadado são **re-derivadas da resposta bruta** com `gemini.ParseRaw`: nada disso precisou de coluna própria. A guarda de não sobrescrever metadado humano fica no SQL (`COALESCE`/`NULLIF`), não no chamador, então nenhum caminho de código a contorna.
+
+**Mudança com efeito em segurança, registrada aqui de propósito:** `internal/middleware/security.go` passou de `X-Frame-Options: DENY` para `SAMEORIGIN`, com `frame-src 'self'`, `object-src 'self'` e `frame-ancestors 'self'` acrescentados ao CSP. Motivo: a revisão mostra o PDF ao lado dos valores, e `DENY` bloqueia até o enquadramento da própria origem. Enquadramento por terceiro continua bloqueado, que é o que `DENY` de fato protegia.
+
+**Defeitos encontrados e corrigidos durante a verificação, não presumidos:**
+- N+1 na lista de documentos: a interface fazia uma chamada por PDF da página, até 20, para saber se havia extração. Resolvido com três subconsultas em `fileSelectSQL` (`extraction_count`, `latest_extraction_id`, `latest_extraction_status`, `review_count`), e o código cliente correspondente foi apagado. De 20 requisições para zero.
+- O selo de estado continuava "Aguardando revisão" depois de confirmar. Agora reflete a decisão: Confirmada, Rejeitada, Em andamento ou Falhou.
+
+**Fato do ambiente, não defeito nosso:** o PDF no painel lateral não renderizou no Chrome usado na verificação. Os cabeçalhos e os bytes estão corretos, comprovados por `fetch`: 200, `application/pdf`, 207.179 bytes, começando em `%PDF-1.5`, com `X-Frame-Options: SAMEORIGIN`. Navegar direto para o PDF fez o Chrome baixar o arquivo em vez de exibir, o que desanexou a aba. [INFERENCE] O navegador está configurado para baixar PDFs em vez de abri-los. A tela já oferece "Abrir o documento em outra aba" como alternativa.
+
+**Prova executada:** `go test ./internal/handlers/ -run TestReview`, cinco testes, incluindo o que garante que confirmar **não** sobrescreve metadado digitado por humano e ainda preenche o campo vazio, e o que garante que reextrair a mesma coleta **substitui em vez de duplicar** — este último protege a chave única de ADR 0003, que compara data como texto e só vale enquanto todo datetime é gravado num único formato. Verificação visual com a aplicação de verdade rodando: login, lista de documentos mostrando "1 extração / aguardando revisão", diálogo de consentimento com os quatro pontos, tela de revisão com as três regras difíceis honradas (`>90` marcado como não numérico, `faixa não informada` distinta de `dentro da faixa`, linha evolutiva distinta da primária), confirmação em bloco pela interface promovendo 8 Observações e gravando os 4 metadados, e a série de glicose passando a existir de 2024 a 2026. Aba admin verificada nos dois estados, com e sem `GEMINI_API_KEY`, para conferir o aviso de chave ausente. `go build ./...`, `go vet ./...`, `go test ./...` e `npm run build` passam.
+
+### Fase 4 — Visualização: **não iniciada**
+
+Próxima ação conforme `docs/v3/plano.md`: série temporal por Indicador, apenas com Observação `confirmed`, faixa desenhada onde há `ref_min`/`ref_max`, ponto `evolutive` distinto, e Observação sem `value_num` em lista e não em gráfico. Nenhuma biblioteca de gráficos existe no frontend: escolher a menor que resolva, ou desenhar em SVG puro, dado o compromisso com o tamanho da imagem.
+
+Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.

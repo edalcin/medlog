@@ -14,6 +14,7 @@
   import Dashboard from './routes/Dashboard.svelte'
   import Sharing from './routes/Sharing.svelte'
   import Files from './routes/Files.svelte'
+  import ExtractionReview from './routes/ExtractionReview.svelte'
 
   import './app.css'
 
@@ -29,6 +30,7 @@
     '/files': Files,
     '/reports': Reports,
     '/sharing': Sharing,
+    '/extractions/:id/review': ExtractionReview,
     '/admin': Admin,
   }
 

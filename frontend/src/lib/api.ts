@@ -59,6 +59,13 @@ export interface MedFile {
   professionalName?: string
   uploadedAt: string
   categories: FileCategory[]
+  collectedAt?: string
+  labName?: string
+  reportNumber?: string
+  extractionCount: number
+  latestExtractionId?: string
+  latestExtractionStatus?: 'pending' | 'succeeded' | 'failed'
+  reviewCount: number
 }
 
 export interface Consultation {
@@ -475,3 +482,111 @@ export const restoreBackup = (file: File) => {
     return res.json()
   })
 }
+
+// Extração de indicadores por IA — todas as rotas exigem ADMIN.
+// A extração sempre aponta para um documento que já está no sistema:
+// não existe upload no fluxo de extração.
+export interface Extraction {
+  id: string
+  userId: string
+  fileId: string
+  triggeredBy?: string
+  model: string
+  promptVersion: string
+  schemaVersion: string
+  status: 'pending' | 'succeeded' | 'failed'
+  inputTokens?: number
+  outputTokens?: number
+  error?: string
+  consentedAt: string
+  createdAt: string
+  finishedAt?: string
+  observationCount: number
+}
+
+export interface Observation {
+  id: string
+  indicatorId: string
+  indicatorCode: string
+  indicatorName: string
+  collectedAt: string
+  valueText: string
+  valueNum?: number
+  unit?: string
+  referenceText?: string
+  refMin?: number
+  refMax?: number
+  outOfRange?: boolean
+  provenance: 'primary' | 'evolutive'
+  status: 'review' | 'confirmed'
+}
+
+export interface UnmappedAnalyte {
+  label: string
+  collectedAt: string
+  valueText: string
+  unit: string
+  referenceText: string
+}
+
+export interface MetadataField {
+  field: string
+  label: string
+  suggested: string
+  current: string
+  divergent: boolean
+  willBeSet: boolean
+}
+
+export interface ExtractionReview {
+  extraction: Extraction
+  file: MedFile
+  observations: Observation[]
+  unmapped: UnmappedAnalyte[]
+  metadata: MetadataField[]
+}
+
+export interface HealthIndicator {
+  id: string
+  code: string
+  name: string
+  unit?: string
+}
+
+export interface GeminiModelConfig {
+  current: string
+  available: { model: string; label: string; costPerReportUsd: string }[]
+  apiKeySet: boolean
+}
+
+/** Dispara a extração de um documento já existente. Exige consentimento explícito. */
+export const createExtraction = (fileId: string) =>
+  request<{ data: Extraction }>('POST', '/extractions', { fileId, consent: true }).then(r => r.data)
+
+/** Consulta o estado da extração. A chamada ao provedor dura mais que o timeout de 30s do fetch. */
+export const getExtraction = (id: string) =>
+  request<{ data: Extraction }>('GET', `/extractions/${id}`).then(r => r.data)
+
+export const getFileExtractions = (fileId: string) =>
+  request<{ data: Extraction[] }>('GET', `/files/${fileId}/extractions`).then(r => r.data)
+
+export const getExtractionReview = (id: string) =>
+  request<{ data: ExtractionReview }>('GET', `/extractions/${id}/review`).then(r => r.data)
+
+export const confirmExtraction = (id: string) =>
+  request<{ data: { confirmed: number; metadataApplied: string[] } }>('POST', `/extractions/${id}/confirm`).then(r => r.data)
+
+export const rejectExtraction = (id: string) =>
+  request<{ data: { rejected: number } }>('POST', `/extractions/${id}/reject`).then(r => r.data)
+
+export const getHealthIndicators = () =>
+  request<{ data: HealthIndicator[] }>('GET', '/health-indicators').then(r => r.data)
+
+export const promoteHealthIndicator = (code: string, name: string, unit?: string) =>
+  request<{ data: HealthIndicator }>('POST', '/health-indicators', { code, name, unit: unit || '' }).then(r => r.data)
+
+export const getGeminiModel = () =>
+  request<{ data: GeminiModelConfig }>('GET', '/admin/gemini-model').then(r => r.data)
+
+export const setGeminiModel = (model: string) =>
+  request<{ data: { current: string } }>('PUT', '/admin/gemini-model', { model }).then(r => r.data)

@@ -6,7 +6,7 @@
   import FileEditModal from '../components/FileEditModal.svelte'
   import { localDate } from '../lib/date'
 
-  type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'logs' | 'backup'
+  type Tab = 'users' | 'consultations' | 'professionals' | 'specialties' | 'categories' | 'clinics' | 'files' | 'logs' | 'gemini' | 'backup'
 
   interface AdminSection { key: Tab; label: string; icon: string; description: string }
   const sections: AdminSection[] = [
@@ -18,6 +18,7 @@
     { key: 'clinics', label: 'Clínicas', icon: '🏥', description: 'Clínicas e hospitais' },
     { key: 'files', label: 'Arquivos', icon: '📄', description: 'Arquivos enviados' },
     { key: 'logs', label: 'Logs', icon: '📜', description: 'Registros de login' },
+    { key: 'gemini', label: 'Extração por IA', icon: '🧠', description: 'Modelo usado na leitura dos laudos' },
     { key: 'backup', label: 'Backup', icon: '💾', description: 'Backup e restauração' },
   ]
 
@@ -94,8 +95,15 @@
   let restoreError = $state('')
   let downloadingBackup = $state(false)
 
+  // Extração por IA
+  let geminiConfig = $state<api.GeminiModelConfig | null>(null)
+  let geminiSaving = $state(false)
+  let geminiMsg = $state('')
+  let geminiError = $state('')
+
   onMount(async () => {
     await loadAll()
+    await loadGeminiConfig()
   })
 
   async function loadAll() {
@@ -455,6 +463,32 @@
     if (mime === 'image/png') return 'PNG'
     if (mime === 'image/jpeg') return 'JPG'
     return mime
+  }
+
+  async function loadGeminiConfig() {
+    geminiError = ''
+    try {
+      geminiConfig = await api.getGeminiModel()
+    } catch (e: unknown) {
+      geminiError = e instanceof Error ? e.message : 'Erro ao carregar a configuração de extração'
+    }
+  }
+
+  async function selectGeminiModel(model: string) {
+    if (!geminiConfig || geminiSaving || geminiConfig.current === model) return
+    geminiSaving = true
+    geminiMsg = ''
+    geminiError = ''
+    try {
+      const res = await api.setGeminiModel(model)
+      const label = geminiConfig.available.find(m => m.model === res.current)?.label ?? res.current
+      geminiConfig = { ...geminiConfig, current: res.current }
+      geminiMsg = `Modelo alterado para ${label}. Vale para as próximas extrações.`
+    } catch (e: unknown) {
+      geminiError = e instanceof Error ? e.message : 'Erro ao alterar o modelo'
+    } finally {
+      geminiSaving = false
+    }
   }
 </script>
 
@@ -893,6 +927,67 @@
         {/if}
       </div>
     </div>
+    <!-- Extração por IA Tab -->
+    {:else if activeTab === 'gemini'}
+      <div class="tab-section">
+        {#if geminiConfig && !geminiConfig.apiKeySet}
+          <div class="key-warning">
+            <strong>GEMINI_API_KEY não está configurada neste servidor.</strong>
+            <p>
+              Enquanto a variável de ambiente estiver ausente, <strong>nenhuma extração vai
+              funcionar</strong>: o disparo falha antes de qualquer documento ser enviado.
+            </p>
+            <p>
+              A chave é lida do ambiente do container e, por decisão de segurança,
+              <strong>não é configurável por esta interface</strong>. Defina
+              <code>GEMINI_API_KEY</code> no ambiente do serviço e reinicie.
+            </p>
+          </div>
+        {/if}
+
+        <h3>Modelo usado na leitura dos laudos</h3>
+
+        {#if geminiError}
+          <p class="error-msg">{geminiError}</p>
+        {/if}
+
+        {#if !geminiConfig}
+          <p class="loading">Carregando...</p>
+        {:else}
+          <div class="model-list">
+            {#each geminiConfig.available as m (m.model)}
+              <label class="model-option" class:selected={geminiConfig.current === m.model}>
+                <input
+                  type="radio"
+                  name="gemini-model"
+                  value={m.model}
+                  checked={geminiConfig.current === m.model}
+                  disabled={geminiSaving}
+                  onchange={() => selectGeminiModel(m.model)}
+                />
+                <span class="model-text">
+                  <span class="model-label">{m.label}</span>
+                  <span class="model-id">{m.model}</span>
+                </span>
+                <span class="model-cost">
+                  US$ {m.costPerReportUsd}<span class="model-cost-unit"> / laudo</span>
+                </span>
+              </label>
+            {/each}
+          </div>
+
+          {#if geminiMsg}
+            <p class="success-msg">{geminiMsg}</p>
+          {/if}
+
+          <p class="model-note">
+            Use uma chave do <strong>tier pago</strong>. No tier gratuito o Google usa o
+            conteúdo enviado para treinar seus modelos — o laudo inteiro, com nome e data de
+            nascimento, entraria no treinamento.
+          </p>
+        {/if}
+      </div>
+
     {/if}
 
   </div>
@@ -1065,5 +1160,109 @@
   .page-info {
     font-size: 13px;
     color: var(--text-muted);
+  }
+
+  .key-warning {
+    border: 1px solid var(--danger);
+    border-left-width: 3px;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  .key-warning strong {
+    color: var(--danger);
+  }
+
+  .key-warning p {
+    margin: 8px 0 0;
+  }
+
+  .key-warning code {
+    font-family: ui-monospace, monospace;
+    font-size: 12px;
+    background: var(--bg-elevated);
+    padding: 1px 5px;
+    border-radius: 4px;
+    color: var(--text);
+  }
+
+  .model-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 620px;
+  }
+
+  .model-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .model-option:hover {
+    border-color: var(--accent);
+  }
+
+  .model-option.selected {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+  }
+
+  .model-option input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+
+  .model-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .model-label {
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .model-id {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: ui-monospace, monospace;
+  }
+
+  .model-cost {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .model-cost-unit {
+    font-weight: 400;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .model-note {
+    max-width: 620px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  .model-note strong {
+    color: var(--text);
   }
 </style>

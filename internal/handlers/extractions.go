@@ -256,6 +256,190 @@ func textOrCanonical(reported string, canonical *string) *string {
 	return canonical
 }
 
+// reviewPayload is everything the review screen needs in one round trip: the
+// observations, the analytes the catalog could not place, and the document
+// metadata as suggestion versus current value.
+type reviewPayload struct {
+	Extraction   *models.Extraction   `json:"extraction"`
+	File         *models.File         `json:"file"`
+	Observations []models.Observation `json:"observations"`
+	Unmapped     []gemini.Unmapped    `json:"unmapped"`
+	Metadata     []metadataField      `json:"metadata"`
+}
+
+// metadataField carries a suggestion beside what the document already holds.
+// Divergent means a human already typed something different: the review shows
+// it, and confirmation keeps the human value.
+type metadataField struct {
+	Field     string `json:"field"`
+	Label     string `json:"label"`
+	Suggested string `json:"suggested"`
+	Current   string `json:"current"`
+	Divergent bool   `json:"divergent"`
+	WillBeSet bool   `json:"willBeSet"`
+}
+
+// Review returns the whole block to be confirmed or rejected at once.
+func (h *ExtractionHandler) Review(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	extraction, err := models.ExtractionFindByID(r.Context(), h.DB, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, "extração não encontrada", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+
+	file, err := models.FileFindByID(r.Context(), h.DB, extraction.FileID)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+
+	observations, err := models.ObservationFindByExtraction(r.Context(), h.DB, id)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+
+	// Unmapped analytes and metadata suggestions are re-derived from the
+	// stored raw response, so nothing extra needs a column of its own.
+	payload := reviewPayload{Extraction: extraction, File: file, Observations: observations, Unmapped: []gemini.Unmapped{}}
+	if raw, err := models.ExtractionRawResponse(r.Context(), h.DB, id); err == nil && raw != "" {
+		if result, _, err := gemini.ParseRaw(raw); err == nil {
+			payload.Unmapped = result.Unmapped
+			payload.Metadata = metadataFields(file, result)
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": payload})
+}
+
+func metadataFields(file *models.File, res *gemini.Result) []metadataField {
+	suggestedName := ""
+	if res.CollectedAt != "" {
+		if t, err := time.Parse("2006-01-02", res.CollectedAt); err == nil {
+			suggestedName = "Exame de sangue — " + t.Format("02/01/2006")
+		}
+	}
+
+	current := func(p *string) string {
+		if p == nil {
+			return ""
+		}
+		return *p
+	}
+	currentCollected := ""
+	if file.CollectedAt != nil {
+		currentCollected = file.CollectedAt.Format("2006-01-02")
+	}
+
+	fields := []metadataField{
+		{Field: "collectedAt", Label: "Data de coleta", Suggested: res.CollectedAt, Current: currentCollected},
+		{Field: "labName", Label: "Laboratório", Suggested: res.LabName, Current: current(file.LabName)},
+		{Field: "reportNumber", Label: "Número da ficha", Suggested: res.ReportNumber, Current: current(file.ReportNumber)},
+		{Field: "customName", Label: "Nome do documento", Suggested: suggestedName, Current: current(file.CustomName)},
+	}
+	for i := range fields {
+		f := &fields[i]
+		f.Divergent = f.Current != "" && f.Suggested != "" && f.Current != f.Suggested
+		f.WillBeSet = f.Current == "" && f.Suggested != ""
+	}
+	return fields
+}
+
+// Confirm promotes the whole block at once and writes the document metadata
+// that was still empty. Block confirmation is one act, not forty (ADR 0009).
+func (h *ExtractionHandler) Confirm(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	extraction, err := models.ExtractionFindByID(r.Context(), h.DB, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, "extração não encontrada", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+
+	confirmed, err := models.ObservationConfirmByExtraction(r.Context(), h.DB, id)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+
+	applied := []string{}
+	if raw, err := models.ExtractionRawResponse(r.Context(), h.DB, id); err == nil && raw != "" {
+		if result, _, err := gemini.ParseRaw(raw); err == nil {
+			meta := models.ExtractedMetadata{LabName: result.LabName, ReportNumber: result.ReportNumber}
+			if t, err := time.Parse("2006-01-02", result.CollectedAt); err == nil {
+				meta.CollectedAt = &t
+				meta.CustomName = "Exame de sangue — " + t.Format("02/01/2006")
+			}
+			applied, err = models.FileApplyExtractedMetadata(r.Context(), h.DB, extraction.FileID, meta)
+			if err != nil {
+				writeDBError(w, err)
+				return
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+		"confirmed":       confirmed,
+		"metadataApplied": applied,
+	}})
+}
+
+// Reject discards the observations and keeps the Extraction: the raw response
+// stays auditable and reinterpretable (ADR 0009).
+func (h *ExtractionHandler) Reject(w http.ResponseWriter, r *http.Request) {
+	rejected, err := models.ObservationRejectByExtraction(r.Context(), h.DB, chi.URLParam(r, "id"))
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"rejected": rejected}})
+}
+
+// PromoteIndicator adds a code the catalog lacked, from a pending analyte.
+// Creating an Indicator is always an explicit ADMIN act, never a side effect.
+func (h *ExtractionHandler) PromoteIndicator(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Code string `json:"code"`
+		Name string `json:"name"`
+		Unit string `json:"unit"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeError(w, "corpo inválido", http.StatusBadRequest)
+		return
+	}
+	in.Code, in.Name = strings.TrimSpace(in.Code), strings.TrimSpace(in.Name)
+	if in.Code == "" || in.Name == "" {
+		writeError(w, "code e name são obrigatórios", http.StatusBadRequest)
+		return
+	}
+	indicator, err := models.IndicatorCreate(r.Context(), h.DB, in.Code, in.Name, textOrNil(in.Unit))
+	if err != nil {
+		writeError(w, "não foi possível criar o indicador: "+err.Error(), http.StatusConflict)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"data": indicator})
+}
+
+// ListIndicators exposes the catalog, which the review screen needs to offer
+// a code when promoting a pending analyte.
+func (h *ExtractionHandler) ListIndicators(w http.ResponseWriter, r *http.Request) {
+	list, err := models.IndicatorFindAll(r.Context(), h.DB)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+}
+
 // Get reports the state of one extraction. This is what the frontend polls,
 // since the call outlives the 30s fetch timeout.
 func (h *ExtractionHandler) Get(w http.ResponseWriter, r *http.Request) {

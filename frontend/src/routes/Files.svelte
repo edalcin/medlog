@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { push } from '@keenmate/svelte-spa-router'
+  import { push, link } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
   import type { MedFile, FileCategory, Professional } from '../lib/api'
   import { isAdmin } from '../lib/auth'
@@ -33,6 +33,12 @@
   let sortDir = $state<'asc' | 'desc'>('desc')
 
   let hasFilters = $derived(!!(filterCategory || filterProfessional))
+
+  // Extração por IA (somente ADMIN, somente PDF)
+  let consentFile = $state<MedFile | null>(null)
+  let consentAccepted = $state(false)
+  let startingExtraction = $state(false)
+  let consentError = $state('')
 
   async function reload() {
     loading = true
@@ -165,6 +171,54 @@
     if (mime === 'image/jpeg') return 'JPG'
     return mime
   }
+
+  function canExtract(f: MedFile): boolean {
+    return $isAdmin && f.mimeType === 'application/pdf'
+  }
+
+  function statusLabel(f: MedFile): string {
+    if (f.latestExtractionStatus === 'pending') return 'em andamento'
+    if (f.latestExtractionStatus === 'failed') return 'falhou'
+    return f.reviewCount > 0 ? 'aguardando revisão' : 'revisada'
+  }
+
+  function statusBadge(f: MedFile): string {
+    if (f.latestExtractionStatus === 'pending') return 'badge badge-yellow'
+    if (f.latestExtractionStatus === 'failed') return 'badge badge-red'
+    return f.reviewCount > 0 ? 'badge badge-yellow' : 'badge badge-blue'
+  }
+
+  function askConsent(f: MedFile) {
+    consentFile = f
+    consentAccepted = false
+    consentError = ''
+  }
+
+  function closeConsent() {
+    if (startingExtraction) return
+    consentFile = null
+    consentAccepted = false
+  }
+
+  function onConsentBackdropClick(e: MouseEvent) {
+    if (e.target === e.currentTarget) closeConsent()
+  }
+
+  async function startExtraction() {
+    if (!consentFile || !consentAccepted) return
+    startingExtraction = true
+    consentError = ''
+    try {
+      const extraction = await api.createExtraction(consentFile.id)
+      consentFile = null
+      consentAccepted = false
+      push(`/extractions/${extraction.id}/review`)
+    } catch (e: unknown) {
+      consentError = e instanceof Error ? e.message : 'Erro ao iniciar a extração'
+    } finally {
+      startingExtraction = false
+    }
+  }
 </script>
 
 <div class="page">
@@ -260,6 +314,14 @@
                 >
                   {f.customName || f.filename}
                 </a>
+                {#if canExtract(f) && f.extractionCount > 0 && f.latestExtractionId}
+                  <div class="extraction-line">
+                    <a href="/extractions/{f.latestExtractionId}/review" use:link>
+                      {f.extractionCount} extraç{f.extractionCount === 1 ? 'ão' : 'ões'}
+                    </a>
+                    <span class={statusBadge(f)}>{statusLabel(f)}</span>
+                  </div>
+                {/if}
               </td>
               <td>
                 <span class={fileBadgeClass(f.mimeType)}>{fileMimeLabel(f.mimeType)}</span>
@@ -288,6 +350,15 @@
                 >
                   <i class="bx bx-link-external"></i>
                 </button>
+                {#if canExtract(f)}
+                  <button
+                    class="icon-btn"
+                    onclick={() => askConsent(f)}
+                    title="Extrair indicadores"
+                  >
+                    <i class="bx bx-brain"></i>
+                  </button>
+                {/if}
                 <button
                   class="icon-btn"
                   onclick={() => (editing = f)}
@@ -323,6 +394,60 @@
     onSaved={onEditSaved}
     onClose={() => (editing = null)}
   />
+{/if}
+
+{#if consentFile}
+  <div class="modal-backdrop" role="presentation" onclick={onConsentBackdropClick}>
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Consentimento para extração por IA">
+      <div class="modal-header">
+        <h3>Enviar este laudo para leitura por IA</h3>
+        <button class="btn btn-ghost btn-xs" onclick={closeConsent} disabled={startingExtraction} aria-label="Fechar">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="consent-file">{consentFile.customName || consentFile.filename}</p>
+
+        <ul class="consent-list">
+          <li>
+            O documento <strong>sai deste servidor e é enviado ao Google (Gemini)</strong>,
+            que faz a leitura do conteúdo.
+          </li>
+          <li>
+            O laudo contém <strong>dados pessoais e de saúde</strong> — incluindo nome e data
+            de nascimento — e <strong>não é anonimizado</strong> antes do envio.
+          </li>
+          <li>
+            A leitura custa <strong>cerca de US$ 0,02 por laudo</strong>, cobrados na conta
+            Google configurada.
+          </li>
+          <li>
+            Nada do que a IA extrair passa a valer automaticamente: os indicadores ficam
+            <strong>em revisão</strong> até que um humano confirme.
+          </li>
+        </ul>
+
+        <label class="consent-check">
+          <input type="checkbox" bind:checked={consentAccepted} disabled={startingExtraction} />
+          <span>Li os quatro pontos acima e autorizo o envio deste documento ao Google.</span>
+        </label>
+
+        {#if consentError}
+          <p class="error-msg">{consentError}</p>
+        {/if}
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick={closeConsent} disabled={startingExtraction}>Cancelar</button>
+        <button
+          class="btn btn-primary"
+          onclick={startExtraction}
+          disabled={!consentAccepted || startingExtraction}
+        >
+          {startingExtraction ? 'Enviando...' : 'Autorizar e extrair'}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>
@@ -426,5 +551,107 @@
     padding: 20px;
     color: var(--text-muted);
     font-size: 12px;
+  }
+
+  .extraction-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 16px;
+  }
+
+  .modal {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 520px;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .modal-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .consent-file {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    word-break: break-all;
+  }
+
+  .consent-list {
+    margin: 0;
+    padding-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-muted);
+  }
+
+  .consent-list strong {
+    color: var(--text);
+  }
+
+  .consent-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+
+  .consent-check input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--accent);
   }
 </style>

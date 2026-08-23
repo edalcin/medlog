@@ -12,22 +12,31 @@ import (
 )
 
 type File struct {
-	ID               string         `json:"id"`
-	Filename         string         `json:"filename"`
-	CustomName       *string        `json:"customName,omitempty"`
-	Path             string         `json:"path"`
-	MimeType         string         `json:"mimeType"`
-	Size             int64          `json:"size"`
-	Hash             *string        `json:"hash,omitempty"`
-	ThumbnailPath    *string        `json:"thumbnailPath,omitempty"`
-	ConsultationID   *string        `json:"consultationId,omitempty"`
-	ConsultationDate *time.Time     `json:"consultationDate,omitempty"`
-	ProfessionalID   *string        `json:"professionalId,omitempty"`
-	UserID           *string        `json:"userId,omitempty"`
-	UserName         *string        `json:"userName,omitempty"`
-	ProfessionalName *string        `json:"professionalName,omitempty"`
-	Categories       []FileCategory `json:"categories"`
-	UploadedAt       time.Time      `json:"uploadedAt"`
+	ID             string  `json:"id"`
+	Filename       string  `json:"filename"`
+	CustomName     *string `json:"customName,omitempty"`
+	Path           string  `json:"path"`
+	MimeType       string  `json:"mimeType"`
+	Size           int64   `json:"size"`
+	Hash           *string `json:"hash,omitempty"`
+	ThumbnailPath  *string `json:"thumbnailPath,omitempty"`
+	ConsultationID *string `json:"consultationId,omitempty"`
+	// Filled by an Extraction, on confirmation only (ADR 0010).
+	CollectedAt  *time.Time `json:"collectedAt,omitempty"`
+	LabName      *string    `json:"labName,omitempty"`
+	ReportNumber *string    `json:"reportNumber,omitempty"`
+	// Extraction summary, so the document list costs no extra request per row.
+	ExtractionCount        int            `json:"extractionCount"`
+	LatestExtractionID     *string        `json:"latestExtractionId,omitempty"`
+	LatestExtractionStatus *string        `json:"latestExtractionStatus,omitempty"`
+	ReviewCount            int            `json:"reviewCount"`
+	ConsultationDate       *time.Time     `json:"consultationDate,omitempty"`
+	ProfessionalID         *string        `json:"professionalId,omitempty"`
+	UserID                 *string        `json:"userId,omitempty"`
+	UserName               *string        `json:"userName,omitempty"`
+	ProfessionalName       *string        `json:"professionalName,omitempty"`
+	Categories             []FileCategory `json:"categories"`
+	UploadedAt             time.Time      `json:"uploadedAt"`
 }
 
 // fileSelectSQL is the base SELECT with JOINs that populates ProfessionalName and ConsultationDate.
@@ -35,6 +44,11 @@ type File struct {
 const fileSelectSQL = `
 SELECT f.id, f.filename, f.custom_name, f.path, f.mime_type, f.size,
        f.hash, f.thumbnail_path, f.consultation_id, f.professional_id, f.user_id, f.uploaded_at,
+       f.collected_at, f.lab_name, f.report_number,
+       (SELECT COUNT(*) FROM extractions e WHERE e.file_id = f.id) AS extraction_count,
+       (SELECT e.id     FROM extractions e WHERE e.file_id = f.id ORDER BY e.created_at DESC LIMIT 1) AS latest_extraction_id,
+       (SELECT e.status FROM extractions e WHERE e.file_id = f.id ORDER BY e.created_at DESC LIMIT 1) AS latest_extraction_status,
+       (SELECT COUNT(*) FROM health_observations o WHERE o.source_file_id = f.id AND o.status = 'review') AS review_count,
        COALESCE(p1.name, p2.name) AS professional_name,
        c.date AS consultation_date,
        u.name AS user_name
@@ -49,6 +63,8 @@ func scanFileRow(rows *sql.Rows) (File, error) {
 	err := rows.Scan(
 		&f.ID, &f.Filename, &f.CustomName, &f.Path, &f.MimeType, &f.Size,
 		&f.Hash, &f.ThumbnailPath, &f.ConsultationID, &f.ProfessionalID, &f.UserID, &f.UploadedAt,
+		&f.CollectedAt, &f.LabName, &f.ReportNumber,
+		&f.ExtractionCount, &f.LatestExtractionID, &f.LatestExtractionStatus, &f.ReviewCount,
 		&f.ProfessionalName, &f.ConsultationDate,
 		&f.UserName,
 	)
@@ -477,6 +493,74 @@ func FileDelete(ctx context.Context, db *sql.DB, id string) (disassociated bool,
 
 func removeFile(path string) error {
 	return os.Remove(path)
+}
+
+// ExtractedMetadata is what an Extraction suggests for the document itself.
+type ExtractedMetadata struct {
+	CollectedAt  *time.Time
+	LabName      string
+	ReportNumber string
+	CustomName   string
+}
+
+// FileApplyExtractedMetadata fills the document metadata suggested by an
+// Extraction, and only where the field is still empty. A value a human typed
+// is never overwritten: divergence is shown in review, never resolved behind
+// the user's back (ADR 0010).
+//
+// The guard is in the SQL (COALESCE / NULLIF), not in the caller, so no code
+// path can bypass it. Returns the field names actually written.
+func FileApplyExtractedMetadata(ctx context.Context, db *sql.DB, fileID string, in ExtractedMetadata) ([]string, error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var collectedAt sql.NullTime
+	var labName, reportNumber, customName sql.NullString
+	if err := tx.QueryRowContext(ctx,
+		`SELECT collected_at, lab_name, report_number, custom_name FROM files WHERE id = ?`, fileID).
+		Scan(&collectedAt, &labName, &reportNumber, &customName); err != nil {
+		return nil, err
+	}
+
+	applied := []string{}
+	if in.CollectedAt != nil && !collectedAt.Valid {
+		applied = append(applied, "collectedAt")
+	}
+	if in.LabName != "" && labName.String == "" {
+		applied = append(applied, "labName")
+	}
+	if in.ReportNumber != "" && reportNumber.String == "" {
+		applied = append(applied, "reportNumber")
+	}
+	if in.CustomName != "" && customName.String == "" {
+		applied = append(applied, "customName")
+	}
+	if len(applied) == 0 {
+		return applied, tx.Commit()
+	}
+
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE files SET
+		     collected_at  = COALESCE(collected_at, ?),
+		     lab_name      = COALESCE(NULLIF(lab_name, ''), ?),
+		     report_number = COALESCE(NULLIF(report_number, ''), ?),
+		     custom_name   = COALESCE(NULLIF(custom_name, ''), ?)
+		 WHERE id = ?`,
+		in.CollectedAt, nullIfEmpty(in.LabName), nullIfEmpty(in.ReportNumber), nullIfEmpty(in.CustomName),
+		fileID); err != nil {
+		return nil, err
+	}
+	return applied, tx.Commit()
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 // FileBackfillHashes computes and stores the content hash for every file
