@@ -35,7 +35,7 @@ A tabela comparativa ao final do Laudo, com os resultados de coletas anteriores 
 _Avoid_: Histórico, tabela comparativa
 
 **Extração**:
-O envio de um Laudo ao modelo de IA e a interpretação da resposta em Observações. É registro persistido em `extractions`, criado antes da chamada e portador de estado, da resposta bruta do modelo, de quem disparou, quando, qual modelo e o custo em tokens. Restrita a `ADMIN`.
+O envio de um Laudo ao modelo de IA e a interpretação da resposta em Observações. É registro persistido em `extractions`, criado antes da chamada e portador de estado, da resposta bruta do modelo, de quem disparou, quando, qual modelo e o custo em tokens. Cada usuário extrai os próprios documentos; o `ADMIN` alcança os de todos (ADR 0011). Um documento guarda uma Extração: a nova substitui a anterior.
 _Avoid_: Processamento, análise, importação, parsing
 
 **Consentimento de extração**:
@@ -43,5 +43,5 @@ A aceitação explícita, dada por documento, de que aquele Laudo seja enviado a
 _Avoid_: Autorização, permissão, opt-in
 
 **Revisão**:
-O estado em que a Observação nasce, antes de valer. Observação em Revisão não aparece em gráfico nem em série temporal. Um `ADMIN` confere a lista inteira da Extração contra o Laudo e confirma ou rejeita em bloco.
+O estado em que a Observação nasce, antes de valer. Observação em Revisão não aparece em gráfico nem em série temporal. O dono do documento — ou um `ADMIN` — confere a lista inteira da Extração contra o Laudo e confirma ou rejeita em bloco.
 _Avoid_: Aprovação, validação, rascunho, staging

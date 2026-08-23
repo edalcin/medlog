@@ -292,6 +292,16 @@ DELETE /api/files/{id}
 GET    /api/health-series        Indicadores com Observação confirmada do usuário
 GET    /api/health-series/{code} Série temporal de um Indicador
 
+POST   /api/extractions          Exige consent: true; responde 202 com a linha pending
+GET    /api/extractions/{id}     Alvo do polling: a chamada dura mais que o timeout de 30s
+GET    /api/extractions/{id}/observations
+GET    /api/extractions/{id}/review     Observações + pendências + metadados sugeridos
+POST   /api/extractions/{id}/confirm    Confirma o bloco e grava metadados vazios de files
+POST   /api/extractions/{id}/reject     Descarta Observações, preserva a Extração
+GET    /api/files/{id}/extractions
+DELETE /api/files/{id}/extractions      Zera o documento: apaga extrações e Observações
+GET    /api/health-indicators
+
 GET    /api/sharing/professionals
 POST   /api/sharing/professionals
 DELETE /api/sharing/professionals/{userId}
@@ -330,16 +340,7 @@ POST   /api/admin/restore
 GET    /api/admin/gemini-model   Modelo atual + lista curada + se a chave está presente
 PUT    /api/admin/gemini-model
 
-POST   /api/extractions          Exige consent: true; responde 202 com a linha pending
-GET    /api/extractions/{id}     Alvo do polling: a chamada dura mais que o timeout de 30s
-GET    /api/extractions/{id}/observations
-GET    /api/extractions/{id}/review     Observações + pendências + metadados sugeridos
-POST   /api/extractions/{id}/confirm    Confirma o bloco e grava metadados vazios de files
-POST   /api/extractions/{id}/reject     Descarta Observações, preserva a Extração
-GET    /api/files/{id}/extractions
-DELETE /api/files/{id}/extractions      Zera o documento: apaga extrações e Observações
-GET    /api/health-indicators
-POST   /api/health-indicators    Promove analito pendente ao catálogo
+POST   /api/health-indicators    Promove analito pendente ao catálogo (catálogo é global)
 ```
 
 ---
@@ -462,11 +463,11 @@ Extrai os valores de um PDF de laudo **já anexado** ao sistema e os transforma 
 
 ### Fluxo
 
-1. `POST /api/extractions` com `consent: true`. Sem consentimento explícito nada é enviado — o pedido morre em 400.
+1. `POST /api/extractions` com `consent: true`. Sem consentimento explícito nada é enviado — o pedido morre em 400. Quem dispara é o dono do documento; o `ADMIN` dispara em qualquer um. Documento alheio responde **404**, nunca 403 (ADR 0011).
 2. A linha nasce em `extractions` com `status = pending` **antes** da chamada: uma queda no meio deixa evidência, não silêncio.
 3. A chamada roda em goroutine com `context.Background()`, fora de qualquer transação. O cliente desistir não cancela o que já está sendo cobrado.
 4. `raw_response` e os contadores de token são gravados **antes** de qualquer interpretação, inclusive quando a chamada falha. Corrigir parsing nunca custa uma nova chamada: use `gemini.ParseRaw`.
-5. As Observações nascem com `status = review`. Nenhuma aparece em série antes de um `ADMIN` confirmar o bloco.
+5. As Observações nascem com `status = review`. Nenhuma aparece em série antes de o dono do documento, ou um `ADMIN`, confirmar o bloco.
 6. `POST /api/extractions/{id}/confirm` promove tudo de uma vez e grava em `files` apenas os metadados ainda vazios. A guarda contra sobrescrever valor humano está no SQL (`COALESCE`/`NULLIF`), não no chamador.
 7. Um documento guarda **uma** extração. Quando uma nova termina, as anteriores daquele documento são apagadas junto com o que elas tinham deixado em revisão. Observação já confirmada sobrevive: `extraction_id` é `ON DELETE SET NULL` e `source_file_id` continua dizendo de onde veio.
 8. `DELETE /api/files/{id}/extractions` é o recomeço deliberado: apaga extrações **e** todas as Observações daquele documento, confirmadas inclusive. Serve para tentar outro modelo do zero. O documento, seus metadados e suas categorias ficam intactos.
@@ -488,6 +489,8 @@ Uma extração encontrada em `pending` no arranque é chamada perdida, não prog
 - `provenance = primary` é o bloco principal do laudo; `evolutive` é a tabela comparativa de coletas anteriores, que traz só valor e data. Na colisão, `primary` prevalece — é o que a chave única por procedência garante
 - `value_text` guarda sempre o literal impresso; `value_num` só quando é número sem qualificador. `>90` jamais vira 90
 - `ref_min`/`ref_max` só quando o laudo traz faixa única e inequívoca; `out_of_range` vem do marcador do próprio laboratório. O MedLog não calcula faixa nem decide se um resultado está alterado
+- O valor é lido do literal impresso: `9.000(1)` vira `value_text` `"9.000(1)"` e `value_num` 9000, com `out_of_range` true tirado do marcador. O `(1)` é marcador do laboratório, não parte do número
+- Número segue a convenção brasileira: **ponto agrupa milhar, vírgula abre decimal**. `3.650` é três mil seiscentos e cinquenta, e `5,40` é cinco e quatro décimos. Ler ao contrário desloca uma faixa de leucócitos por um fator de mil, que foi exatamente o defeito encontrado em uso real
 
 ### Privacidade
 

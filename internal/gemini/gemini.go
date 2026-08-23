@@ -29,7 +29,7 @@ const (
 	// PromptVersion and SchemaVersion are stored on every Extraction, so a
 	// stored raw response can be reinterpreted later by the exact contract
 	// that produced it (ADR 0008). Bump on any change to prompt or schema.
-	PromptVersion = "2"
+	PromptVersion = "3"
 	SchemaVersion = "2"
 
 	// DefaultModel is the cheapest model validated against the reference
@@ -217,11 +217,11 @@ Regras, todas obrigatórias:
 
 1. Escolha "code" APENAS na lista de indicadores abaixo. Nunca invente um código. Analito do laudo que não corresponda a nenhum código da lista vai em "unmapped", com o rótulo exato impresso.
 2. "valueText" é sempre o texto literal impresso, fiel: ">90", "normais", "----", "5,40", ou o texto morfológico completo. Nunca normalize nem traduza.
-3. "valueNum" só é preenchido quando o resultado é um número sem qualificador. ">90" e "normais" têm valueNum nulo. Use ponto decimal: "5,40" tem valueNum 5.40. Separador de milhar do laudo não é decimal: "9.450" tem valueNum 9450.
+3. "valueNum" é o número do resultado, e um resultado numérico SEMPRE tem "valueNum". Só fica nulo quando o resultado não é número: ">90", "normais", "----", texto morfológico. Use ponto decimal: "5,40" tem valueNum 5.40. O ponto do laudo é separador de milhar, não decimal: "9.450" tem valueNum 9450 e "3.650" tem 3650. O marcador de alteração vem colado no número e NÃO faz parte dele: "9.000(1)" tem valueText "9.000(1)" e valueNum 9000.
 4. "referenceText" é OBRIGATÓRIO sempre que o laudo imprimir qualquer faixa para aquele resultado, copiado fiel. Só use string vazia quando o laudo realmente não imprime faixa nenhuma para o analito. Atenção ao layout: a coluna "VALORES DE REFERÊNCIA" fica à direita e vale linha a linha — a faixa impressa na mesma linha do resultado é a faixa daquele resultado. Um cabeçalho de condição acima da coluna ("Masc: Maior ou igual a 18 anos") qualifica a coluna inteira e não substitui a faixa da linha; se quiser, inclua os dois no texto, mas nunca devolva a faixa vazia porque existe cabeçalho.
 5. A tabela evolutiva tem sua própria coluna "VALORES DE REFERÊNCIA", à direita de todas as colunas de coleta. Essa faixa vale para TODAS as observações daquela linha, uma por coluna de data: repita o mesmo "referenceText" em cada uma.
 6. "refMin" e "refMax" são obrigatórios quando a faixa da linha é um intervalo numérico único, como "4,32 a 5,67" ou "70 a 99 mg/dL": preencha 4.32 e 5.67. Deixe nulos quando a faixa é condicional por sexo, idade, jejum, etnia ou risco, quando é aberta ("Superior a 60", "Inferior a 200"), ou quando não é numérica.
-7. "outOfRange" é true quando o resultado traz o marcador (1) do laboratório, false quando o laudo indica explicitamente que está na faixa, e nulo quando não há informação. Nunca compare valores por conta própria.
+7. "outOfRange" é true quando o resultado traz o marcador (1) do laboratório, colado ao número ou ao lado, false quando o laudo indica explicitamente que está na faixa, e nulo quando não há informação. Nunca compare valores por conta própria.
 8. "provenance" é "primary" para resultados do corpo do laudo, e "evolutive" para os da tabela comparativa de coletas anteriores, no final do documento.
 9. Extraia TODAS as coletas da tabela evolutiva, cada valor como uma observação própria, com o "collectedAt" da sua coluna. Ignore célula com "----": ausência de resultado não é observação.
 10. "collectedAt" é sempre a data de coleta, no formato AAAA-MM-DD. Nunca a data de liberação nem a de impressão.

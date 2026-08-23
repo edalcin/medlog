@@ -4,6 +4,7 @@
   import * as api from '../lib/api'
   import type { ExtractionReview, Observation } from '../lib/api'
   import { localDate } from '../lib/date'
+  import { isAdmin } from '../lib/auth'
 
   let { params } = $props<{ params: Record<string, string> }>()
 
@@ -455,6 +456,12 @@
                     <p class="pend-ok">
                       Promovido ao catálogo como <code>{promoted[i]}</code>. Rode uma nova extração
                       deste documento para capturar o valor.
+                    </p>
+                  {:else if !$isAdmin}
+                    <p class="pend-note">
+                      O catálogo de Indicadores é global: só um administrador pode acrescentar este
+                      analito. O valor fica registrado na resposta bruta desta extração e entra
+                      quando o analito for promovido e o documento reextraído.
                     </p>
                   {:else}
                     <div class="pend-form">
@@ -919,6 +926,13 @@
 
   .pend-ok code {
     font-size: 12px;
+  }
+
+  .pend-note {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-muted);
   }
 
   .empty-small {

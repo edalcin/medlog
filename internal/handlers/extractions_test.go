@@ -137,6 +137,9 @@ const answerFixture = `{
     {"code":"hemoglobin","collectedAt":"2026-05-08","valueText":"16,5","valueNum":16.5,"unit":"g/dL",
      "referenceText":"Masc: 13,3 a 16,5 / Fem: 11,7 a 15,5","refMin":null,"refMax":null,
      "outOfRange":null,"provenance":"primary"},
+    {"code":"leukocytes","collectedAt":"2025-06-12","valueText":"8.280(1)","valueNum":null,
+     "unit":"/mm3","referenceText":"3.650 a 8.120/mm3","refMin":null,"refMax":null,
+     "outOfRange":null,"provenance":"evolutive"},
     {"code":"nao_existe_no_catalogo","collectedAt":"2026-05-08","valueText":"42","valueNum":42,
      "unit":"","referenceText":"","refMin":null,"refMax":null,"outOfRange":null,"provenance":"primary"}
   ],
@@ -242,8 +245,8 @@ func TestExtraction_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ObservationFindByExtraction: %v", err)
 	}
-	if len(list) != 7 {
-		t.Fatalf("observations = %d, want 7", len(list))
+	if len(list) != 8 {
+		t.Fatalf("observations = %d, want 8", len(list))
 	}
 	catalog, err := models.IndicatorFindAll(ctx, database)
 	if err != nil {
@@ -288,6 +291,26 @@ func TestExtraction_EndToEnd(t *testing.T) {
 	if hemoglobin.ReferenceText == nil {
 		t.Error("hemoglobin lost the printed reference text")
 	}
+
+	// The lab glues its marker to the number: "8.280(1)" is 8280 out of range,
+	// not a textual result. And the dot groups thousands, so the reference
+	// "3.650 a 8.120" is 3650 to 8120, not 3,65 to 8,12.
+	leukocytes := byCode["leukocytes|evolutive"]
+	if leukocytes.ValueNum == nil || *leukocytes.ValueNum != 8280 {
+		t.Errorf("leukocytes valueNum = %v, want 8280 read out of %q",
+			leukocytes.ValueNum, leukocytes.ValueText)
+	}
+	if leukocytes.ValueText != "8.280(1)" {
+		t.Errorf("leukocytes valueText = %q, want the literal with the marker", leukocytes.ValueText)
+	}
+	if leukocytes.OutOfRange == nil || !*leukocytes.OutOfRange {
+		t.Errorf("leukocytes outOfRange = %v, want true from the (1) marker", leukocytes.OutOfRange)
+	}
+	if leukocytes.RefMin == nil || leukocytes.RefMax == nil ||
+		*leukocytes.RefMin != 3650 || *leukocytes.RefMax != 8120 {
+		t.Errorf("leukocytes bounds = %v/%v, want 3650/8120: the dot groups thousands",
+			leukocytes.RefMin, leukocytes.RefMax)
+	}
 	// The evolutive table lands as its own dated observation.
 	evolutive := byCode["glucose_serum|evolutive"]
 	if got := evolutive.CollectedAt.Format("2006-01-02"); got != "2025-06-12" {
@@ -314,6 +337,129 @@ func TestExtraction_EndToEnd(t *testing.T) {
 	}
 	if len(series) != 0 {
 		t.Errorf("confirmed series = %d, want 0 before review", len(series))
+	}
+}
+
+// seedUser creates a plain USER, the role that may now extract its own PDFs.
+func seedUser(t *testing.T, ctx context.Context, database *sql.DB) string {
+	t.Helper()
+	id := uuid.New().String()
+	if _, err := models.UserCreate(ctx, database, id, models.CreateUserInput{
+		Email: id + "@test.com", Name: "Usuária", PasswordHash: "x", Role: "USER", Theme: "SYSTEM",
+	}); err != nil {
+		t.Fatalf("UserCreate: %v", err)
+	}
+	return id
+}
+
+// userRouter serves the extraction routes under a plain USER session, the way
+// RequireAuth does in production now that extraction left the ADMIN group.
+func userRouter(h *handlers.ExtractionHandler, userID string) http.Handler {
+	router := chi.NewRouter()
+	router.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			auth.Manager.Put(r.Context(), auth.SessionKeyUserID, userID)
+			auth.Manager.Put(r.Context(), auth.SessionKeyRole, "USER")
+			next.ServeHTTP(w, r)
+		})
+	})
+	router.Post("/api/extractions", h.Create)
+	router.Get("/api/extractions/{id}", h.Get)
+	router.Get("/api/extractions/{id}/review", h.Review)
+	router.Post("/api/extractions/{id}/confirm", h.Confirm)
+	router.Get("/api/files/{id}/extractions", h.ListByFile)
+	router.Delete("/api/files/{id}/extractions", h.ResetFile)
+	return wrapWithSession(router)
+}
+
+// TestExtraction_UserExtractsOwnDocument covers ADR 0011: a plain USER runs
+// the extraction on their own PDF, reviews it and confirms it, and reaches
+// nothing that belongs to somebody else.
+func TestExtraction_UserExtractsOwnDocument(t *testing.T) {
+	database := appdb.SetupTestDB(t)
+	auth.InitSessions(database, false)
+	ctx := context.Background()
+	filesPath := t.TempDir()
+
+	mine := seedUser(t, ctx, database)
+	stranger := seedUser(t, ctx, database)
+	myFile := seedPDF(t, ctx, database, filesPath, mine)
+	theirFile := seedPDF(t, ctx, database, filesPath, stranger)
+
+	provider := newFakeProvider(t, answerFixture)
+	h := &handlers.ExtractionHandler{DB: database, FilesPath: filesPath, Client: provider.client()}
+	router := userRouter(h, mine)
+
+	post := func(url string, body any) *httptest.ResponseRecorder {
+		var reader *bytes.Reader
+		if body == nil {
+			reader = bytes.NewReader(nil)
+		} else {
+			raw, _ := json.Marshal(body)
+			reader = bytes.NewReader(raw)
+		}
+		req := httptest.NewRequest(http.MethodPost, url, reader)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+
+	// Somebody else's document is invisible, not merely forbidden.
+	if w := post("/api/extractions", map[string]any{"fileId": theirFile.ID, "consent": true}); w.Code != http.StatusNotFound {
+		t.Fatalf("extracting another user's document = %d, want 404; body: %s", w.Code, w.Body.String())
+	}
+
+	w := post("/api/extractions", map[string]any{"fileId": myFile.ID, "consent": true})
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("USER extracting own document = %d, want 202; body: %s", w.Code, w.Body.String())
+	}
+	var created struct{ Data models.Extraction }
+	json.NewDecoder(w.Body).Decode(&created)
+	if created.Data.UserID != mine {
+		t.Errorf("extraction owner = %q, want the document owner %q", created.Data.UserID, mine)
+	}
+	done := waitForStatus(t, database, created.Data.ID, models.ExtractionSucceeded)
+
+	// The owner reviews and confirms their own block.
+	req := httptest.NewRequest(http.MethodGet, "/api/extractions/"+done.ID+"/review", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("owner review = %d, want 200; body: %s", rec.Code, rec.Body.String())
+	}
+	if w := post("/api/extractions/"+done.ID+"/confirm", nil); w.Code != http.StatusOK {
+		t.Fatalf("owner confirm = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	series, err := models.ObservationFindSeries(ctx, database, mine, "glucose_serum")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(series) != 2 {
+		t.Errorf("confirmed series = %d, want 2", len(series))
+	}
+
+	// A stranger sees none of it, on any extraction-scoped route.
+	outsider := userRouter(h, stranger)
+	for _, url := range []string{
+		"/api/extractions/" + done.ID,
+		"/api/extractions/" + done.ID + "/review",
+		"/api/files/" + myFile.ID + "/extractions",
+	} {
+		rec := httptest.NewRecorder()
+		outsider.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, url, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Errorf("GET %s as a stranger = %d, want 404", url, rec.Code)
+		}
+	}
+	rec = httptest.NewRecorder()
+	outsider.ServeHTTP(rec, httptest.NewRequest(http.MethodDelete, "/api/files/"+myFile.ID+"/extractions", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("stranger reset = %d, want 404", rec.Code)
+	}
+	var left int
+	database.QueryRowContext(ctx, `SELECT COUNT(*) FROM extractions`).Scan(&left)
+	if left != 1 {
+		t.Errorf("extractions after the stranger's attempt = %d, want 1", left)
 	}
 }
 
@@ -390,8 +536,8 @@ func TestExtraction_ReparseRawWithoutCallingProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseRaw: %v", err)
 	}
-	if len(res.Observations) != 8 || len(res.Unmapped) != 1 {
-		t.Errorf("parsed %d observations and %d unmapped, want 8 and 1", len(res.Observations), len(res.Unmapped))
+	if len(res.Observations) != 9 || len(res.Unmapped) != 1 {
+		t.Errorf("parsed %d observations and %d unmapped, want 9 and 1", len(res.Observations), len(res.Unmapped))
 	}
 	if usage.OutputTokens != 9500 {
 		t.Errorf("outputTokens = %d, want 9500", usage.OutputTokens)

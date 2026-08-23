@@ -86,8 +86,8 @@ func TestReview_ConfirmPromotesBlockAndFillsMetadata(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&review); err != nil {
 		t.Fatalf("decode review: %v", err)
 	}
-	if len(review.Data.Observations) != 7 {
-		t.Errorf("observations = %d, want 7", len(review.Data.Observations))
+	if len(review.Data.Observations) != 8 {
+		t.Errorf("observations = %d, want 8", len(review.Data.Observations))
 	}
 	if len(review.Data.Unmapped) != 1 {
 		t.Errorf("unmapped = %d, want 1", len(review.Data.Unmapped))
@@ -117,8 +117,8 @@ func TestReview_ConfirmPromotesBlockAndFillsMetadata(t *testing.T) {
 		}
 	}
 	json.NewDecoder(w.Body).Decode(&confirmed)
-	if confirmed.Data.Confirmed != 7 {
-		t.Errorf("confirmed = %d, want 7", confirmed.Data.Confirmed)
+	if confirmed.Data.Confirmed != 8 {
+		t.Errorf("confirmed = %d, want 8", confirmed.Data.Confirmed)
 	}
 	if len(confirmed.Data.MetadataApplied) != 4 {
 		t.Errorf("metadataApplied = %v, want all four fields", confirmed.Data.MetadataApplied)
@@ -190,8 +190,8 @@ func TestReview_ReExtractionDoesNotDuplicate(t *testing.T) {
 	if err := database.QueryRowContext(ctx, `SELECT COUNT(*) FROM health_observations`).Scan(&total); err != nil {
 		t.Fatal(err)
 	}
-	if total != 7 {
-		t.Errorf("observations = %d, want 7: re-extraction must replace, not duplicate", total)
+	if total != 8 {
+		t.Errorf("observations = %d, want 8: re-extraction must replace, not duplicate", total)
 	}
 
 	// The surviving rows belong to the newest extraction.
@@ -199,8 +199,8 @@ func TestReview_ReExtractionDoesNotDuplicate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(list) != 7 {
-		t.Errorf("newest extraction owns %d observations, want 7", len(list))
+	if len(list) != 8 {
+		t.Errorf("newest extraction owns %d observations, want 8", len(list))
 	}
 	old, err := models.ObservationFindByExtraction(ctx, database, first)
 	if err != nil {
@@ -375,8 +375,8 @@ func TestReview_ResetFileStartsFromScratch(t *testing.T) {
 		}
 	}
 	json.NewDecoder(w.Body).Decode(&reset)
-	if reset.Data.Observations != 7 || reset.Data.Extractions != 1 {
-		t.Errorf("reset removed %d observations and %d extractions, want 7 and 1",
+	if reset.Data.Observations != 8 || reset.Data.Extractions != 1 {
+		t.Errorf("reset removed %d observations and %d extractions, want 8 and 1",
 			reset.Data.Observations, reset.Data.Extractions)
 	}
 

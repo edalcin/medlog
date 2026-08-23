@@ -46,6 +46,54 @@ var AvailableModels = []struct {
 	{"gemini-3.5-flash", "Gemini 3.5 Flash", "0.127"},
 }
 
+// caller answers who is asking and whether they are an administrator.
+func caller(r *http.Request) (userID string, admin bool) {
+	userID = auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	return userID, auth.Manager.GetString(r.Context(), auth.SessionKeyRole) == "ADMIN"
+}
+
+// mayReachExtraction gates every extraction-scoped route. A USER reaches the
+// extractions of their own documents; an ADMIN reaches all of them, which is
+// what the admin panel and family support need.
+//
+// The answer is 404, never 403: the existence of somebody else's extraction is
+// itself information this caller has no business receiving.
+func (h *ExtractionHandler) mayReachExtraction(w http.ResponseWriter, r *http.Request, id string) (*models.Extraction, bool) {
+	extraction, err := models.ExtractionFindByID(r.Context(), h.DB, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		writeError(w, "extração não encontrada", http.StatusNotFound)
+		return nil, false
+	}
+	if err != nil {
+		writeDBError(w, err)
+		return nil, false
+	}
+	if userID, admin := caller(r); !admin && extraction.UserID != userID {
+		writeError(w, "extração não encontrada", http.StatusNotFound)
+		return nil, false
+	}
+	return extraction, true
+}
+
+// mayReachFile is the same gate for the document-scoped routes.
+func (h *ExtractionHandler) mayReachFile(w http.ResponseWriter, r *http.Request, id string) (*models.File, bool) {
+	file, err := models.FileFindByID(r.Context(), h.DB, id)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && file == nil) {
+		writeError(w, "documento não encontrado", http.StatusNotFound)
+		return nil, false
+	}
+	if err != nil {
+		writeDBError(w, err)
+		return nil, false
+	}
+	userID, admin := caller(r)
+	if !admin && (file.UserID == nil || *file.UserID != userID) {
+		writeError(w, "documento não encontrado", http.StatusNotFound)
+		return nil, false
+	}
+	return file, true
+}
+
 type createExtractionRequest struct {
 	FileID  string `json:"fileId"`
 	Consent bool   `json:"consent"`
@@ -88,6 +136,13 @@ func (h *ExtractionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, "documento sem proprietário", http.StatusBadRequest)
 		return
 	}
+	// A USER extracts the documents that are theirs; an ADMIN extracts anyone's.
+	// The document owner, not the caller, owns the resulting Observations.
+	triggeredBy, admin := caller(r)
+	if !admin && *file.UserID != triggeredBy {
+		writeError(w, "documento não encontrado", http.StatusNotFound)
+		return
+	}
 
 	model, err := models.ConfigGet(r.Context(), h.DB, ConfigKeyGeminiModel, gemini.DefaultModel)
 	if err != nil {
@@ -95,7 +150,6 @@ func (h *ExtractionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	triggeredBy := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
 	extraction, err := models.ExtractionCreate(r.Context(), h.DB, *file.UserID, file.ID, triggeredBy,
 		model, gemini.PromptVersion, gemini.SchemaVersion, time.Now().UTC())
 	if err != nil {
@@ -216,6 +270,20 @@ func buildObservations(e models.Extraction, catalog []models.Indicator, res *gem
 			skipped++
 			continue
 		}
+		// The lab glues its alteration marker to the number: "9.000(1)". The
+		// marker carries meaning but is not part of the value, so the number is
+		// read without it, and the marker answers out_of_range when the model
+		// left it null.
+		marked := markerRE.MatchString(strings.TrimSpace(o.ValueText))
+		valueNum := o.ValueNum
+		if valueNum == nil {
+			valueNum = deriveValue(o.ValueText)
+		}
+		outOfRange := o.OutOfRange
+		if outOfRange == nil && marked {
+			t := true
+			outOfRange = &t
+		}
 		// The model still drops bounds now and then, even with the field
 		// required. When it does, read them off the literal it did send.
 		refMin, refMax := o.RefMin, o.RefMax
@@ -229,12 +297,12 @@ func buildObservations(e models.Extraction, catalog []models.Indicator, res *gem
 			ExtractionID:  &extractionID,
 			CollectedAt:   collectedAt,
 			ValueText:     o.ValueText,
-			ValueNum:      o.ValueNum,
+			ValueNum:      valueNum,
 			Unit:          textOrCanonical(o.Unit, indicator.Unit),
 			ReferenceText: textOrNil(o.ReferenceText),
 			RefMin:        refMin,
 			RefMax:        refMax,
-			OutOfRange:    o.OutOfRange,
+			OutOfRange:    outOfRange,
 			Provenance:    o.Provenance,
 			Status:        models.ObservationReview,
 		})
@@ -242,15 +310,54 @@ func buildObservations(e models.Extraction, catalog []models.Indicator, res *gem
 	return list, skipped
 }
 
-// rangeRE matches a single printed interval: "4,32 a 5,67", "70 a 99 mg/dL",
+// markerRE matches the alteration marker the lab prints glued to an altered
+// result: "9.000(1)". It carries meaning, but it is not part of the number.
+var markerRE = regexp.MustCompile(`\(\d\)\s*$`)
+
+// numberRE matches one number printed the Brazilian way: "9.000", "5,40",
+// "1.234,56", "93". Nothing else — a value with a qualifier is not a number.
+var numberRE = regexp.MustCompile(`^\d{1,3}(?:\.\d{3})+(?:,\d+)?$|^\d+(?:,\d+)?$`)
+
+// rangeRE matches a single printed interval: "4,32 a 5,67", "3.650 a 8.120",
 // "13,3 - 16,5". The separator must stand alone, so "5,67 milhões" never reads
 // as a bound.
-var rangeRE = regexp.MustCompile(`(\d+(?:[.,]\d+)?)\s*(?:\s[aA]\s|-|–|\s[aA]té\s)\s*(\d+(?:[.,]\d+)?)`)
+var rangeRE = regexp.MustCompile(`(\d+(?:[.,]\d+)*)\s*(?:\s[aA]\s|-|–|\s[aA]té\s)\s*(\d+(?:[.,]\d+)*)`)
 
 // conditionalRE marks a reference the report qualifies by patient or context.
 // ADR 0004 keeps those as text only: one printed interval is a fact, a
 // conditional table is a decision the MedLog does not make.
 var conditionalRE = regexp.MustCompile(`(?i)(masc|fem|homem|mulher|anos|idade|jejum|etnia|afro|risco|depende|gestante|crian|adulto|categoria|conforme)`)
+
+// parseNumberBR reads a number the way a Brazilian lab prints it: the dot
+// groups thousands and the comma opens the decimals. "3.650" is three thousand
+// six hundred and fifty, never 3.65 — reading it backwards moved a leukocyte
+// reference range by a factor of a thousand.
+func parseNumberBR(s string) (float64, bool) {
+	s = strings.TrimSpace(s)
+	if !numberRE.MatchString(s) {
+		return 0, false
+	}
+	s = strings.ReplaceAll(s, ".", "")
+	s = strings.Replace(s, ",", ".", 1)
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+// deriveValue recovers the number from a result the model left unquantified.
+// It accepts a bare printed number with the lab marker stripped, and nothing
+// else: ">90" and "normais" stay without a number, because they are not points
+// on an axis.
+func deriveValue(text string) *float64 {
+	text = markerRE.ReplaceAllString(strings.TrimSpace(text), "")
+	v, ok := parseNumberBR(text)
+	if !ok {
+		return nil
+	}
+	return &v
+}
 
 // deriveRange reads numeric bounds out of the reference text exactly as
 // printed. This is transcription, not calculation: anything conditional, open
@@ -264,9 +371,9 @@ func deriveRange(text string) (*float64, *float64) {
 	if len(matches) != 1 {
 		return nil, nil
 	}
-	lo, errLo := strconv.ParseFloat(strings.Replace(matches[0][1], ",", ".", 1), 64)
-	hi, errHi := strconv.ParseFloat(strings.Replace(matches[0][2], ",", ".", 1), 64)
-	if errLo != nil || errHi != nil || lo >= hi {
+	lo, okLo := parseNumberBR(matches[0][1])
+	hi, okHi := parseNumberBR(matches[0][2])
+	if !okLo || !okHi || lo >= hi {
 		return nil, nil
 	}
 	return &lo, &hi
@@ -335,13 +442,8 @@ type metadataField struct {
 func (h *ExtractionHandler) Review(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	extraction, err := models.ExtractionFindByID(r.Context(), h.DB, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, "extração não encontrada", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		writeDBError(w, err)
+	extraction, ok := h.mayReachExtraction(w, r, id)
+	if !ok {
 		return
 	}
 
@@ -407,13 +509,8 @@ func metadataFields(file *models.File, res *gemini.Result) []metadataField {
 func (h *ExtractionHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 
-	extraction, err := models.ExtractionFindByID(r.Context(), h.DB, id)
-	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, "extração não encontrada", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		writeDBError(w, err)
+	extraction, ok := h.mayReachExtraction(w, r, id)
+	if !ok {
 		return
 	}
 
@@ -448,6 +545,9 @@ func (h *ExtractionHandler) Confirm(w http.ResponseWriter, r *http.Request) {
 // Reject discards the observations and keeps the Extraction: the raw response
 // stays auditable and reinterpretable (ADR 0009).
 func (h *ExtractionHandler) Reject(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.mayReachExtraction(w, r, chi.URLParam(r, "id")); !ok {
+		return
+	}
 	rejected, err := models.ObservationRejectByExtraction(r.Context(), h.DB, chi.URLParam(r, "id"))
 	if err != nil {
 		writeDBError(w, err)
@@ -495,13 +595,8 @@ func (h *ExtractionHandler) ListIndicators(w http.ResponseWriter, r *http.Reques
 // Get reports the state of one extraction. This is what the frontend polls,
 // since the call outlives the 30s fetch timeout.
 func (h *ExtractionHandler) Get(w http.ResponseWriter, r *http.Request) {
-	extraction, err := models.ExtractionFindByID(r.Context(), h.DB, chi.URLParam(r, "id"))
-	if errors.Is(err, sql.ErrNoRows) {
-		writeError(w, "extração não encontrada", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		writeDBError(w, err)
+	extraction, ok := h.mayReachExtraction(w, r, chi.URLParam(r, "id"))
+	if !ok {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": extraction})
@@ -509,6 +604,9 @@ func (h *ExtractionHandler) Get(w http.ResponseWriter, r *http.Request) {
 
 // ListByFile returns the extraction history of one document.
 func (h *ExtractionHandler) ListByFile(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.mayReachFile(w, r, chi.URLParam(r, "id")); !ok {
+		return
+	}
 	list, err := models.ExtractionFindByFile(r.Context(), h.DB, chi.URLParam(r, "id"))
 	if err != nil {
 		writeDBError(w, err)
@@ -523,13 +621,7 @@ func (h *ExtractionHandler) ListByFile(w http.ResponseWriter, r *http.Request) {
 // values lingering in the series.
 func (h *ExtractionHandler) ResetFile(w http.ResponseWriter, r *http.Request) {
 	fileID := chi.URLParam(r, "id")
-	file, err := models.FileFindByID(r.Context(), h.DB, fileID)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && file == nil) {
-		writeError(w, "documento não encontrado", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		writeDBError(w, err)
+	if _, ok := h.mayReachFile(w, r, fileID); !ok {
 		return
 	}
 	observations, extractions, err := models.ExtractionResetFile(r.Context(), h.DB, fileID)
@@ -548,6 +640,9 @@ func (h *ExtractionHandler) ResetFile(w http.ResponseWriter, r *http.Request) {
 
 // ListObservations returns what one extraction produced, in review order.
 func (h *ExtractionHandler) ListObservations(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.mayReachExtraction(w, r, chi.URLParam(r, "id")); !ok {
+		return
+	}
 	list, err := models.ObservationFindByExtraction(r.Context(), h.DB, chi.URLParam(r, "id"))
 	if err != nil {
 		writeDBError(w, err)

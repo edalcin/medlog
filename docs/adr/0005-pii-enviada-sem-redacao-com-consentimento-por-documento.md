@@ -1,5 +1,6 @@
 ---
 status: accepted
+superseded-by: 0011 (apenas a restrição a ADMIN; PII e consentimento seguem valendo)
 ---
 
 # PII enviada sem redação, com consentimento por documento e extração restrita a ADMIN
@@ -14,12 +15,12 @@ Redigir a PII antes de enviar foi rejeitado por dois motivos concretos. A valida
 
 Consentimento único no ato de habilitar a extração foi rejeitado: cada extração é um envio novo a terceiro, e o consentimento deve acompanhar o envio, não a configuração.
 
-Permitir que qualquer `USER` dispare extração nos próprios documentos foi rejeitado nesta fase. A `GEMINI_API_KEY` é credencial global do servidor e o gasto recai sobre quem paga a chave; com compartilhamento familiar, um `USER` gastaria o dinheiro do `ADMIN`. Cota por usuário foi rejeitada como desenho prematuro: entra quando o gasto real doer.
+Permitir que qualquer `USER` dispare extração nos próprios documentos foi rejeitado nesta fase. A `GEMINI_API_KEY` é credencial global do servidor e o gasto recai sobre quem paga a chave; com compartilhamento familiar, um `USER` gastaria o dinheiro do `ADMIN`. Cota por usuário foi rejeitada como desenho prematuro: entra quando o gasto real doer. **Revisto pelo ADR 0011:** a extração passou a ser do dono do documento, e a cota continua rejeitada pelo mesmo motivo.
 
 ## Consequences
 
 O usuário aceita explicitamente, por documento, que aquele PDF seja enviado ao Google. A interface precisa dizer isso sem eufemismo, nomeando o destinatário e o que vai nele.
 
-`ADMIN`-only significa que, num uso familiar, o `ADMIN` extrai os laudos dos demais. O consentimento por documento é o contrapeso: sem ele, nenhum envio acontece.
+`ADMIN`-only significa que, num uso familiar, o `ADMIN` extrai os laudos dos demais. O consentimento por documento é o contrapeso: sem ele, nenhum envio acontece. **Desde o ADR 0011 isso não vale mais:** o dono extrai o próprio documento, e o `ADMIN` segue alcançando os de todos.
 
 O registro de quem, quando, qual modelo e quanto custou é obrigatório desde a primeira extração — é a base tanto da auditoria de privacidade quanto da decisão futura sobre cota.

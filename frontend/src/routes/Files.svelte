@@ -3,7 +3,7 @@
   import { push, link } from '@keenmate/svelte-spa-router'
   import * as api from '../lib/api'
   import type { MedFile, FileCategory, Professional } from '../lib/api'
-  import { isAdmin } from '../lib/auth'
+  import { isAdmin, currentUser } from '../lib/auth'
   import FileUpload from '../components/FileUpload.svelte'
   import FileEditModal from '../components/FileEditModal.svelte'
   import { localDate } from '../lib/date'
@@ -175,8 +175,11 @@
     return mime
   }
 
+  // Extrair é ação do dono do documento; o ADMIN alcança os documentos de
+  // todos, como no resto do painel (ADR 0011).
   function canExtract(f: MedFile): boolean {
-    return $isAdmin && f.mimeType === 'application/pdf'
+    if (f.mimeType !== 'application/pdf') return false
+    return $isAdmin || f.userId === $currentUser?.id
   }
 
   function statusLabel(f: MedFile): string {

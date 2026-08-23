@@ -121,9 +121,9 @@ services:
 
 ## Extraindo indicadores de um laudo
 
-Requer `GEMINI_API_KEY` no ambiente e um usuário `ADMIN`.
+Requer `GEMINI_API_KEY` no ambiente. Cada usuário extrai os **próprios** documentos; o administrador alcança os de todos.
 
-1. **Admin → Extração por IA** — escolha o modelo. O padrão é `gemini-3.1-flash-lite`, cerca de US$ 0,02 por laudo de 16 páginas; o custo estimado de cada opção aparece ao lado
+1. **Admin → Extração por IA** — o administrador escolhe o modelo, que vale para a instância inteira. O padrão é `gemini-3.1-flash-lite`, cerca de US$ 0,02 por laudo de 16 páginas; o custo estimado de cada opção aparece ao lado
 2. **Arquivos** — no PDF do laudo, dispare a extração e confirme o diálogo de consentimento. O documento precisa já estar anexado: não há upload nesse caminho
 3. A chamada dura minutos e roda no servidor; a tela acompanha o andamento sozinha
 4. **Revisão** — confira a lista inteira contra o PDF exibido ao lado e confirme ou rejeite em bloco. Rejeitar descarta os valores e preserva a Extração, que continua auditável

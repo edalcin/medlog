@@ -143,6 +143,18 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Get("/health-series", seriesH.Index)
 		r.Get("/health-series/{code}", seriesH.Series)
 
+		// Extração dos próprios documentos: cada rota confere o dono, e o
+		// ADMIN alcança todos (ADR 0011, que revisa a restrição do ADR 0005).
+		r.Post("/extractions", extractionH.Create)
+		r.Get("/extractions/{id}", extractionH.Get)
+		r.Get("/extractions/{id}/observations", extractionH.ListObservations)
+		r.Get("/extractions/{id}/review", extractionH.Review)
+		r.Post("/extractions/{id}/confirm", extractionH.Confirm)
+		r.Post("/extractions/{id}/reject", extractionH.Reject)
+		r.Get("/files/{id}/extractions", extractionH.ListByFile)
+		r.Delete("/files/{id}/extractions", extractionH.ResetFile)
+		r.Get("/health-indicators", extractionH.ListIndicators)
+
 		r.Get("/specialties", specialtyH.List)
 		r.Get("/file-categories", categoryH.List)
 
@@ -214,18 +226,9 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Get("/admin/backup", adminH.Backup)
 		r.Post("/admin/restore", adminH.Restore)
 
-		// Extração restrita a ADMIN: a chave da API é credencial do servidor
-		// e cada chamada custa dinheiro (ADR 0005).
-		r.Post("/extractions", extractionH.Create)
-		r.Get("/extractions/{id}", extractionH.Get)
-		r.Get("/extractions/{id}/observations", extractionH.ListObservations)
-		r.Get("/extractions/{id}/review", extractionH.Review)
-		r.Post("/extractions/{id}/confirm", extractionH.Confirm)
-		r.Post("/extractions/{id}/reject", extractionH.Reject)
-		r.Get("/health-indicators", extractionH.ListIndicators)
+		// Só ADMIN promove analito ao catálogo: o catálogo é global (ADR 0007).
 		r.Post("/health-indicators", extractionH.PromoteIndicator)
-		r.Delete("/files/{id}/extractions", extractionH.ResetFile)
-		r.Get("/files/{id}/extractions", extractionH.ListByFile)
+
 		r.Get("/admin/gemini-model", extractionH.Models)
 		r.Put("/admin/gemini-model", extractionH.SetModel)
 	})
