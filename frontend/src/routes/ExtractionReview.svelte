@@ -396,7 +396,7 @@
                         {:else if o.outOfRange === false}
                           <span class="tag tag-in">dentro da faixa</span>
                         {:else}
-                          <span class="tag tag-unknown">faixa não informada</span>
+                          <span class="tag tag-unknown" title="O laudo não traz marcador de alteração para este resultado. Não significa que a faixa de referência esteja ausente.">sem marcador</span>
                         {/if}
                         {#if o.provenance === 'evolutive'}
                           <span class="tag tag-evolutive">tabela evolutiva</span>
@@ -406,7 +406,7 @@
                       {#if o.referenceText}
                         <p class="obs-ref">Referência: {o.referenceText}</p>
                       {:else if o.provenance === 'primary'}
-                        <p class="obs-ref obs-ref-none">Referência não informada no laudo.</p>
+                        <p class="obs-ref obs-ref-none">Faixa de referência não impressa no laudo.</p>
                       {/if}
                       {#if o.valueNum === undefined}
                         <p class="obs-note">

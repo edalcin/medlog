@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -200,6 +202,12 @@ func buildObservations(e models.Extraction, catalog []models.Indicator, res *gem
 			skipped++
 			continue
 		}
+		// The model still drops bounds now and then, even with the field
+		// required. When it does, read them off the literal it did send.
+		refMin, refMax := o.RefMin, o.RefMax
+		if refMin == nil && refMax == nil {
+			refMin, refMax = deriveRange(o.ReferenceText)
+		}
 		list = append(list, models.Observation{
 			UserID:        e.UserID,
 			IndicatorID:   indicator.ID,
@@ -210,14 +218,44 @@ func buildObservations(e models.Extraction, catalog []models.Indicator, res *gem
 			ValueNum:      o.ValueNum,
 			Unit:          textOrCanonical(o.Unit, indicator.Unit),
 			ReferenceText: textOrNil(o.ReferenceText),
-			RefMin:        o.RefMin,
-			RefMax:        o.RefMax,
+			RefMin:        refMin,
+			RefMax:        refMax,
 			OutOfRange:    o.OutOfRange,
 			Provenance:    o.Provenance,
 			Status:        models.ObservationReview,
 		})
 	}
 	return list, skipped
+}
+
+// rangeRE matches a single printed interval: "4,32 a 5,67", "70 a 99 mg/dL",
+// "13,3 - 16,5". The separator must stand alone, so "5,67 milhões" never reads
+// as a bound.
+var rangeRE = regexp.MustCompile(`(\d+(?:[.,]\d+)?)\s*(?:\s[aA]\s|-|–|\s[aA]té\s)\s*(\d+(?:[.,]\d+)?)`)
+
+// conditionalRE marks a reference the report qualifies by patient or context.
+// ADR 0004 keeps those as text only: one printed interval is a fact, a
+// conditional table is a decision the MedLog does not make.
+var conditionalRE = regexp.MustCompile(`(?i)(masc|fem|homem|mulher|anos|idade|jejum|etnia|afro|risco|depende|gestante|crian|adulto|categoria|conforme)`)
+
+// deriveRange reads numeric bounds out of the reference text exactly as
+// printed. This is transcription, not calculation: anything conditional, open
+// ended or carrying more than one interval yields no bounds at all.
+func deriveRange(text string) (*float64, *float64) {
+	text = strings.TrimSpace(text)
+	if text == "" || conditionalRE.MatchString(text) {
+		return nil, nil
+	}
+	matches := rangeRE.FindAllStringSubmatch(text, 2)
+	if len(matches) != 1 {
+		return nil, nil
+	}
+	lo, errLo := strconv.ParseFloat(strings.Replace(matches[0][1], ",", ".", 1), 64)
+	hi, errHi := strconv.ParseFloat(strings.Replace(matches[0][2], ",", ".", 1), 64)
+	if errLo != nil || errHi != nil || lo >= hi {
+		return nil, nil
+	}
+	return &lo, &hi
 }
 
 // parseCollectedAt accepts the observation date, falling back to the report

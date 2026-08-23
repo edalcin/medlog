@@ -131,6 +131,12 @@ const answerFixture = `{
      "outOfRange":null,"provenance":"primary"},
     {"code":"red_cell_morphology","collectedAt":"2026-05-08","valueText":"normais","valueNum":null,
      "unit":"","referenceText":"","refMin":null,"refMax":null,"outOfRange":null,"provenance":"primary"},
+    {"code":"erythrocytes","collectedAt":"2026-05-08","valueText":"5,40","valueNum":5.40,
+     "unit":"milhões/mm3","referenceText":"4,32 a 5,67 milhões/mm3","refMin":null,"refMax":null,
+     "outOfRange":null,"provenance":"primary"},
+    {"code":"hemoglobin","collectedAt":"2026-05-08","valueText":"16,5","valueNum":16.5,"unit":"g/dL",
+     "referenceText":"Masc: 13,3 a 16,5 / Fem: 11,7 a 15,5","refMin":null,"refMax":null,
+     "outOfRange":null,"provenance":"primary"},
     {"code":"nao_existe_no_catalogo","collectedAt":"2026-05-08","valueText":"42","valueNum":42,
      "unit":"","referenceText":"","refMin":null,"refMax":null,"outOfRange":null,"provenance":"primary"}
   ],
@@ -236,8 +242,8 @@ func TestExtraction_EndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ObservationFindByExtraction: %v", err)
 	}
-	if len(list) != 5 {
-		t.Fatalf("observations = %d, want 5", len(list))
+	if len(list) != 7 {
+		t.Fatalf("observations = %d, want 7", len(list))
 	}
 	catalog, err := models.IndicatorFindAll(ctx, database)
 	if err != nil {
@@ -264,6 +270,23 @@ func TestExtraction_EndToEnd(t *testing.T) {
 	tsh := byCode["tsh|primary"]
 	if tsh.RefMin != nil || tsh.RefMax != nil || tsh.ReferenceText == nil {
 		t.Errorf("tsh bounds = %v/%v, text = %v; want nil bounds with text", tsh.RefMin, tsh.RefMax, tsh.ReferenceText)
+	}
+	// The model dropped the bounds but sent the literal: they are read off the
+	// printed interval, not computed from the value.
+	erythrocytes := byCode["erythrocytes|primary"]
+	if erythrocytes.RefMin == nil || erythrocytes.RefMax == nil ||
+		*erythrocytes.RefMin != 4.32 || *erythrocytes.RefMax != 5.67 {
+		t.Errorf("erythrocytes bounds = %v/%v, want 4.32/5.67 derived from %q",
+			erythrocytes.RefMin, erythrocytes.RefMax, "4,32 a 5,67 milhões/mm3")
+	}
+	// A range printed per sex is conditional: text survives, bounds do not.
+	hemoglobin := byCode["hemoglobin|primary"]
+	if hemoglobin.RefMin != nil || hemoglobin.RefMax != nil {
+		t.Errorf("hemoglobin bounds = %v/%v, want nil: the range is conditional by sex",
+			hemoglobin.RefMin, hemoglobin.RefMax)
+	}
+	if hemoglobin.ReferenceText == nil {
+		t.Error("hemoglobin lost the printed reference text")
 	}
 	// The evolutive table lands as its own dated observation.
 	evolutive := byCode["glucose_serum|evolutive"]
@@ -367,8 +390,8 @@ func TestExtraction_ReparseRawWithoutCallingProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ParseRaw: %v", err)
 	}
-	if len(res.Observations) != 6 || len(res.Unmapped) != 1 {
-		t.Errorf("parsed %d observations and %d unmapped, want 6 and 1", len(res.Observations), len(res.Unmapped))
+	if len(res.Observations) != 8 || len(res.Unmapped) != 1 {
+		t.Errorf("parsed %d observations and %d unmapped, want 8 and 1", len(res.Observations), len(res.Unmapped))
 	}
 	if usage.OutputTokens != 9500 {
 		t.Errorf("outputTokens = %d, want 9500", usage.OutputTokens)

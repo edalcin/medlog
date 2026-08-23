@@ -217,12 +217,17 @@ cd frontend && npm run build
 
 **Autorizar a chamada real ao Gemini.** É a prova que falta da fase 2, definida no plano, e a única pendência da v3.0. Envia o laudo de referência, com nome completo e data de nascimento, ao Google, e gasta cerca de US$ 0,02. `GEMINI_API_KEY` estava presente no ambiente da sessão anterior. Sem essa autorização, a fase 2 permanece provada apenas contra provedor falso — o que cobre contrato, persistência e interpretação, mas não a qualidade real do mapeamento do modelo.
 
+**Defeito encontrado no primeiro uso real (2026-08-23), já corrigido:** com `gemini-3.7-flash`, o laudo voltou sem nenhuma faixa de referência — nem no hemograma, onde ela é impressa em coluna à direita, nem na tabela evolutiva, que tem coluna própria. O mapeamento não tinha culpa: repassa `referenceText` intacto. A causa é a documentada pelo provedor — campo ausente de `required` pode ser omitido pelo modelo para poupar tokens. Correções, todas em `prompt`/`schema` versão `2`: todo campo da observação passou a `required`, nulidade migrou de `anyOf` para `"nullable": true`, o prompt ganhou regra explícita sobre a coluna de referência (vale linha a linha, e na tabela evolutiva vale para todas as colunas de coleta) e sobre preencher `refMin`/`refMax` em intervalo único. Além disso, `deriveRange` em `internal/handlers/extractions.go` lê os limites do texto literal quando o modelo os deixa nulos, recusando faixa condicional. Na interface, o selo "faixa não informada" virou "sem marcador": ele sempre falou do marcador `(1)` do laboratório, nunca da faixa, e a redação confundia.
+
 Depois disso, a v3.1 (relatórios de saúde gerados por IA) tem grill próprio, ainda não iniciado.
 
 ### Armadilhas que já custaram tempo, para não repetir
 
 - `ALTER TABLE ... DROP COLUMN` falha se a coluna estiver indexada: no `Down` da `007`, o índice é dropado antes. SQLite embutido é 3.49.2, folgado para `DROP COLUMN` (3.35+).
 - `responseSchema` e `responseMimeType` precisam ir em camelCase; em snake_case a API ignora **em silêncio** e devolve texto livre.
+- Campo fora de `required` no `responseSchema` **é descartado pelo modelo para poupar tokens de saída** — está na documentação do provedor. Foi assim que a faixa de referência sumiu num laudo real, com `gemini-3.7-flash`: o layout imprime a faixa em coluna à direita, e o modelo tratou o campo opcional como dispensável. Desde o prompt/schema `2`, **todo** campo da observação é obrigatório; o que pode faltar vai como `null`.
+- Nulidade no `responseSchema` vai como `"nullable": true`, convenção do provedor. `anyOf` misturado com irmãos e `"type": ["number","null"]` dão 400 ou comportamento silenciosamente errado.
+- Faixa impressa não vira automaticamente `ref_min`/`ref_max`: `deriveRange` lê o intervalo do texto literal e **recusa** qualquer coisa condicional (sexo, idade, jejum, etnia, risco) ou aberta. É transcrição, não cálculo — ADR 0004 continua valendo.
 - Tokens de raciocínio são cobrados como saída e vêm em `thoughtsTokenCount`, separado de `candidatesTokenCount`. Somar os dois, ou o custo aparece menor do que é.
 - A resposta bruta é gravada **antes** de interpretar, inclusive quando a chamada falha. Corrigir parsing nunca deve custar uma nova chamada: use `gemini.ParseRaw`.
 - Extração `pending` encontrada no arranque é chamada perdida, não progresso: `ExtractionMarkStale` a marca como falha.
