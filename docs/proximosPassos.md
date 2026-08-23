@@ -3,7 +3,7 @@
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
 **Última atualização:** 2026-08-23
-**Fase atual:** **fase 1 (esquema) concluída e verificada.** Grill concluído, Q1 a Q14 fechadas, plano em `docs/v3/plano.md`. Próximo passo: fase 2 (extração).
+**Fase atual:** fase 1 concluída. **Fase 2 implementada e verificada contra provedor falso; a prova com a API real ainda não foi executada**, porque enviar o laudo ao Google exige consentimento explícito do usuário (ADR 0005). Próximo passo: autorizar a chamada real, ou seguir para a fase 3.
 
 ---
 
@@ -132,8 +132,20 @@ Correção de fato: **PyMuPDF extrai as 16 páginas sem falha**, inclusive a 2 e
 
 **Prova executada:** `go test ./internal/db/ -run TestMigrate007`, em `internal/db/migrate_test.go`, verifica que a migração sobe, que o catálogo tem 55 linhas, que `glucose_serum` tem unidade `mg/dL`, que `homa_ir` é adimensional, que as três colunas novas de `files` existem, que `provenance` inválida é rejeitada pelo CHECK, que o `Down` remove tabelas e colunas, e que o `Up` seguinte funciona. `go build ./...`, `go vet ./...` e `go test ./...` passam por inteiro.
 
-### Fase 2 — Extração: **não iniciada**
+### Fase 2 — Extração: **implementada; prova real pendente de autorização**
 
-Próxima ação: cliente Gemini em Go puro, `responseSchema` declarado em Go, prompt versionado recebendo a lista fechada de `code`, endpoints `ADMIN` de disparo e de status, e goroutine gravando `raw_response` fora de transação. Prova: extrair o PDF de referência com chave real e conferir as Observações no banco.
+Arquivos novos: `internal/gemini/gemini.go`, `internal/models/health.go`, `internal/models/appconfig.go`, `internal/handlers/extractions.go`, `internal/handlers/extractions_test.go`. Rotas registradas em `cmd/medlog/main.go`, todas dentro do grupo `RequireAdmin`.
+
+**Decisão de implementação, registrada aqui porque não estava no grill:** usamos `POST /v1beta/models/{model}:generateContent`, não a Interactions API. A documentação de agosto de 2026 marca `generateContent` como legado mas plenamente suportado, e a Interactions API existe para carregar estado de conversa, que esta chamada não tem. Zero dependência nova: `net/http` e `encoding/json` bastam, então `CGO_ENABLED=0` e o tamanho da imagem continuam intactos.
+
+Fatos da API confirmados na documentação oficial: PDF inline em base64 até 50MB, acima disso Files API; `generationConfig.responseMimeType` e `responseSchema` em camelCase, snake_case é ignorado em silêncio; `usageMetadata` traz `promptTokenCount`, `candidatesTokenCount` e `thoughtsTokenCount` em campos separados, e o raciocínio é cobrado como saída, então o código soma `candidates + thoughts`; `gemini-3.1-flash-lite` não usa raciocínio, e na série 3.x não é possível desligá-lo.
+
+Endpoints: `POST /api/extractions` (exige `consent: true`, devolve 202 com a linha `pending`), `GET /api/extractions/{id}`, `GET /api/extractions/{id}/observations`, `GET /api/files/{id}/extractions`, `GET` e `PUT /api/admin/gemini-model`.
+
+Comportamentos que o código garante, cada um coberto por teste: sem consentimento nada é enviado; a linha nasce antes da chamada; a chamada roda em goroutine com `context.Background()`, para que o cliente desistir não cancele o que já está sendo cobrado; a resposta bruta é gravada antes de qualquer interpretação, e também quando a chamada falha; código fora do catálogo é descartado como pendência e nunca cria Indicador; Observação nasce em `review` e não aparece em série; `ExtractionMarkStale` no arranque marca como falha toda extração `pending`, porque goroutine não sobrevive a reinício; modelo fora da lista curada é rejeitado com 400.
+
+**Prova executada:** `go test ./internal/handlers/ -run TestExtraction`, seis testes, todos passando, contra um provedor falso em `httptest` que devolve o envelope real da API. O teste confere o que vai no fio (PDF inline, `responseSchema`, catálogo no prompt) e o que chega no banco, com um fixture que reproduz os casos difíceis do laudo real: `>90` sem `value_num`, TSH com faixa condicional e sem limites numéricos, valor evolutivo datado de 12/06/2025, `out_of_range` true e false vindos do marcador, e um analito fora do catálogo. Mutação de sanidade: desativar a checagem de consentimento faz o teste correspondente falhar com 202 em vez de 400. `go build ./...`, `go vet ./...` e `go test ./...` passam por inteiro.
+
+**Pendente, e é uma decisão do usuário, não técnica:** a prova definida no plano é extrair o PDF de referência com a chave real. Ela envia o laudo, com nome completo e data de nascimento, ao Google, e gasta cerca de US$ 0,02. O ADR 0005 exige consentimento explícito por documento, e esse consentimento é do usuário. `GEMINI_API_KEY` está presente no ambiente, então basta autorizar.
 
 Fases 3 e 4 conforme `docs/v3/plano.md`. Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.

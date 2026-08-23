@@ -19,6 +19,7 @@ import (
 	"medlog/internal/auth"
 	"medlog/internal/db"
 	embedfs "medlog/internal/embed"
+	"medlog/internal/gemini"
 	"medlog/internal/handlers"
 	appmiddleware "medlog/internal/middleware"
 	"medlog/internal/models"
@@ -63,6 +64,14 @@ func main() {
 		log.Printf("file hash backfill: %v", err)
 	}
 
+	// A goroutine cannot survive a restart, so an extraction still marked
+	// pending is a lost call, not progress in flight.
+	if stale, err := models.ExtractionMarkStale(context.Background(), database); err != nil {
+		log.Printf("mark stale extractions: %v", err)
+	} else if stale > 0 {
+		log.Printf("marked %d interrupted extraction(s) as failed", stale)
+	}
+
 	if err := bootstrapAdmin(database, adminEmail, adminPassword); err != nil {
 		log.Fatalf("bootstrap admin: %v", err)
 	}
@@ -83,7 +92,7 @@ func main() {
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/api", func(r chi.Router) {
-		registerRoutes(r, database, filesPath, databaseURL, trustProxy)
+		registerRoutes(r, database, filesPath, databaseURL, trustProxy, os.Getenv("GEMINI_API_KEY"))
 	})
 
 	r.Handle("/*", spaHandler())
@@ -102,7 +111,7 @@ func main() {
 	}
 }
 
-func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL string, trustProxy bool) {
+func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL string, trustProxy bool, geminiAPIKey string) {
 	authH := &handlers.AuthHandler{DB: database}
 	r.With(appmiddleware.RateLimit(database, trustProxy)).Post("/auth/signin", authH.SignIn)
 	r.Post("/auth/signout", authH.SignOut)
@@ -115,6 +124,7 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 	fileH := &handlers.FileHandler{DB: database, FilesPath: filesPath}
 	phoneH := &handlers.PhoneHandler{DB: database}
 	sharingH := &handlers.SharingHandler{DB: database}
+	extractionH := &handlers.ExtractionHandler{DB: database, FilesPath: filesPath, Client: gemini.New(geminiAPIKey)}
 	userH := &handlers.UserHandler{DB: database}
 	adminH := &handlers.AdminHandler{DB: database, FilesPath: filesPath, DBPath: extractDBPath(databaseURL)}
 	dashH := &handlers.DashboardHandler{DB: database}
@@ -198,6 +208,15 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Get("/admin/login-logs", adminH.ListLoginLogs)
 		r.Get("/admin/backup", adminH.Backup)
 		r.Post("/admin/restore", adminH.Restore)
+
+		// Extração restrita a ADMIN: a chave da API é credencial do servidor
+		// e cada chamada custa dinheiro (ADR 0005).
+		r.Post("/extractions", extractionH.Create)
+		r.Get("/extractions/{id}", extractionH.Get)
+		r.Get("/extractions/{id}/observations", extractionH.ListObservations)
+		r.Get("/files/{id}/extractions", extractionH.ListByFile)
+		r.Get("/admin/gemini-model", extractionH.Models)
+		r.Put("/admin/gemini-model", extractionH.SetModel)
 	})
 }
 
