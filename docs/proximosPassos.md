@@ -3,7 +3,7 @@
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
 **Última atualização:** 2026-08-23
-**Fase atual:** entrevista de desenho (grill) **concluída**. Q1 a Q14 fechadas. Plano faseado escrito em `docs/v3/plano.md`. Nenhuma linha de código de produção alterada ainda; o próximo passo é a fase 1 do plano.
+**Fase atual:** **fase 1 (esquema) concluída e verificada.** Grill concluído, Q1 a Q14 fechadas, plano em `docs/v3/plano.md`. Próximo passo: fase 2 (extração).
 
 ---
 
@@ -96,7 +96,7 @@ Arquivo de teste: `docs/pdfSangue/f39defb0-78a7-46fd-8d1c-96fea29bf841.pdf` (pas
 - Páginas 15 e 16 formam o **laudo evolutivo**: seis coletas anteriores identificadas por data e número de ficha, cobrindo de 2018 a 2025. Datas cobertas neste exemplar: 12/06/2025, 03/12/2024, 25/04/2024, 25/01/2024 e 27/03/2023.
 - Marcador `(1)` indica resultado fora da faixa de referência.
 - PII presente: nome completo, data de nascimento, número de ficha, médico e CRM, CNES do laboratório, assinaturas digitais.
-- Extratores de texto locais falham nas páginas 2 e 13; o Gemini recebe o PDF nativamente, então isso não bloqueia, mas confirma que depender de parsing local seria frágil.
+- Extração de texto local: PyMuPDF lê as 16 páginas sem falha, inclusive a 2 e a 13 (verificado na fase 1). Serve para conferir a extração da IA contra o laudo sem gastar tokens. O Gemini continua recebendo o PDF nativamente.
 
 ---
 
@@ -115,6 +115,25 @@ Fontes: `https://ai.google.dev/gemini-api/docs/pricing`, `https://ai.google.dev/
 
 ---
 
-## 7. Próxima ação
+## 7. Estado da execução
 
-Executar a **fase 1** de `docs/v3/plano.md`: migração `007` com `health_indicators` semeado, `health_observations`, `extractions` e as colunas novas em `files`. Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
+### Fase 1 — Esquema: **concluída**
+
+Migração `007_health_indicators.sql`, em `internal/migrations/`, com `Up` e `Down`:
+
+- `health_indicators`: catálogo global sem `user_id`, `code` UNIQUE, `unit` canônica.
+- `extractions`: `status` em (`pending`, `succeeded`, `failed`), `raw_response`, `input_tokens`, `output_tokens`, `prompt_version`, `schema_version`, `triggered_by`, `consented_at`.
+- `health_observations`: `value_text` NOT NULL e `value_num` opcional; `reference_text`, `ref_min`, `ref_max`, `out_of_range`; `provenance` em (`primary`, `evolutive`); `status` em (`review`, `confirmed`). Índice de série em `(user_id, indicator_id, collected_at)` e índice único em `(user_id, indicator_id, collected_at, provenance)`, que é o que dá suporte à substituição de `evolutive` por `primary`.
+- `files`: colunas novas `collected_at`, `lab_name`, `report_number`, mais índice em `collected_at`.
+
+**Catálogo semeado: 55 Indicadores**, não os cerca de 40 estimados no grill. A diferença vem do hemograma, que rende contagem absoluta e percentual separadas para cada série branca, e da filtração glomerular, que rende cinco Indicadores distintos (CKD-EPI 2009 afrodescendente e não afrodescendente, CKD-EPI 2021, MDRD afrodescendente e não afrodescendente). Nomes e unidades foram lidos do laudo de referência com PyMuPDF, não presumidos.
+
+Correção de fato: **PyMuPDF extrai as 16 páginas sem falha**, inclusive a 2 e a 13, ao contrário do que a seção 4 registrava. Isso não muda nenhuma decisão — o Gemini continua recebendo o PDF nativamente — mas serve para conferir a extração contra o laudo sem custo em tokens.
+
+**Prova executada:** `go test ./internal/db/ -run TestMigrate007`, em `internal/db/migrate_test.go`, verifica que a migração sobe, que o catálogo tem 55 linhas, que `glucose_serum` tem unidade `mg/dL`, que `homa_ir` é adimensional, que as três colunas novas de `files` existem, que `provenance` inválida é rejeitada pelo CHECK, que o `Down` remove tabelas e colunas, e que o `Up` seguinte funciona. `go build ./...`, `go vet ./...` e `go test ./...` passam por inteiro.
+
+### Fase 2 — Extração: **não iniciada**
+
+Próxima ação: cliente Gemini em Go puro, `responseSchema` declarado em Go, prompt versionado recebendo a lista fechada de `code`, endpoints `ADMIN` de disparo e de status, e goroutine gravando `raw_response` fora de transação. Prova: extrair o PDF de referência com chave real e conferir as Observações no banco.
+
+Fases 3 e 4 conforme `docs/v3/plano.md`. Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
