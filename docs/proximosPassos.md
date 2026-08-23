@@ -2,8 +2,8 @@
 
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
-**Última atualização:** 2026-08-22
-**Fase atual:** entrevista de desenho (grill) em andamento. Nenhuma linha de código alterada, por decisão explícita do usuário.
+**Última atualização:** 2026-08-23
+**Fase atual:** entrevista de desenho (grill) **concluída**. Q1 a Q14 fechadas. Plano faseado escrito em `docs/v3/plano.md`. Nenhuma linha de código de produção alterada ainda; o próximo passo é a fase 1 do plano.
 
 ---
 
@@ -22,48 +22,25 @@ Documento de origem: `docs/v3/MedLog V3.0.md`.
 | Q1 | Catálogo + Observações (`health_indicators` + `health_observations`), em vez de uma tabela por tipo de exame | `docs/adr/0001-catalogo-e-observacoes-para-indicadores-de-saude.md` |
 | Q2 | Sem entidade `Coleta`. A Observação carrega `collected_at` e `source_file_id`; o Laudo agrupa | `docs/adr/0002-sem-entidade-coleta-o-laudo-agrupa-observacoes.md` |
 | Q3 | Ingerir também o laudo evolutivo, distinguindo `provenance` (`primary` prevalece sobre `evolutive`) | `docs/adr/0003-ingestao-do-laudo-evolutivo-com-procedencia.md` |
+| Q4 | Faixa de referência: texto fiel sempre, `ref_min`/`ref_max` só quando inequívocos, `out_of_range` do marcador do laboratório | `docs/adr/0004-faixa-de-referencia-fiel-com-numericos-opcionais.md` |
+| Q5 | PDF enviado sem redação da PII; Consentimento de extração por documento; Extração restrita a `ADMIN`, com registro de autor, modelo e custo | `docs/adr/0005-pii-enviada-sem-redacao-com-consentimento-por-documento.md` |
+| Q6 | Extração gravada em `extractions` antes da chamada, executada em goroutine fora de transação, resposta bruta persistida, frontend por polling | `docs/adr/0006-extracao-persistida-antes-da-chamada-executada-em-goroutine.md` |
+| Q7 | Relatórios de IA ficam fora da v3.0, adiados para v3.1 com grill próprio | esta tabela (decisão de escopo, reversível, sem ADR) |
+| Q8 | Catálogo `health_indicators` global, semeado na migração `007`; chave `code` interno mais `unit` canônica; analito não catalogado gera pendência | `docs/adr/0007-catalogo-semeado-com-codigo-interno-como-chave.md` |
+| Q9 | Saída estruturada (`responseSchema`), esquema em Go como fonte única, lista plana, `value_text` sempre e `value_num` opcional, `prompt_version` e `schema_version` na Extração | `docs/adr/0008-saida-estruturada-com-esquema-em-go-e-versoes-gravadas.md` |
+| Q10 | Observações nascem em Revisão; `ADMIN` confere contra o PDF e confirma ou rejeita em bloco; só então valem | `docs/adr/0009-observacoes-nascem-em-revisao-confirmadas-em-bloco.md` |
+| Q11 | Extrair sempre. Cobertura pelo Laudo evolutivo não bloqueia nem avisa; a colisão continua resolvida por Q3. Decidido com base em custo medido, ver seção 6 | esta tabela (decisão reversível, sem ADR) |
+| Q12 | A Extração enriquece `files` com `collected_at`, `lab_name` e `report_number`, e sugere `custom_name` só se vazio; nada sobrescreve campo humano, e só grava na confirmação do bloco | `docs/adr/0010-extracao-enriquece-metadados-do-documento.md` |
+| Q13 | `gemini_model` em `app_config`, escolhido na aba admin a partir de lista curta declarada em Go, com o custo por Extração ao lado; padrão `gemini-3.1-flash-lite`. `GEMINI_API_KEY` permanece em variável de ambiente | esta tabela (decisão reversível, sem ADR) |
+| Q14 | Quatro fases: 1 esquema, 2 extração sem interface, 3 revisão, 4 visualização. A fase 2 é entregável sozinha, provada por endpoint e inspeção do banco | `docs/v3/plano.md` |
 
-Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de coleta, Procedência, Laudo evolutivo.
+Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de coleta, Faixa de referência, Procedência, Laudo evolutivo, Extração, Consentimento de extração, Revisão.
 
 ---
 
 ## 3. Perguntas em aberto
 
-Aguardando decisão do usuário. Uma pergunta por vez, na ordem abaixo.
-
-### Q4 — Valores de referência (em aberto agora)
-
-As faixas do laudo são condicionais, e cada exame condiciona por um eixo diferente: TSH por idade, ácido úrico por sexo, triglicérides por jejum, LDL por categoria de risco cardiovascular, eGFR por etnia e equação, hemograma por sexo e idade.
-
-- (a) Só o texto do laudo, fiel
-- (b) Só `ref_min`/`ref_max` numéricos
-- (c) Texto fiel + `ref_min`/`ref_max` opcionais (só quando inequívocos) + `out_of_range` vindo do marcador `(1)` do próprio laboratório
-
-**Recomendação: (c).** O laboratório já conhece sexo, idade e condições de coleta, e já declara o que está fora da faixa. Recalcular produziria resposta pior com menos informação.
-
-### Q5 — Privacidade da PII e autorização de gasto
-
-Enviar o PDF ao Gemini expõe ao Google nome completo, data de nascimento, médico e laboratório. Três decisões na mesma fronteira de confiança: redigir a PII antes de enviar; exigir consentimento explícito por documento; e quem pode disparar a extração, dado que `GEMINI_API_KEY` é credencial global e cada extração custa dinheiro, num modelo de compartilhamento familiar.
-
-**Recomendação:** não redigir (quebraria a validação de identidade e a interpretação por idade); consentimento explícito por documento, com registro de quem disparou, quando, qual modelo e custo em tokens; extração restrita a `ADMIN` na primeira fase. Merece ADR.
-
-### Q6 — Execução: síncrona ou trabalho persistido
-
-Dois fatos conflitam com o caminho óbvio: `frontend/src/lib/api.ts` aborta todo `fetch` em 30s, e o SQLite roda com uma única conexão física, então segurar transação durante a chamada externa travaria o app.
-
-- (a) Inline síncrono com timeout maior
-- (b) Linha em `extractions` gravada antes da chamada, execução em goroutine, frontend consultando status
-- (c) Fila com worker
-
-**Recomendação: (b).** Tokens são caros e limitados; gravar a resposta bruta antes de interpretar evita pagar a extração de novo por erro de parsing. A chamada externa acontece fora de qualquer transação.
-
-### Q7 — Relatórios de IA dentro ou fora da v3.0
-
-**Recomendação:** fora. Fases 1 a 4 entregam extração, revisão e visualização; relatórios ficam para v3.1, com grill próprio.
-
-### Rodada seguinte (depende das acima)
-
-Catálogo inicial de indicadores e chave de deduplicação; contrato de saída da IA e versionamento de prompt; tela de revisão humana; seleção do modelo na interface admin; corte exato das fases.
+Nenhuma. A fronteira do grill está vazia: Q1 a Q14 fechadas. Perguntas novas surgirão da execução das fases, e de v3.1 (relatórios de IA), que tem grill próprio.
 
 ---
 
@@ -111,17 +88,33 @@ Catálogo inicial de indicadores e chave de deduplicação; contrato de saída d
 
 Arquivo de teste: `docs/pdfSangue/f39defb0-78a7-46fd-8d1c-96fea29bf841.pdf` (pasta ignorada pelo git, dados sensíveis, nunca enviar ao remoto).
 
+**Informado pelo usuário, não levantado do repositório:** a princípio todos os exames de sangue vêm do mesmo laboratório, a Clínica Felippe Mattoso. O layout do laudo é, portanto, estável, o que favorece o mapeamento para o catálogo de Indicadores. Não é garantia contratual: o desenho continua tolerando laudo de outro laboratório, que cai em pendência em vez de dado errado.
+
 - 16 páginas, cerca de 40 analitos. O hemograma sozinho traz cerca de 20 sub-analitos.
 - Valores derivados e calculados: HOMA-IR, eGFR em três equações com variação por etnia, VLDL por fórmula de Martin/Hopkins, glicemia média estimada, relação PSA livre/total.
 - Resultados não numéricos que o modelo precisa tolerar: `>90`, `normais`, `----`, e texto morfológico livre.
-- Páginas 15 e 16 formam o **laudo evolutivo**: seis coletas anteriores identificadas por data e número de ficha, cobrindo de 2018 a 2025.
+- Páginas 15 e 16 formam o **laudo evolutivo**: seis coletas anteriores identificadas por data e número de ficha, cobrindo de 2018 a 2025. Datas cobertas neste exemplar: 12/06/2025, 03/12/2024, 25/04/2024, 25/01/2024 e 27/03/2023.
 - Marcador `(1)` indica resultado fora da faixa de referência.
 - PII presente: nome completo, data de nascimento, número de ficha, médico e CRM, CNES do laboratório, assinaturas digitais.
-- Três datas distintas: coleta (08/05/2026), liberação por analito (varia), impressão (04/07/2026). Só a de coleta ordena a série temporal.
 - Extratores de texto locais falham nas páginas 2 e 13; o Gemini recebe o PDF nativamente, então isso não bloqueia, mas confirma que depender de parsing local seria frágil.
 
 ---
 
-## 6. Próxima ação
+## 6. Custo medido da Extração (não recalcular)
 
-Responder **Q4**. Cada decisão fechada deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. O plano faseado em `docs/v3/` só é escrito quando Q4 a Q7 estiverem fechadas, porque o corte das fases e as colunas da tabela de Observações dependem delas.
+Fontes: `https://ai.google.dev/gemini-api/docs/pricing`, `https://ai.google.dev/gemini-api/docs/document-processing` e `https://ai.google.dev/gemini-api/docs/rate-limits`, consultadas em 2026-08-23, com preços vigentes até 31/12/2026.
+
+- O Gemini cobra **258 tokens por página** de PDF, contadas como imagem. O texto nativo do PDF **não é cobrado**.
+- O PDF de referência tem 16 páginas, contadas do arquivo: 4.128 tokens. Com prompt, esquema e catálogo de 40 indicadores, o input fica em torno de 6.100 tokens.
+- Saída estimada: cerca de 40 Observações `primary` e cerca de 180 `evolutive`, aproximadamente 9.100 tokens de JSON. Tokens de raciocínio são cobrados como saída.
+- Custo de uma Extração, tier pago, considerando raciocínio médio: `gemini-3.1-flash-lite` cerca de US$ 0,021; `gemini-3.5-flash-lite` US$ 0,035; `gemini-3.7-flash` US$ 0,054; `gemini-3.5-flash` US$ 0,127; `gemini-3.1-pro-preview` US$ 0,17.
+- O Free Tier zera o custo em dólar e o volume pessoal não chega perto dos limites de RPM, TPM e RPD. Mas no Free Tier o conteúdo é usado para melhorar os produtos do Google, o que colide com Q5. Os números por modelo deixaram de ser publicados na documentação e só aparecem no AI Studio.
+- `gemini-3.1-pro-preview` não tem Free Tier.
+
+**Consequência já usada em decisão:** o custo é baixo o bastante para não governar desenho. Foi o que fechou Q11 em "extrair sempre". O que governa a escolha do modelo é privacidade, não preço: tier pago, para que o laudo não entre em treino.
+
+---
+
+## 7. Próxima ação
+
+Executar a **fase 1** de `docs/v3/plano.md`: migração `007` com `health_indicators` semeado, `health_observations`, `extractions` e as colunas novas em `files`. Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
