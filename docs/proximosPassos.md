@@ -48,10 +48,10 @@ Nenhuma. A fronteira do grill está vazia: Q1 a Q14 fechadas. Perguntas novas su
 
 **Stack e restrições**
 - Go 1.24, `chi` v5, `modernc.org/sqlite` v1.37.1 puro Go, `CGO_ENABLED=0`. Imagem final `alpine:3.21`, ~30MB. Qualquer dependência com C está fora.
-- Gemini seria a **primeira dependência de rede externa** do projeto.
-- Migrações: `goose` v3, SQL embutido via `go:embed` em `internal/migrations/`. Existem `001`–`006`; **a próxima é `007`**.
+- Gemini é a **primeira e única dependência de rede externa** do projeto, em `internal/gemini/gemini.go`, escrita só com `net/http` e `encoding/json`. Nenhuma dependência foi somada em nenhuma fase: `go.mod` e `go.sum` estão intocados desde o começo da v3.0.
+- Migrações: `goose` v3, SQL embutido via `go:embed` em `internal/migrations/`. Existem `001`–`007`; **a próxima é `008`**.
 - `internal/db/db.go`: uma única conexão física (`MaxOpenConns=1`), WAL, `foreign_keys=ON`, `busy_timeout=5000`.
-- PKs são UUID TEXT (`google/uuid`). Timestamps `DATETIME` no formato `YYYY-MM-DD HH:MM:SS`.
+- PKs são UUID TEXT (`google/uuid`). Timestamps `DATETIME` gravados pelo driver com `_time_format=sqlite`, o que produz `YYYY-MM-DD HH:MM:SS+00:00` para todo valor escrito pelo Go. **Formato único importa:** o índice de deduplicação de Observações compara `collected_at` como texto, então um caminho de código que grave em outro formato passa a duplicar em silêncio. Há teste protegendo isso (`TestReview_ReExtractionDoesNotDuplicate`).
 - Sem extensão JSON em uso.
 - `frontend/src/lib/api.ts`: wrapper `fetch` com `credentials: 'include'` e **timeout de 30s**.
 - Frontend Svelte 5 compilado pelo Vite e embutido no binário via `go:embed` (`internal/embed/dist`).
@@ -60,27 +60,28 @@ Nenhuma. A fronteira do grill está vazia: Q1 a Q14 fechadas. Perguntas novas su
 - `users.role` com `ADMIN` | `USER`. Middlewares `RequireAuth` e `RequireAdmin` em `internal/auth/middleware.go`.
 - Todas as tabelas de domínio têm `user_id` com `ON DELETE CASCADE`. Há compartilhamento familiar.
 - Sessões via `alexedwards/scs` com store SQLite.
-- `app_config(key TEXT PK, value TEXT)` **já existe** (migração 003, hoje só guarda `session_secret_hash`) — cabe o modelo Gemini escolhido, sem tabela nova.
+- `app_config(key TEXT PK, value TEXT)` (migração 003) guarda `session_secret_hash` e, desde a fase 2, `gemini_model`. Credencial nunca entra aqui: `SESSION_SECRET` e `GEMINI_API_KEY` vivem no ambiente, e do primeiro só o hash é gravado.
 
 **Documentos**
-- Tabela `files`: `id`, `filename`, `custom_name`, `path`, `mime_type`, `size`, `hash` (SHA256), `thumbnail_path` (coluna existe e nunca é preenchida), `consultation_id`, `professional_id`, `user_id`, `uploaded_at`.
+- Tabela `files`: `id`, `filename`, `custom_name`, `path`, `mime_type`, `size`, `hash` (SHA256), `thumbnail_path` (coluna existe e nunca é preenchida), `consultation_id`, `professional_id`, `user_id`, `uploaded_at`, e desde a migração `007` também `collected_at`, `lab_name` e `report_number`.
 - Arquivos gravados no filesystem em `FILES_PATH` com nome `UUID.ext`. Confirma a convenção do PDF de exemplo.
 - Deduplicação por `(user_id, hash)` (migração 006). MIME aceitos: `application/pdf`, `image/png`, `image/jpeg`. Limite de 10MB validado no cliente.
 - Endpoints em `internal/handlers/files.go`: `ListMine`, `Upload`, `Serve`, `Update`, `Delete`.
-- **Nenhum processamento de PDF hoje**, nem dependência Go ou npm nesse sentido.
+- **Nenhum processamento local de PDF**, nem dependência Go ou npm nesse sentido: o Gemini recebe o PDF nativamente. PyMuPDF foi usado apenas em análise fora do produto, para conferir o laudo sem gastar tokens.
 
 **Domínio existente**
 - **Não existe entidade Exame.** Um exame é registrado como `Consultation` com `Files` anexados e categorizados por `FileCategory`.
 - Vocabulário misto: Go e SQL em `snake_case` inglês, JSON da API em `camelCase`, rótulos de UI em português.
 - Nenhuma entidade de resultado, valor medido ou indicador existe hoje.
-- Nenhuma biblioteca de gráficos no frontend.
+- Nenhuma biblioteca de gráficos no frontend. Continua sendo verdade, e é decisão da fase 4.
 - Envelope de resposta JSON: `{data, error, ok}`, com helpers `writeJSON` / `writeError` em `internal/handlers/helpers.go`.
 
 **Operação e CI**
 - Volume único `./data` com `db/` e `uploads/`. `DATABASE_URL` e `SESSION_SECRET` obrigatórias; `FILES_PATH`, `PORT`, `SESSION_SECURE`, `TRUST_PROXY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` opcionais.
 - GitHub Actions publica em `ghcr.io/edalcin/medlog` (linux/amd64). Roda lint, typecheck e build do frontend.
-- Existem 11 arquivos `_test.go` (handlers e models) que **não rodam no CI**.
-- Interface admin já existe: `internal/handlers/admin.go` (11 endpoints) e `frontend/src/routes/Admin.svelte` (9 abas), incluindo backup e restore.
+- Existem **14** arquivos `_test.go` (handlers, models e db) que **não rodam no CI**. Os três novos da v3.0 são `internal/db/migrate_test.go`, `internal/handlers/extractions_test.go` e `internal/handlers/review_test.go`.
+- Interface admin: `internal/handlers/admin.go` (11 endpoints) e `frontend/src/routes/Admin.svelte`, agora com **10 abas**, incluindo backup, restore e "Extração por IA".
+- `npm run check` **não existe** e `svelte-check` **não está instalado**. A verificação de frontend disponível é `npm run build`, que roda o compilador Svelte e reprova runa mal usada. Adicionar `svelte-check` é decisão em aberto, nunca proposta ao usuário como necessária.
 
 ---
 
@@ -169,3 +170,40 @@ O payload de revisão vem numa só chamada e as pendências e sugestões de meta
 Próxima ação conforme `docs/v3/plano.md`: série temporal por Indicador, apenas com Observação `confirmed`, faixa desenhada onde há `ref_min`/`ref_max`, ponto `evolutive` distinto, e Observação sem `value_num` em lista e não em gráfico. Nenhuma biblioteca de gráficos existe no frontend: escolher a menor que resolva, ou desenhar em SVG puro, dado o compromisso com o tamanho da imagem.
 
 Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
+
+---
+
+## 8. Como retomar numa sessão nova
+
+**Onde o trabalho está:** branch `main`, três commits da v3.0, working tree limpo.
+
+| Commit | Conteúdo |
+|---|---|
+| `9b02108` | grill fechado, ADRs 0004–0010, plano faseado |
+| `1568d72` | fase 1: migração `007`, catálogo com 55 Indicadores |
+| `014036c` | fase 2: cliente Gemini, endpoints, interpretação em Revisão |
+| `86ff55a` | fase 3: tela de revisão, confirmar/rejeitar, aba admin, correção de N+1 |
+
+**Reproduzir a verificação inteira, sem gastar token nenhum:**
+
+```
+go build ./... && go vet ./... && go test ./... -count=1
+cd frontend && npm run build
+```
+
+**Subir a aplicação de verdade para olhar a interface:** binário com `DATABASE_URL`, `SESSION_SECRET`, `FILES_PATH`, `PORT`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`. A extração aponta para documento **já existente** no sistema, anexado pelo fluxo normal de arquivos: não há upload no caminho de extração. O disparo fica na lista de documentos, só para `ADMIN` e só para PDF, atrás do diálogo de consentimento.
+
+### As duas decisões esperando o usuário
+
+**1. Autorizar a chamada real ao Gemini.** É a prova que falta da fase 2, definida no plano. Envia o laudo de referência, com nome completo e data de nascimento, ao Google, e gasta cerca de US$ 0,02. `GEMINI_API_KEY` estava presente no ambiente da sessão anterior. Sem essa autorização, a fase 2 permanece provada apenas contra provedor falso — o que cobre contrato, persistência e interpretação, mas não a qualidade real do mapeamento do modelo.
+
+**2. Fase 4, visualização.** Ninguém a começou. A pergunta de desenho ainda aberta é como desenhar o gráfico sem somar dependência: SVG puro, escrito à mão, contra uma biblioteca pequena. A inclinação registrada é SVG puro, pelo compromisso com o tamanho da imagem Docker, mas isso não foi decidido com o usuário.
+
+### Armadilhas que já custaram tempo, para não repetir
+
+- `ALTER TABLE ... DROP COLUMN` falha se a coluna estiver indexada: no `Down` da `007`, o índice é dropado antes. SQLite embutido é 3.49.2, folgado para `DROP COLUMN` (3.35+).
+- `responseSchema` e `responseMimeType` precisam ir em camelCase; em snake_case a API ignora **em silêncio** e devolve texto livre.
+- Tokens de raciocínio são cobrados como saída e vêm em `thoughtsTokenCount`, separado de `candidatesTokenCount`. Somar os dois, ou o custo aparece menor do que é.
+- A resposta bruta é gravada **antes** de interpretar, inclusive quando a chamada falha. Corrigir parsing nunca deve custar uma nova chamada: use `gemini.ParseRaw`.
+- Extração `pending` encontrada no arranque é chamada perdida, não progresso: `ExtractionMarkStale` a marca como falha.
+- O PDF pode não renderizar no `<iframe>` se o navegador estiver configurado para baixar PDFs. Não é defeito do servidor; a tela oferece abrir em outra aba.
