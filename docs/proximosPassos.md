@@ -3,7 +3,7 @@
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
 **Última atualização:** 2026-08-23
-**Fase atual:** fases 1, 2 e 3 concluídas e verificadas. **A prova com a API real do Gemini continua pendente de autorização** do usuário (ADR 0005). Próximo passo: autorizar a chamada real, ou seguir para a fase 4 (visualização).
+**Fase atual:** fases 1 a 4 concluídas e verificadas. A v3.0 está funcionalmente completa. **A prova com a API real do Gemini continua pendente de autorização** do usuário (ADR 0005), e é a única coisa que falta.
 
 ---
 
@@ -33,6 +33,7 @@ Documento de origem: `docs/v3/MedLog V3.0.md`.
 | Q12 | A Extração enriquece `files` com `collected_at`, `lab_name` e `report_number`, e sugere `custom_name` só se vazio; nada sobrescreve campo humano, e só grava na confirmação do bloco | `docs/adr/0010-extracao-enriquece-metadados-do-documento.md` |
 | Q13 | `gemini_model` em `app_config`, escolhido na aba admin a partir de lista curta declarada em Go, com o custo por Extração ao lado; padrão `gemini-3.1-flash-lite`. `GEMINI_API_KEY` permanece em variável de ambiente | esta tabela (decisão reversível, sem ADR) |
 | Q14 | Quatro fases: 1 esquema, 2 extração sem interface, 3 revisão, 4 visualização. A fase 2 é entregável sozinha, provada por endpoint e inspeção do banco | `docs/v3/plano.md` |
+| Q15 | Gráfico em SVG escrito à mão, sem biblioteca. Nenhuma dependência nova no frontend | esta tabela (decisão reversível, sem ADR) |
 
 Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de coleta, Faixa de referência, Procedência, Laudo evolutivo, Extração, Consentimento de extração, Revisão.
 
@@ -165,9 +166,19 @@ O payload de revisão vem numa só chamada e as pendências e sugestões de meta
 
 **Prova executada:** `go test ./internal/handlers/ -run TestReview`, cinco testes, incluindo o que garante que confirmar **não** sobrescreve metadado digitado por humano e ainda preenche o campo vazio, e o que garante que reextrair a mesma coleta **substitui em vez de duplicar** — este último protege a chave única de ADR 0003, que compara data como texto e só vale enquanto todo datetime é gravado num único formato. Verificação visual com a aplicação de verdade rodando: login, lista de documentos mostrando "1 extração / aguardando revisão", diálogo de consentimento com os quatro pontos, tela de revisão com as três regras difíceis honradas (`>90` marcado como não numérico, `faixa não informada` distinta de `dentro da faixa`, linha evolutiva distinta da primária), confirmação em bloco pela interface promovendo 8 Observações e gravando os 4 metadados, e a série de glicose passando a existir de 2024 a 2026. Aba admin verificada nos dois estados, com e sem `GEMINI_API_KEY`, para conferir o aviso de chave ausente. `go build ./...`, `go vet ./...`, `go test ./...` e `npm run build` passam.
 
-### Fase 4 — Visualização: **não iniciada**
+### Fase 4 — Visualização: **concluída**
 
-Próxima ação conforme `docs/v3/plano.md`: série temporal por Indicador, apenas com Observação `confirmed`, faixa desenhada onde há `ref_min`/`ref_max`, ponto `evolutive` distinto, e Observação sem `value_num` em lista e não em gráfico. Nenhuma biblioteca de gráficos existe no frontend: escolher a menor que resolva, ou desenhar em SVG puro, dado o compromisso com o tamanho da imagem.
+Backend: `IndicatorSeriesIndex` em `internal/models/health.go` e `internal/handlers/series.go` (`SeriesHandler`), com `GET /api/health-series` e `GET /api/health-series/{code}`. São as **primeiras rotas da v3.0 fora de `RequireAdmin`**: ler o próprio indicador é uso comum, e o escopo é sempre o usuário da sessão — o compartilhamento familiar cobre profissionais e clínicas, nunca resultado de exame. `ObservationFindSeries`, escrita na fase 2 e até então sem chamador, passou a ser usada.
+
+Frontend: `frontend/src/routes/HealthSeries.svelte`, rota `/indicators` em `App.svelte`, link "Indicadores" em `Navigation.svelte` (desktop e mobile), e `getSeriesIndex` / `getSeries` em `lib/api.ts`.
+
+**Q15, decidida na execução:** o gráfico é SVG escrito à mão dentro do próprio componente, cerca de 60 linhas de geometria. Nenhuma biblioteca entrou, então `package.json` continua intocado desde o começo da v3.0, como `go.mod`. Escalas linear em tempo e em valor, banda de referência como um `<rect>`, linha como `<polyline>`, pontos como `<circle>` com `<title>` nativo servindo de tooltip — zero JavaScript de interação.
+
+Regras do plano honradas e verificadas na tela: só Observação `confirmed` aparece; ponto `evolutive` é vazado e o `primary` é sólido; `out_of_range` pinta o ponto de vermelho; Observação sem `value_num` fica só na lista e não no gráfico; a faixa é desenhada apenas quando `ref_min` **e** `ref_max` existem — HDL, que só tem "Superior a 40", não ganha banda, como esperado.
+
+**Decisão de desenho que vale registrar:** a faixa desenhada é a da coleta mais recente que traz os dois limites, não uma por ponto. Faixa condicional (TSH por idade) muda entre coletas; uma banda só é honesta o bastante e evita um polígono que ninguém pediu. Está marcado no código com comentário `ponytail:`.
+
+**Prova executada:** `go test ./internal/handlers/ -run TestSeries`, que verifica que Observação em Revisão não existe na série nem no índice, que o dado de outro usuário não vaza, que a ordem é por Data de coleta crescente, que a procedência sobrevive ao caminho todo, e que indicador sem dado confirmado responde vazio em vez de erro. Verificação visual com a aplicação de verdade rodando em `:3399`, com base semeada com cinco medidas de glicose de 2018 a 2026 (quatro `evolutive`, uma `primary`, duas fora da faixa), duas de HDL e uma não numérica: o gráfico saiu com a banda 70–99, os pontos vazados, os dois pontos vermelhos e a tabela de medidas coerente. `go build ./...`, `go vet ./...`, `go test ./...` e `npm run build` passam.
 
 Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
 
@@ -175,7 +186,7 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 
 ## 8. Como retomar numa sessão nova
 
-**Onde o trabalho está:** branch `main`, três commits da v3.0, working tree limpo.
+**Onde o trabalho está:** branch `main`, working tree limpo.
 
 | Commit | Conteúdo |
 |---|---|
@@ -183,6 +194,8 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 | `1568d72` | fase 1: migração `007`, catálogo com 55 Indicadores |
 | `014036c` | fase 2: cliente Gemini, endpoints, interpretação em Revisão |
 | `86ff55a` | fase 3: tela de revisão, confirmar/rejeitar, aba admin, correção de N+1 |
+| `893c83c` | continuidade atualizada para retomada da fase 4 |
+| `(esta sessão)` | fase 4: série temporal, gráfico SVG sem dependência |
 
 **Reproduzir a verificação inteira, sem gastar token nenhum:**
 
@@ -193,11 +206,11 @@ cd frontend && npm run build
 
 **Subir a aplicação de verdade para olhar a interface:** binário com `DATABASE_URL`, `SESSION_SECRET`, `FILES_PATH`, `PORT`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`. A extração aponta para documento **já existente** no sistema, anexado pelo fluxo normal de arquivos: não há upload no caminho de extração. O disparo fica na lista de documentos, só para `ADMIN` e só para PDF, atrás do diálogo de consentimento.
 
-### As duas decisões esperando o usuário
+### A decisão esperando o usuário
 
-**1. Autorizar a chamada real ao Gemini.** É a prova que falta da fase 2, definida no plano. Envia o laudo de referência, com nome completo e data de nascimento, ao Google, e gasta cerca de US$ 0,02. `GEMINI_API_KEY` estava presente no ambiente da sessão anterior. Sem essa autorização, a fase 2 permanece provada apenas contra provedor falso — o que cobre contrato, persistência e interpretação, mas não a qualidade real do mapeamento do modelo.
+**Autorizar a chamada real ao Gemini.** É a prova que falta da fase 2, definida no plano, e a única pendência da v3.0. Envia o laudo de referência, com nome completo e data de nascimento, ao Google, e gasta cerca de US$ 0,02. `GEMINI_API_KEY` estava presente no ambiente da sessão anterior. Sem essa autorização, a fase 2 permanece provada apenas contra provedor falso — o que cobre contrato, persistência e interpretação, mas não a qualidade real do mapeamento do modelo.
 
-**2. Fase 4, visualização.** Ninguém a começou. A pergunta de desenho ainda aberta é como desenhar o gráfico sem somar dependência: SVG puro, escrito à mão, contra uma biblioteca pequena. A inclinação registrada é SVG puro, pelo compromisso com o tamanho da imagem Docker, mas isso não foi decidido com o usuário.
+Depois disso, a v3.1 (relatórios de saúde gerados por IA) tem grill próprio, ainda não iniciado.
 
 ### Armadilhas que já custaram tempo, para não repetir
 

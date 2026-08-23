@@ -590,3 +590,20 @@ export const getGeminiModel = () =>
 
 export const setGeminiModel = (model: string) =>
   request<{ data: { current: string } }>('PUT', '/admin/gemini-model', { model }).then(r => r.data)
+
+// Série temporal de indicadores. Só Observação confirmada aparece aqui, e o
+// escopo é sempre o usuário da sessão (ADR 0009).
+export interface IndicatorSeries {
+  code: string
+  name: string
+  unit?: string
+  count: number
+  numericCount: number
+  lastCollectedAt: string
+}
+
+export const getSeriesIndex = () =>
+  request<{ data: IndicatorSeries[] }>('GET', '/health-series').then(r => r.data)
+
+export const getSeries = (code: string) =>
+  request<{ data: Observation[] }>('GET', `/health-series/${encodeURIComponent(code)}`).then(r => r.data)

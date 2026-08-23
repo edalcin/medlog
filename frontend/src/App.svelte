@@ -15,6 +15,7 @@
   import Sharing from './routes/Sharing.svelte'
   import Files from './routes/Files.svelte'
   import ExtractionReview from './routes/ExtractionReview.svelte'
+  import HealthSeries from './routes/HealthSeries.svelte'
 
   import './app.css'
 
@@ -28,6 +29,7 @@
     '/professionals': ProfessionalList,
     '/professionals/:id': ProfessionalDetail,
     '/files': Files,
+    '/indicators': HealthSeries,
     '/reports': Reports,
     '/sharing': Sharing,
     '/extractions/:id/review': ExtractionReview,

@@ -128,6 +128,7 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 	userH := &handlers.UserHandler{DB: database}
 	adminH := &handlers.AdminHandler{DB: database, FilesPath: filesPath, DBPath: extractDBPath(databaseURL)}
 	dashH := &handlers.DashboardHandler{DB: database}
+	seriesH := &handlers.SeriesHandler{DB: database}
 
 	r.Group(func(r chi.Router) {
 		r.Use(auth.RequireAuth)
@@ -137,6 +138,10 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Put("/users/me/password", userH.MeUpdatePassword)
 		r.Patch("/users/me/theme", userH.MeUpdateTheme)
 		r.Get("/dashboard", dashH.Get)
+
+		// Série de indicadores: dado do próprio usuário, não é rota de ADMIN.
+		r.Get("/health-series", seriesH.Index)
+		r.Get("/health-series/{code}", seriesH.Series)
 
 		r.Get("/specialties", specialtyH.List)
 		r.Get("/file-categories", categoryH.List)

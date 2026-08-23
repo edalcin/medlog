@@ -34,6 +34,7 @@
     <a href="/consultations" use:link class:active={$location === '/consultations'}>Consultas</a>
     <a href="/professionals" use:link class:active={$location.startsWith('/professionals')}>Profissionais</a>
     <a href="/files" use:link class:active={$location === '/files'}>Arquivos</a>
+    <a href="/indicators" use:link class:active={$location === '/indicators'}>Indicadores</a>
     <a href="/reports" use:link class:active={$location === '/reports'}>Relatórios</a>
     <a href="/sharing" use:link class:active={$location === '/sharing'}>Compartilhamento</a>
     {#if $isAdmin}
@@ -72,6 +73,7 @@
     <button class="mobile-link" onclick={() => navigate('/consultations')} class:active={$location === '/consultations'}>Consultas</button>
     <button class="mobile-link" onclick={() => navigate('/professionals')} class:active={$location.startsWith('/professionals')}>Profissionais</button>
     <button class="mobile-link" onclick={() => navigate('/files')} class:active={$location === '/files'}>Arquivos</button>
+    <button class="mobile-link" onclick={() => navigate('/indicators')} class:active={$location === '/indicators'}>Indicadores</button>
     <button class="mobile-link" onclick={() => navigate('/reports')} class:active={$location === '/reports'}>Relatórios</button>
     <button class="mobile-link" onclick={() => navigate('/sharing')} class:active={$location === '/sharing'}>Compartilhamento</button>
     {#if $isAdmin}

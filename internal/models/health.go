@@ -310,6 +310,53 @@ func ObservationFindSeries(ctx context.Context, db *sql.DB, userID, indicatorCod
 	return scanObservations(rows)
 }
 
+// IndicatorSeries is one row of the series index: an Indicator the user has
+// confirmed data for. NumericCount is what a chart can draw; the difference
+// against Count is the part that only exists as a list, because ">90" has no
+// place on an axis.
+type IndicatorSeries struct {
+	Code            string  `json:"code"`
+	Name            string  `json:"name"`
+	Unit            *string `json:"unit,omitempty"`
+	Count           int     `json:"count"`
+	NumericCount    int     `json:"numericCount"`
+	LastCollectedAt string  `json:"lastCollectedAt"`
+}
+
+// IndicatorSeriesIndex lists the Indicators that have confirmed Observations
+// for one user. Anything still in review is absent on purpose (ADR 0009).
+func IndicatorSeriesIndex(ctx context.Context, db *sql.DB, userID string) ([]IndicatorSeries, error) {
+	rows, err := db.QueryContext(ctx, `
+SELECT i.code, i.name, i.unit, COUNT(*),
+       SUM(CASE WHEN o.value_num IS NOT NULL THEN 1 ELSE 0 END),
+       MAX(o.collected_at)
+FROM health_observations o
+JOIN health_indicators i ON i.id = o.indicator_id
+WHERE o.user_id = ? AND o.status = ?
+GROUP BY i.id
+ORDER BY i.name`, userID, ObservationConfirmed)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	list := []IndicatorSeries{}
+	for rows.Next() {
+		var s IndicatorSeries
+		var last string
+		if err := rows.Scan(&s.Code, &s.Name, &s.Unit, &s.Count, &s.NumericCount, &last); err != nil {
+			return nil, err
+		}
+		// Stored as "YYYY-MM-DD HH:MM:SS+00:00"; the index only shows the day.
+		if len(last) >= 10 {
+			last = last[:10]
+		}
+		s.LastCollectedAt = last
+		list = append(list, s)
+	}
+	return list, rows.Err()
+}
+
 // ObservationConfirmByExtraction promotes a whole extraction at once: block
 // confirmation is one act, not forty.
 func ObservationConfirmByExtraction(ctx context.Context, db *sql.DB, extractionID string) (int64, error) {
