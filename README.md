@@ -8,13 +8,14 @@
 [![Svelte](https://img.shields.io/badge/svelte-5-FF3E00.svg)](https://svelte.dev/)
 [![SQLite](https://img.shields.io/badge/sqlite-embedded-003B57.svg)](https://www.sqlite.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
+[![Gemini](https://img.shields.io/badge/gemini-opcional-8E75B2.svg)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 ---
 
 ## Visão Geral
 
-MedLog centraliza o histórico médico de consultas, exames, laudos e receitas em um único local seguro e privado. Projetado para uso familiar — cada usuário gerencia seu próprio histórico, com compartilhamento opcional entre membros da família e um administrador com visão global.
+MedLog centraliza o histórico médico de consultas, exames, laudos e receitas em um único local seguro e privado. Projetado para uso familiar — cada usuário gerencia seu próprio histórico, com compartilhamento opcional entre membros da família e um administrador com visão global. Desde a v3.0, extrai também os indicadores de saúde de dentro dos PDFs de laudo, com revisão humana antes de o dado valer.
 
 ### Funcionalidades
 
@@ -22,6 +23,14 @@ MedLog centraliza o histórico médico de consultas, exames, laudos e receitas e
 - Registro de consultas com notas em Markdown e avaliação (1–5 estrelas)
 - Upload de arquivos (PDF, PNG, JPG — até 10MB por arquivo)
 - Categorização de arquivos (laudos, receitas, pedidos de exame, etc.)
+
+**Indicadores de Saúde (v3.0)**
+- Extração dos valores de um PDF de laudo por IA (Gemini), a partir de documento **já anexado** no sistema
+- Catálogo global de 55 Indicadores semeado na instalação (hemograma, lipidograma, função renal, tireoide, etc.)
+- Revisão obrigatória: o `ADMIN` confere a lista inteira ao lado do PDF e confirma ou rejeita em bloco — valor não revisado não aparece em lugar nenhum
+- Leitura do laudo evolutivo: as coletas anteriores impressas no próprio documento viram série histórica
+- Série temporal por Indicador, com faixa de referência desenhada e valor fora da faixa destacado
+- Valor com qualificador (`>90`, `normais`) é guardado fiel e listado, nunca convertido em número
 
 **Profissionais e Clínicas**
 - Gestão de profissionais de saúde com múltiplas especialidades e clínica associada
@@ -48,12 +57,15 @@ MedLog centraliza o histórico médico de consultas, exames, laudos e receitas e
 - Gerenciamento de dicionários: especialidades, categorias, clínicas
 - Logs de acesso com IP e user-agent
 - Backup e restauração do banco SQLite
+- Escolha do modelo de IA usado na extração, com o custo estimado por laudo ao lado de cada opção
 
-**Segurança**
+**Segurança e Privacidade**
 - Rate limiting no login (5 tentativas/minuto por IP)
 - Content-Security-Policy, X-Frame-Options, HSTS
 - Sessões server-side com invalidação automática ao rotacionar SESSION_SECRET
 - Timeout de 30s em todas as chamadas de API
+- Nenhum documento sai do servidor sem consentimento explícito, por documento, registrado com autor e data
+- A chave da API de IA vive só no ambiente do processo; nunca é gravada no banco nem exposta pela interface
 
 ---
 
@@ -90,10 +102,11 @@ services:
       ADMIN_EMAIL: admin@exemplo.com
       ADMIN_PASSWORD: senha_forte
       SESSION_SECURE: "true"
+      GEMINI_API_KEY: "sua_chave_do_google_ai_studio"   # opcional — habilita a extração por IA
       TRUST_PROXY: "false"   # "true" se estiver atrás de nginx/Cloudflare
     restart: unless-stopped
     healthcheck:
-      test: ["/medlog", "healthcheck"]
+      test: ["CMD", "/medlog", "healthcheck"]
       interval: 30s
       timeout: 3s
       start_period: 10s
@@ -102,12 +115,30 @@ services:
 
 > `ADMIN_EMAIL` e `ADMIN_PASSWORD` são usados apenas no **primeiro boot** para criar o usuário administrador. Após a criação, podem ser removidos das variáveis de ambiente.
 
+> `GEMINI_API_KEY` é **opcional**. Sem ela o MedLog funciona por inteiro, apenas com a extração por IA desabilitada — o painel admin avisa que a chave está ausente. Use uma chave de **tier pago**: no Free Tier o Google usa o conteúdo enviado para melhorar os produtos dele, e o laudo carrega nome completo e data de nascimento.
+
+---
+
+## Extraindo indicadores de um laudo
+
+Requer `GEMINI_API_KEY` no ambiente e um usuário `ADMIN`.
+
+1. **Admin → Extração por IA** — escolha o modelo. O padrão é `gemini-3.1-flash-lite`, cerca de US$ 0,02 por laudo de 16 páginas; o custo estimado de cada opção aparece ao lado
+2. **Arquivos** — no PDF do laudo, dispare a extração e confirme o diálogo de consentimento. O documento precisa já estar anexado: não há upload nesse caminho
+3. A chamada dura minutos e roda no servidor; a tela acompanha o andamento sozinha
+4. **Revisão** — confira a lista inteira contra o PDF exibido ao lado e confirme ou rejeite em bloco. Rejeitar descarta os valores e preserva a Extração, que continua auditável
+5. **Indicadores** — a série temporal passa a mostrar o que foi confirmado, incluindo as coletas antigas lidas do laudo evolutivo
+
+O que o modelo não souber mapear vira pendência na tela de revisão, nunca um Indicador inventado. Promover um analito novo ao catálogo é decisão explícita do `ADMIN`.
+
 ---
 
 ## Documentação
 
 - **[Instalação e Unraid](UNRAID.md)** — guia detalhado para instalar no Unraid
 - **[Documentação Técnica](TECHNICAL.md)** — arquitetura, schema do banco, desenvolvimento local
+- **[Vocabulário do domínio](CONTEXT.md)** — o que é Indicador, Observação, Laudo, Procedência, Revisão
+- **[Decisões de arquitetura](docs/adr/)** — ADRs, incluindo as que governam privacidade e revisão da extração
 
 ---
 

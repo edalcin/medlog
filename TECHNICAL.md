@@ -1,4 +1,4 @@
-# Documentação Técnica — MedLog v2
+# Documentação Técnica — MedLog v3
 
 ---
 
@@ -14,6 +14,7 @@
 | Frontend | Svelte 5 + Vite 5 + TypeScript |
 | Roteamento SPA | @keenmate/svelte-spa-router |
 | Markdown | marked v18 |
+| IA (opcional) | Google Gemini via REST, escrito só com `net/http` e `encoding/json` |
 | Deploy | Docker multi-stage (alpine:3.21, ~30MB imagem final) |
 
 O frontend é compilado em tempo de build e embutido no binário Go via `//go:embed`. O resultado é um único executável sem dependências externas além do SQLite.
@@ -72,14 +73,21 @@ internal/
     sharing.go                  # Compartilhamento entre usuários
     users.go                    # CRUD usuários + /me/password + /me/theme + /others
     admin.go                    # Admin: stats, bulk-delete, backup/restore, login-logs
+    extractions.go              # Extração por IA: disparo, status, revisão, confirmar/rejeitar
+    series.go                   # Série temporal de indicadores (rotas de usuário, não de admin)
     dashboard.go                # Dashboard com cache TTL 5min
     helpers.go                  # parsePagination, writeJSON, writePagedJSON, writeDBError
     auth_test.go
     consultations_test.go
     professionals_test.go
+    extractions_test.go         # Extração contra provedor falso (httptest)
+    review_test.go              # Revisão, confirmação em bloco e não-duplicação
+    series_test.go              # Série: só confirmed, escopo por usuário
   middleware/
     security.go                 # CSP, X-Frame-Options, HSTS, nosniff
     ratelimit.go                # Rate limiting SQLite (5 req/min/IP) para /auth/signin
+  gemini/
+    gemini.go                   # Cliente Gemini: PDF inline, responseSchema, contagem de tokens
   models/                       # Funções SQL (sem ORM)
     user.go
     consultation.go
@@ -90,6 +98,8 @@ internal/
     phone.go                    # PhoneFindBy*, PhoneCreate, PhoneBelongsToUser
     sharing.go                  # ProfessionalSharing*, ClinicSharing*
     login_log.go                # LoginLogFindAll
+    health.go                   # Indicator*, Observation*, Extraction* (v3.0)
+    appconfig.go                # ConfigGet/ConfigSet sobre app_config
     helpers.go                  # inClause, anySlice (batch queries)
     user_test.go
     consultation_test.go
@@ -100,6 +110,9 @@ internal/
     002_add_sessions.sql
     003_rate_limiting_and_config.sql
     004_login_logs_extended.sql
+    005_fix_datetime_format.sql
+    006_file_hash_index.sql
+    007_health_indicators.sql   # Catálogo + observações + extrações (v3.0)
     migrations.go               # //go:embed *.sql
 frontend/
   src/lib/api.ts                # Cliente API tipado (todos os endpoints)
@@ -113,7 +126,10 @@ frontend/
     ProfessionalDetail.svelte   # CRUD + phones + specialties + clinic
     Sharing.svelte              # Gerenciar compartilhamento com outros usuários
     Reports.svelte
-    Admin.svelte                # Todos os tabs admin incluindo login logs
+    Admin.svelte                # Tabs admin, incluindo login logs e "Extração por IA"
+    Files.svelte                # Lista de documentos + disparo de extração
+    ExtractionReview.svelte     # Revisão em bloco ao lado do PDF
+    HealthSeries.svelte         # Série temporal, gráfico SVG escrito à mão
     SignIn.svelte
   src/components/
     Navigation.svelte           # Cyclo de tema SYSTEM/LIGHT/DARK
@@ -172,6 +188,8 @@ files
   id, filename, custom_name, path, mime_type, size, hash
   consultation_id → consultations, professional_id → professionals
   user_id → users, uploaded_at
+  collected_at, lab_name, report_number    # v3.0 — preenchidos pela Extração, nunca por cima de valor humano
+  UNIQUE(user_id, hash)                    # deduplicação de upload
 
 file_file_categories
   id, file_id → files, category_id → file_categories, created_at
@@ -187,6 +205,25 @@ rate_limit_attempts
 app_config
   key TEXT PRIMARY KEY, value TEXT
 
+health_indicators                          # v3.0 — catálogo global, sem user_id
+  id, code UNIQUE, name, unit, created_at
+
+extractions                                # v3.0 — uma linha por envio ao provedor de IA
+  id, user_id → users, file_id → files, triggered_by → users
+  model, prompt_version, schema_version
+  status (pending|succeeded|failed), raw_response
+  input_tokens, output_tokens, error
+  consented_at, created_at, finished_at
+
+health_observations                        # v3.0 — uma medição de um Indicador
+  id, user_id → users, indicator_id → health_indicators
+  source_file_id → files, extraction_id → extractions
+  collected_at, value_text NOT NULL, value_num NULL, unit
+  reference_text, ref_min, ref_max, out_of_range
+  provenance (primary|evolutive), status (review|confirmed), created_at
+  INDEX(user_id, indicator_id, collected_at)                        # a consulta da série
+  UNIQUE(user_id, indicator_id, collected_at, provenance)           # reextrair substitui, não duplica
+
 sessions                        # gerenciado pelo alexedwards/scs
   token, data, expiry
 ```
@@ -196,6 +233,9 @@ sessions                        # gerenciado pelo alexedwards/scs
 - `consultations` delete → cascata em `files`
 - `professionals` delete → cascata em `professional_specialties`, `phones`
 - `clinics` delete → SET NULL em `professionals.clinic_id`; cascata em `phones`
+- `users` delete → cascata também em `health_observations` e `extractions`
+
+**Formato de datetime:** todo valor gravado pelo Go usa `_time_format=sqlite`, que produz `YYYY-MM-DD HH:MM:SS+00:00`. O índice único de Observações compara `collected_at` como texto: um caminho de código que grave em outro formato passa a duplicar em silêncio. Há teste protegendo isso (`TestReview_ReExtractionDoesNotDuplicate`).
 
 ---
 
@@ -243,9 +283,14 @@ GET    /api/consultations/{id}
 PUT    /api/consultations/{id}
 DELETE /api/consultations/{id}
 
+GET    /api/files                Lista os próprios documentos (traz estado da extração)
 POST   /api/files
 GET    /api/files/{filename}     Cache-Control: private, max-age=3600
+PATCH  /api/files/{id}
 DELETE /api/files/{id}
+
+GET    /api/health-series        Indicadores com Observação confirmada do usuário
+GET    /api/health-series/{code} Série temporal de um Indicador
 
 GET    /api/sharing/professionals
 POST   /api/sharing/professionals
@@ -281,6 +326,19 @@ GET    /api/admin/files
 GET    /api/admin/login-logs
 GET    /api/admin/backup
 POST   /api/admin/restore
+
+GET    /api/admin/gemini-model   Modelo atual + lista curada + se a chave está presente
+PUT    /api/admin/gemini-model
+
+POST   /api/extractions          Exige consent: true; responde 202 com a linha pending
+GET    /api/extractions/{id}     Alvo do polling: a chamada dura mais que o timeout de 30s
+GET    /api/extractions/{id}/observations
+GET    /api/extractions/{id}/review     Observações + pendências + metadados sugeridos
+POST   /api/extractions/{id}/confirm    Confirma o bloco e grava metadados vazios de files
+POST   /api/extractions/{id}/reject     Descarta Observações, preserva a Extração
+GET    /api/files/{id}/extractions
+GET    /api/health-indicators
+POST   /api/health-indicators    Promove analito pendente ao catálogo
 ```
 
 ---
@@ -320,6 +378,7 @@ ADMIN_EMAIL=admin@exemplo.com
 ADMIN_PASSWORD=senha_forte
 SESSION_SECURE=false
 TRUST_PROXY=false
+GEMINI_API_KEY=            # opcional — habilita a extração por IA
 ```
 
 | Variável | Obrigatória | Descrição |
@@ -332,6 +391,7 @@ TRUST_PROXY=false
 | `ADMIN_PASSWORD` | primeiro boot | Senha do admin inicial |
 | `SESSION_SECURE` | não | `true` em produção (HTTPS). Padrão: `false` |
 | `TRUST_PROXY` | não | `true` se atrás de proxy reverso (ativa X-Forwarded-For para rate limiting) |
+| `GEMINI_API_KEY` | não | Chave do Google AI Studio. Ausente, a extração por IA fica desabilitada e o resto funciona igual. Nunca é gravada no banco |
 
 ### Comandos
 
@@ -395,6 +455,55 @@ Um usuário pode compartilhar seus profissionais e/ou clínicas com outros usuá
 
 ---
 
+## Extração de Indicadores por IA (v3.0)
+
+Extrai os valores de um PDF de laudo **já anexado** ao sistema e os transforma em Observações de Indicadores. Não há upload no caminho da extração.
+
+### Fluxo
+
+1. `POST /api/extractions` com `consent: true`. Sem consentimento explícito nada é enviado — o pedido morre em 400.
+2. A linha nasce em `extractions` com `status = pending` **antes** da chamada: uma queda no meio deixa evidência, não silêncio.
+3. A chamada roda em goroutine com `context.Background()`, fora de qualquer transação. O cliente desistir não cancela o que já está sendo cobrado.
+4. `raw_response` e os contadores de token são gravados **antes** de qualquer interpretação, inclusive quando a chamada falha. Corrigir parsing nunca custa uma nova chamada: use `gemini.ParseRaw`.
+5. As Observações nascem com `status = review`. Nenhuma aparece em série antes de um `ADMIN` confirmar o bloco.
+6. `POST /api/extractions/{id}/confirm` promove tudo de uma vez e grava em `files` apenas os metadados ainda vazios. A guarda contra sobrescrever valor humano está no SQL (`COALESCE`/`NULLIF`), não no chamador.
+
+Uma extração encontrada em `pending` no arranque é chamada perdida, não progresso: `ExtractionMarkStale` a marca como falha. Goroutine não sobrevive a reinício.
+
+### Cliente Gemini
+
+- `POST /v1beta/models/{model}:generateContent`, PDF inline em base64 (limite de 50MB; acima disso seria a Files API)
+- `generationConfig.responseMimeType` e `responseSchema` em **camelCase** — em snake_case a API ignora em silêncio e devolve texto livre
+- Esquema de saída declarado em Go, fonte única, com `prompt_version` e `schema_version` gravados em cada Extração
+- Custo: `promptTokenCount` + (`candidatesTokenCount` + `thoughtsTokenCount`). Tokens de raciocínio são cobrados como saída
+- O Gemini cobra 258 tokens por página de PDF; o texto nativo não é cobrado
+- Modelo lido de `app_config.gemini_model`, padrão `gemini-3.1-flash-lite`, escolhido na aba admin a partir de lista curada em Go
+
+### Catálogo e procedência
+
+- `health_indicators` é global e semeado pela migração `007` com 55 Indicadores. Analito sem correspondência **nunca** cria Indicador: vira pendência, e promovê-lo é ação explícita de `ADMIN`
+- `provenance = primary` é o bloco principal do laudo; `evolutive` é a tabela comparativa de coletas anteriores, que traz só valor e data. Na colisão, `primary` prevalece — é o que a chave única por procedência garante
+- `value_text` guarda sempre o literal impresso; `value_num` só quando é número sem qualificador. `>90` jamais vira 90
+- `ref_min`/`ref_max` só quando o laudo traz faixa única e inequívoca; `out_of_range` vem do marcador do próprio laboratório. O MedLog não calcula faixa nem decide se um resultado está alterado
+
+### Privacidade
+
+O PDF vai ao provedor **sem redação de PII** — nome completo, data de nascimento e número de ficha incluídos —, por decisão registrada no ADR 0005. O que protege é o consentimento por documento, gravado em `consented_at` com o autor em `triggered_by`, e a restrição a `ADMIN`: a chave é credencial do servidor e cada chamada custa dinheiro. Use tier pago; no Free Tier o conteúdo entra em treino.
+
+> `internal/middleware/security.go` usa `X-Frame-Options: SAMEORIGIN`, com `frame-src 'self'`, `object-src 'self'` e `frame-ancestors 'self'` no CSP. A tela de revisão mostra o PDF ao lado dos valores, e `DENY` bloqueava até o enquadramento da própria origem. Enquadramento por terceiro continua bloqueado.
+
+---
+
+## Série Temporal de Indicadores
+
+- `GET /api/health-series` e `/api/health-series/{code}` são rotas de **usuário**, não de admin: ler o próprio indicador é uso comum. O escopo é sempre o usuário da sessão — o compartilhamento familiar cobre profissionais e clínicas, nunca resultado de exame
+- Só Observação `confirmed` existe para a série. O que está em Revisão não aparece nem no índice
+- O gráfico é **SVG escrito à mão** em `HealthSeries.svelte`: nenhuma biblioteca de gráficos entrou no bundle
+- Faixa de referência desenhada só quando `ref_min` **e** `ref_max` existem, usando a coleta mais recente que traz os dois
+- Ponto `evolutive` é vazado, `primary` é sólido, `out_of_range` é vermelho
+- Observação sem `value_num` aparece em lista, nunca no eixo
+---
+
 ## Backup e Restauração
 
 Disponível em Admin → aba **Backup & Restauração**:
@@ -415,10 +524,16 @@ go test ./...
 Cobertura:
 - `internal/models/` — user, consultation, professional (crud + batch specialties + count)
 - `internal/handlers/` — auth (rate limit), consultations (pagination), professionals (list format)
+- `internal/db/` — `TestMigrate007`: a migração sobe e desce, o catálogo tem 55 linhas, `provenance` inválida é rejeitada pelo CHECK
+- `internal/handlers/extractions_test.go` — extração ponta a ponta contra provedor falso em `httptest`: consentimento obrigatório, linha antes da chamada, resposta bruta persistida, analito fora do catálogo virando pendência
+- `internal/handlers/review_test.go` — confirmação em bloco, metadado humano preservado, reextração que substitui em vez de duplicar
+- `internal/handlers/series_test.go` — série só com `confirmed`, escopo por usuário, ordem por data de coleta
 
 Helpers:
 - `internal/db/testhelper.go` — `SetupTestDB(t)`: abre `:memory:`, roda migrations, registra cleanup
 - `handlers_test` — `wrapWithSession()`, `signInAndGetCookie()` para testes de handler
+
+> Os testes **não rodam no CI**. O workflow roda lint, typecheck e build do frontend, e depois publica a imagem. Rodar `go test ./...` antes de commitar é responsabilidade de quem edita.
 
 ---
 

@@ -43,10 +43,13 @@ docker run -d \
   -e ADMIN_PASSWORD="senha_forte_aqui" \
   -e SESSION_SECURE="true" \
   -e TRUST_PROXY="false" \
+  -e GEMINI_API_KEY="sua_chave_do_google_ai_studio" \
   ghcr.io/edalcin/medlog:latest
 ```
 
 > `ADMIN_EMAIL` e `ADMIN_PASSWORD` são usados apenas no **primeiro boot** para criar o administrador. Após a criação do usuário, remova essas variáveis por segurança.
+
+> `GEMINI_API_KEY` é **opcional** e habilita a extração de indicadores de PDFs de laudo por IA. Sem ela o MedLog funciona por inteiro; o painel admin apenas avisa que a chave está ausente. Na interface do Unraid é uma **Variable** com Key `GEMINI_API_KEY`. A chave é lida só no arranque: depois de adicionar, aplique para o container ser recriado.
 
 ### 4. Verificar
 
@@ -59,6 +62,8 @@ Aguardar a linha `server listening on :3000` e acessar `http://ip-do-unraid:3000
 ---
 
 ## Atualização
+
+> **Antes de atualizar, faça backup.** Migrações de banco rodam sozinhas no arranque e algumas não têm volta trivial. A cópia do arquivo `.sqlite` leva segundos e evita o pior.
 
 ### Via interface do Unraid (recomendado)
 
@@ -74,6 +79,8 @@ docker rm medlog
 docker pull ghcr.io/edalcin/medlog:latest
 # Re-executar o docker run com as mesmas variáveis
 ```
+
+**Atualizando para a v3.0:** a migração `007` cria as tabelas de indicadores de saúde, semeia o catálogo com 55 Indicadores e acrescenta `collected_at`, `lab_name` e `report_number` em `files`. Roda sozinha, não pede nada, e não altera dado existente. Para usar a extração, acrescente `GEMINI_API_KEY` no mesmo passo.
 
 ---
 
@@ -108,6 +115,7 @@ docker logs medlog | tail -50
 | `ADMIN_PASSWORD` | primeiro boot | Senha do admin inicial |
 | `SESSION_SECURE` | não | `true` em produção (HTTPS). Padrão: `false` |
 | `TRUST_PROXY` | não | `true` se atrás de proxy reverso (ativa X-Forwarded-For para rate limiting). Padrão: `false` |
+| `GEMINI_API_KEY` | não | Chave do Google AI Studio. Habilita a extração por IA; ausente, o recurso fica desabilitado |
 
 ---
 
@@ -150,6 +158,21 @@ docker start medlog
 ```bash
 docker exec -it medlog sh
 ```
+
+### Extração por IA não aparece ou falha
+
+```bash
+# A chave é lida só no arranque. Confirme que chegou ao container:
+docker exec medlog printenv GEMINI_API_KEY
+```
+
+Vazio ou ausente → acrescente a **Variable** `GEMINI_API_KEY` e aplique, para o container ser recriado. O painel admin (aba **Extração por IA**) mostra explicitamente quando a chave está faltando.
+
+Extração parada em "em andamento" depois de um reinício não é progresso: a chamada foi perdida junto com o processo, e o MedLog a marca como falha no arranque seguinte. Basta disparar de novo.
+
+### O PDF não aparece na tela de revisão
+
+O documento é servido corretamente; o que costuma acontecer é o navegador estar configurado para **baixar** PDFs em vez de exibi-los, e então o `<iframe>` fica vazio. A própria tela oferece "Abrir o documento em outra aba".
 
 ---
 

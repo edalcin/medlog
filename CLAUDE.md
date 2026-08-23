@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MedLog is a self-hosted medical consultation tracking system designed for families to maintain private medical records. The core entity is the **Consultation** (medical appointment), which connects Users, Professionals, and Files (documents/images).
+MedLog is a self-hosted medical consultation tracking system designed for families to maintain private medical records. The core entity is the **Consultation** (medical appointment), which connects Users, Professionals, and Files (documents/images). Since v3.0 it also extracts health indicators out of lab report PDFs with an AI agent, behind mandatory human review.
 
-**Tech Stack:** Go 1.24 (backend), Svelte 5 + Vite 5 (frontend), SQLite via modernc.org/sqlite, alexedwards/scs v2 (sessions), pressly/goose v3 (migrations), go-chi/chi v5 (router)
+**Tech Stack:** Go 1.24 (backend), Svelte 5 + Vite 5 (frontend), SQLite via modernc.org/sqlite, alexedwards/scs v2 (sessions), pressly/goose v3 (migrations), go-chi/chi v5 (router). Gemini is the only external network dependency, written with `net/http` alone — no dependency has been added for it.
 
 ## Development Commands
 
@@ -21,7 +21,7 @@ cd frontend && npm run dev    # Starts on :5173, proxies /api to :3000
 cd frontend && npm run build  # Build to internal/embed/dist/
 
 # Docker
-docker build -t medlog:v2 .
+docker build -t medlog:v3 .
 docker compose up
 
 # Generate session secret
@@ -39,6 +39,9 @@ openssl rand -base64 32
 - **Consultation**: Central entity linking User + Professional + date + notes (Markdown) + Files
 - **File**: Uploaded documents (PDF) and images (PNG/JPG) with categorization
 - **FileCategory**: File category dictionary (e.g., Laudo, Receita, Pedido de Exame)
+- **Indicator**: Catalog entry defining something measurable (`health_indicators`); global, seeded by migration 007 with 55 entries, grown only by ADMIN decision
+- **Observation**: One measurement of an Indicator (`health_observations`); born in `review`, becomes `confirmed` only by block confirmation
+- **Extraction**: One send of a PDF to the AI provider (`extractions`); created before the call, keeps the raw response for audit
 
 Key relationships:
 - User → Consultations (1:N)
@@ -48,6 +51,8 @@ Key relationships:
 - Consultation → Files (1:N)
 - FileCategory → Files (1:N)
 - Professional → Files (1:N) - for filtering files by professional
+- User → Observations (1:N), Indicator → Observations (1:N)
+- File → Extractions (1:N), Extraction → Observations (1:N)
 
 ### Authentication
 - Credentials-based authentication (email/password with bcrypt)
@@ -70,9 +75,10 @@ internal/
   auth/middleware.go            # RequireAuth, RequireAdmin
   db/db.go                      # sql.Open + WAL PRAGMA
   db/migrate.go                 # goose migrations at startup
-  handlers/                     # HTTP handlers (auth, consultations, etc.)
-  middleware/security.go        # Security headers
-  models/                       # SQL query functions (no ORM)
+  handlers/                     # HTTP handlers (auth, consultations, extractions, series, etc.)
+  gemini/gemini.go              # Gemini REST client (net/http only, no dependency added)
+  middleware/security.go        # Security headers (frame-ancestors 'self' for the review screen)
+  models/                       # SQL query functions (no ORM); health.go holds Indicator/Observation/Extraction
   embed/                        # Embedded Svelte build output
   migrations/                   # SQL migration files (embedded)
 migrations/                     # SQL migration files (source)
@@ -111,12 +117,27 @@ frontend/                       # Svelte 5 SPA
     - Categories: Full CRUD for file category dictionary
     - Clinics: Full CRUD for clinic/hospital dictionary
     - Files: View all files with metadata
+    - Backup & Restore: SQLite download and upload
+    - Login logs: access log with IP and user-agent
+    - AI Extraction: model choice with estimated cost per report, and a warning when `GEMINI_API_KEY` is absent
 
 11. **Clinic Association**: Professionals can optionally be associated with a clinic/hospital from a controlled dictionary. Inline creation is supported during professional registration.
 
 12. **No ORM**: All database access uses raw SQL via `database/sql`. Query functions live in `internal/models/`.
 
 13. **User-scoped Data**: Professionals and Clinics have a `user_id` column so each user manages their own data.
+
+14. **Observations are born in review**: Nothing extracted by the AI counts until an ADMIN confirms the block against the PDF. A chart never shows an observation in `review`. See ADR 0009.
+
+15. **Explicit consent per document**: The PDF goes to the provider unredacted, so `POST /api/extractions` refuses without `consent: true`, and records `consented_at` plus `triggered_by`. Extraction is ADMIN-only: the API key is a server credential and each call costs money. See ADR 0005.
+
+16. **Raw response before interpretation**: `raw_response` and token counts are persisted before parsing, and also on failure. Fixing a parsing bug must never cost a second call — reparse with `gemini.ParseRaw`.
+
+17. **Faithful values**: `value_text` always holds the literal printed on the report; `value_num` is set only for a number without qualifier, so `>90` never becomes 90. Reference ranges are stored as printed, with numeric bounds only when unambiguous.
+
+18. **Never auto-create an Indicator**: An analyte the catalog does not have becomes a pending item on the review screen. Promoting it is an explicit ADMIN action.
+
+19. **No chart library**: The time series in `HealthSeries.svelte` is hand-written SVG. Keep it that way — the project trades features for image size.
 
 ## Environment Variables
 
@@ -130,6 +151,7 @@ ADMIN_EMAIL=admin@example.com    # First-boot only
 ADMIN_PASSWORD=changeme          # First-boot only
 SESSION_SECURE=false             # true in production (HTTPS)
 TRUST_PROXY=false                # true if behind reverse proxy (enables X-Forwarded-For for rate limiting)
+GEMINI_API_KEY=                  # Optional — enables AI extraction; never stored in the database
 ```
 
 ## Docker Deployment
@@ -138,7 +160,7 @@ The project is designed for Docker deployment (e.g., Unraid):
 - Dockerfile builds a single Go binary with embedded Svelte assets
 - Volume mount required for `FILES_PATH` and the SQLite database directory
 - No external database required — SQLite is embedded
-- Build command: `docker build -t medlog:v2 .`
+- Build command: `docker build -t medlog:v3 .`
 
 ## graphify
 

@@ -180,6 +180,12 @@ Regras do plano honradas e verificadas na tela: só Observação `confirmed` apa
 
 **Prova executada:** `go test ./internal/handlers/ -run TestSeries`, que verifica que Observação em Revisão não existe na série nem no índice, que o dado de outro usuário não vaza, que a ordem é por Data de coleta crescente, que a procedência sobrevive ao caminho todo, e que indicador sem dado confirmado responde vazio em vez de erro. Verificação visual com a aplicação de verdade rodando em `:3399`, com base semeada com cinco medidas de glicose de 2018 a 2026 (quatro `evolutive`, uma `primary`, duas fora da faixa), duas de HDL e uma não numérica: o gráfico saiu com a banda 70–99, os pontos vazados, os dois pontos vermelhos e a tabela de medidas coerente. `go build ./...`, `go vet ./...`, `go test ./...` e `npm run build` passam.
 
+### Documentação de usuário e deploy: **atualizada**
+
+Lacuna encontrada depois da fase 4 e corrigida: **`GEMINI_API_KEY` não estava documentada em lugar nenhum**. Quem subisse a imagem nova não tinha como saber que variável acrescentar. Agora consta em `.env.example`, `docker-compose.yml`, `README.md`, `TECHNICAL.md`, `UNRAID.md` e `CLAUDE.md`, sempre marcada como **opcional** e com o aviso de usar tier pago, porque o Free Tier põe o laudo em treino e isso colide com Q5.
+
+Na mesma passada: `README.md` ganhou o bloco de funcionalidades da v3.0 e um guia de cinco passos para extrair um laudo; `TECHNICAL.md` saiu de "v2" para "v3", com as três tabelas novas no schema, as rotas de extração e de série, a seção de extração por IA (fluxo, cliente Gemini, catálogo, privacidade) e a cobertura de testes real, incluindo o aviso de que os testes não rodam no CI; `UNRAID.md` ganhou o aviso de backup antes de atualizar, a nota da migração `007` e dois casos de troubleshooting (chave ausente e PDF que não renderiza no `<iframe>`).
+
 Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
 
 ---
@@ -195,7 +201,8 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 | `014036c` | fase 2: cliente Gemini, endpoints, interpretação em Revisão |
 | `86ff55a` | fase 3: tela de revisão, confirmar/rejeitar, aba admin, correção de N+1 |
 | `893c83c` | continuidade atualizada para retomada da fase 4 |
-| `(esta sessão)` | fase 4: série temporal, gráfico SVG sem dependência |
+| `cfa4abf` | fase 4: série temporal, gráfico SVG sem dependência |
+| `(esta sessão)` | documentação de usuário e deploy alinhada à v3.0, `GEMINI_API_KEY` documentada |
 
 **Reproduzir a verificação inteira, sem gastar token nenhum:**
 
