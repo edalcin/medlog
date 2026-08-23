@@ -39,6 +39,9 @@
   let consentAccepted = $state(false)
   let startingExtraction = $state(false)
   let consentError = $state('')
+  let resetFile = $state<MedFile | null>(null)
+  let resetting = $state(false)
+  let resetError = $state('')
 
   async function reload() {
     loading = true
@@ -219,6 +222,21 @@
       startingExtraction = false
     }
   }
+
+  async function confirmReset() {
+    if (!resetFile) return
+    resetting = true
+    resetError = ''
+    try {
+      await api.resetFileExtractions(resetFile.id)
+      resetFile = null
+      await reload()
+    } catch (e: unknown) {
+      resetError = e instanceof Error ? e.message : 'Erro ao zerar a extração'
+    } finally {
+      resetting = false
+    }
+  }
 </script>
 
 <div class="page">
@@ -320,6 +338,9 @@
                       {f.extractionCount} extraç{f.extractionCount === 1 ? 'ão' : 'ões'}
                     </a>
                     <span class={statusBadge(f)}>{statusLabel(f)}</span>
+                    <button class="link-danger" onclick={() => { resetFile = f; resetError = '' }}>
+                      zerar
+                    </button>
                   </div>
                 {/if}
               </td>
@@ -450,6 +471,38 @@
   </div>
 {/if}
 
+{#if resetFile}
+  <div class="modal-backdrop" role="presentation" onclick={e => { if (e.target === e.currentTarget && !resetting) resetFile = null }}>
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Zerar extração do documento">
+      <div class="modal-header">
+        <h3>Zerar a extração deste documento</h3>
+        <button class="btn btn-ghost btn-xs" onclick={() => (resetFile = null)} disabled={resetting} aria-label="Fechar">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="consent-file">{resetFile.customName || resetFile.filename}</p>
+        <p class="reset-warning">
+          Apaga a extração e <strong>todas as Observações vindas deste documento</strong>, as
+          confirmadas inclusive. Os valores somem das séries e o documento volta ao estado de antes
+          da primeira extração. Serve para recomeçar do zero, por exemplo com outro modelo.
+        </p>
+        <p class="reset-note">
+          O documento em si, seus metadados e suas categorias não são tocados. Não há desfazer:
+          recuperar exige extrair de novo, o que custa uma nova chamada.
+        </p>
+        {#if resetError}<p class="error-msg">{resetError}</p>{/if}
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick={() => (resetFile = null)} disabled={resetting}>Cancelar</button>
+        <button class="btn btn-danger" onclick={confirmReset} disabled={resetting}>
+          {resetting ? 'Apagando...' : 'Zerar extração'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   .filter-bar.hidden {
     display: none;
@@ -559,6 +612,27 @@
     gap: 6px;
     margin-top: 4px;
     font-size: 12px;
+  }
+
+  .link-danger {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 12px;
+    color: var(--danger);
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  .reset-warning {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .reset-note {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-muted);
   }
 
   .modal-backdrop {

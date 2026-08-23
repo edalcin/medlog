@@ -128,6 +128,7 @@ Requer `GEMINI_API_KEY` no ambiente e um usuário `ADMIN`.
 3. A chamada dura minutos e roda no servidor; a tela acompanha o andamento sozinha
 4. **Revisão** — confira a lista inteira contra o PDF exibido ao lado e confirme ou rejeite em bloco. Rejeitar descarta os valores e preserva a Extração, que continua auditável
 5. **Indicadores** — a série temporal passa a mostrar o que foi confirmado, incluindo as coletas antigas lidas do laudo evolutivo
+6. Quer recomeçar do zero, com outro modelo? Em **Arquivos**, o link **zerar** ao lado da extração apaga a extração e todas as Observações daquele documento, confirmadas inclusive. Extrações não se acumulam: uma nova sempre substitui a anterior do mesmo documento
 
 O que o modelo não souber mapear vira pendência na tela de revisão, nunca um Indicador inventado. Promover um analito novo ao catálogo é decisão explícita do `ADMIN`.
 

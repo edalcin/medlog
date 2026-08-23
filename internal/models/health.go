@@ -357,6 +357,66 @@ ORDER BY i.name`, userID, ObservationConfirmed)
 	return list, rows.Err()
 }
 
+// ObservationDiscardSupersededReview drops observations still in review that
+// belong to older extractions of the same document. A new extraction of a
+// document supersedes the previous attempt: what the new run did not produce
+// is not pending work, it is leftover from an answer nobody accepted.
+//
+// Rows already confirmed are never touched, and the old Extraction survives
+// with its raw response, so the audit trail stays intact (ADR 0009).
+func ObservationDiscardSupersededReview(ctx context.Context, db *sql.DB, fileID, keepExtractionID string) (int64, error) {
+	res, err := db.ExecContext(ctx,
+		`DELETE FROM health_observations
+		 WHERE source_file_id = ? AND status = ?
+		   AND (extraction_id IS NULL OR extraction_id <> ?)`,
+		fileID, ObservationReview, keepExtractionID)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// ExtractionDeleteSuperseded removes the older extractions of a document once
+// a new one has landed. One document keeps one extraction: the history of
+// discarded attempts is noise, not audit.
+//
+// Observations already confirmed survive: extraction_id is ON DELETE SET NULL,
+// and source_file_id still says which document they came from. A pending row
+// is never touched, since a call may be in flight.
+func ExtractionDeleteSuperseded(ctx context.Context, db *sql.DB, fileID, keepID string) (int64, error) {
+	res, err := db.ExecContext(ctx,
+		`DELETE FROM extractions WHERE file_id = ? AND id <> ? AND status <> ?`,
+		fileID, keepID, ExtractionPending)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// ExtractionResetFile wipes the extraction history of one document and every
+// observation that came from it, confirmed included. This is the deliberate
+// "start over" — trying another model on a clean slate — so it is destructive
+// on purpose and never runs as a side effect.
+func ExtractionResetFile(ctx context.Context, db *sql.DB, fileID string) (observations, extractions int64, err error) {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer tx.Rollback()
+
+	obsRes, err := tx.ExecContext(ctx, `DELETE FROM health_observations WHERE source_file_id = ?`, fileID)
+	if err != nil {
+		return 0, 0, err
+	}
+	extRes, err := tx.ExecContext(ctx, `DELETE FROM extractions WHERE file_id = ?`, fileID)
+	if err != nil {
+		return 0, 0, err
+	}
+	observations, _ = obsRes.RowsAffected()
+	extractions, _ = extRes.RowsAffected()
+	return observations, extractions, tx.Commit()
+}
+
 // ObservationConfirmByExtraction promotes a whole extraction at once: block
 // confirmation is one act, not forty.
 func ObservationConfirmByExtraction(ctx context.Context, db *sql.DB, extractionID string) (int64, error) {

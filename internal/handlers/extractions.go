@@ -158,8 +158,22 @@ func (h *ExtractionHandler) run(ctx context.Context, e models.Extraction, path s
 		log.Error("insert observations", "err", err)
 		return
 	}
+
+	// A new extraction supersedes the previous attempt on the same document:
+	// whatever the earlier run left in review is stale, and would otherwise
+	// keep the document flagged as pending forever.
+	superseded, err := models.ObservationDiscardSupersededReview(ctx, h.DB, e.FileID, e.ID)
+	if err != nil {
+		log.Error("discard superseded observations", "err", err)
+	}
+	// And the older extraction rows go with it: one document, one extraction.
+	dropped, err := models.ExtractionDeleteSuperseded(ctx, h.DB, e.FileID, e.ID)
+	if err != nil {
+		log.Error("delete superseded extractions", "err", err)
+	}
 	log.Info("extraction done",
 		"observations", len(observations), "skipped", skipped,
+		"supersededObservations", superseded, "supersededExtractions", dropped,
 		"unmapped", len(result.Unmapped), "inputTokens", in, "outputTokens", out)
 }
 
@@ -501,6 +515,35 @@ func (h *ExtractionHandler) ListByFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+}
+
+// ResetFile erases the extraction history of a document and every observation
+// that came from it, confirmed included. It exists for the deliberate restart:
+// trying another model from a clean slate, without the previous answer's
+// values lingering in the series.
+func (h *ExtractionHandler) ResetFile(w http.ResponseWriter, r *http.Request) {
+	fileID := chi.URLParam(r, "id")
+	file, err := models.FileFindByID(r.Context(), h.DB, fileID)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && file == nil) {
+		writeError(w, "documento não encontrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	observations, extractions, err := models.ExtractionResetFile(r.Context(), h.DB, fileID)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	slog.Info("extraction reset", "file", fileID,
+		"observations", observations, "extractions", extractions,
+		"by", auth.Manager.GetString(r.Context(), auth.SessionKeyUserID))
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]int64{
+		"observations": observations,
+		"extractions":  extractions,
+	}})
 }
 
 // ListObservations returns what one extraction produced, in review order.

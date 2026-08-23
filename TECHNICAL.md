@@ -337,6 +337,7 @@ GET    /api/extractions/{id}/review     Observações + pendências + metadados 
 POST   /api/extractions/{id}/confirm    Confirma o bloco e grava metadados vazios de files
 POST   /api/extractions/{id}/reject     Descarta Observações, preserva a Extração
 GET    /api/files/{id}/extractions
+DELETE /api/files/{id}/extractions      Zera o documento: apaga extrações e Observações
 GET    /api/health-indicators
 POST   /api/health-indicators    Promove analito pendente ao catálogo
 ```
@@ -467,6 +468,8 @@ Extrai os valores de um PDF de laudo **já anexado** ao sistema e os transforma 
 4. `raw_response` e os contadores de token são gravados **antes** de qualquer interpretação, inclusive quando a chamada falha. Corrigir parsing nunca custa uma nova chamada: use `gemini.ParseRaw`.
 5. As Observações nascem com `status = review`. Nenhuma aparece em série antes de um `ADMIN` confirmar o bloco.
 6. `POST /api/extractions/{id}/confirm` promove tudo de uma vez e grava em `files` apenas os metadados ainda vazios. A guarda contra sobrescrever valor humano está no SQL (`COALESCE`/`NULLIF`), não no chamador.
+7. Um documento guarda **uma** extração. Quando uma nova termina, as anteriores daquele documento são apagadas junto com o que elas tinham deixado em revisão. Observação já confirmada sobrevive: `extraction_id` é `ON DELETE SET NULL` e `source_file_id` continua dizendo de onde veio.
+8. `DELETE /api/files/{id}/extractions` é o recomeço deliberado: apaga extrações **e** todas as Observações daquele documento, confirmadas inclusive. Serve para tentar outro modelo do zero. O documento, seus metadados e suas categorias ficam intactos.
 
 Uma extração encontrada em `pending` no arranque é chamada perdida, não progresso: `ExtractionMarkStale` a marca como falha. Goroutine não sobrevive a reinício.
 

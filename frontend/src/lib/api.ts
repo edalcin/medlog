@@ -570,6 +570,13 @@ export const getExtraction = (id: string) =>
 export const getFileExtractions = (fileId: string) =>
   request<{ data: Extraction[] }>('GET', `/files/${fileId}/extractions`).then(r => r.data)
 
+/** Apaga extrações e Observações de um documento. Recomeço deliberado, destrutivo. */
+export const resetFileExtractions = (fileId: string) =>
+  request<{ data: { observations: number; extractions: number } }>(
+    'DELETE',
+    `/files/${fileId}/extractions`,
+  ).then(r => r.data)
+
 export const getExtractionReview = (id: string) =>
   request<{ data: ExtractionReview }>('GET', `/extractions/${id}/review`).then(r => r.data)
 

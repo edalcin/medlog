@@ -224,6 +224,7 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Post("/extractions/{id}/reject", extractionH.Reject)
 		r.Get("/health-indicators", extractionH.ListIndicators)
 		r.Post("/health-indicators", extractionH.PromoteIndicator)
+		r.Delete("/files/{id}/extractions", extractionH.ResetFile)
 		r.Get("/files/{id}/extractions", extractionH.ListByFile)
 		r.Get("/admin/gemini-model", extractionH.Models)
 		r.Put("/admin/gemini-model", extractionH.SetModel)
