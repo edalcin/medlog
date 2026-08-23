@@ -49,7 +49,7 @@ docker run -d \
 
 > `ADMIN_EMAIL` e `ADMIN_PASSWORD` são usados apenas no **primeiro boot** para criar o administrador. Após a criação do usuário, remova essas variáveis por segurança.
 
-> `GEMINI_API_KEY` é **opcional** e habilita a extração de indicadores de PDFs de laudo por IA. Sem ela o MedLog funciona por inteiro; o painel admin apenas avisa que a chave está ausente. Na interface do Unraid é uma **Variable** com Key `GEMINI_API_KEY`. A chave é lida só no arranque: depois de adicionar, aplique para o container ser recriado.
+> `GEMINI_API_KEY` é **opcional** e habilita a extração de indicadores de PDFs de laudo por IA. Sem ela o MedLog funciona por inteiro; o painel admin apenas avisa que a chave está ausente. Na interface do Unraid é uma **Variable** com Key `GEMINI_API_KEY`. A chave é lida só no arranque: depois de adicionar, aplique para o container ser recriado. Qualquer usuário da instância pode extrair os próprios documentos, então a chave é o único controle de gasto: sem ela, ninguém extrai.
 
 ### 4. Verificar
 

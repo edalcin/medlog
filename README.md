@@ -27,9 +27,10 @@ MedLog centraliza o histórico médico de consultas, exames, laudos e receitas e
 **Indicadores de Saúde (v3.0)**
 - Extração dos valores de um PDF de laudo por IA (Gemini), a partir de documento **já anexado** no sistema
 - Catálogo global de 55 Indicadores semeado na instalação (hemograma, lipidograma, função renal, tireoide, etc.)
-- Revisão obrigatória: o `ADMIN` confere a lista inteira ao lado do PDF e confirma ou rejeita em bloco — valor não revisado não aparece em lugar nenhum
+- Revisão obrigatória: o dono do documento confere a lista inteira ao lado do PDF e confirma ou rejeita em bloco — valor não revisado não aparece em lugar nenhum
 - Leitura do laudo evolutivo: as coletas anteriores impressas no próprio documento viram série histórica
 - Série temporal por Indicador, com faixa de referência desenhada e valor fora da faixa destacado
+- Um documento guarda uma extração: a nova substitui a anterior, e o link **zerar** apaga tudo daquele documento para recomeçar com outro modelo
 - Valor com qualificador (`>90`, `normais`) é guardado fiel e listado, nunca convertido em número
 
 **Profissionais e Clínicas**

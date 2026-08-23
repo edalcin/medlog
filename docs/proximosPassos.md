@@ -3,7 +3,7 @@
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
 **Última atualização:** 2026-08-23
-**Fase atual:** fases 1 a 4 concluídas e verificadas. A v3.0 está funcionalmente completa. **A prova com a API real do Gemini continua pendente de autorização** do usuário (ADR 0005), e é a única coisa que falta.
+**Fase atual:** v3.0 completa e em uso real. As quatro fases estão concluídas, a extração já rodou contra a API de verdade, e três defeitos encontrados nesse uso foram corrigidos. **Próximo passo: o usuário testa a imagem no UNRAID e volta com observações.**
 
 ---
 
@@ -23,17 +23,19 @@ Documento de origem: `docs/v3/MedLog V3.0.md`.
 | Q2 | Sem entidade `Coleta`. A Observação carrega `collected_at` e `source_file_id`; o Laudo agrupa | `docs/adr/0002-sem-entidade-coleta-o-laudo-agrupa-observacoes.md` |
 | Q3 | Ingerir também o laudo evolutivo, distinguindo `provenance` (`primary` prevalece sobre `evolutive`) | `docs/adr/0003-ingestao-do-laudo-evolutivo-com-procedencia.md` |
 | Q4 | Faixa de referência: texto fiel sempre, `ref_min`/`ref_max` só quando inequívocos, `out_of_range` do marcador do laboratório | `docs/adr/0004-faixa-de-referencia-fiel-com-numericos-opcionais.md` |
-| Q5 | PDF enviado sem redação da PII; Consentimento de extração por documento; Extração restrita a `ADMIN`, com registro de autor, modelo e custo | `docs/adr/0005-pii-enviada-sem-redacao-com-consentimento-por-documento.md` |
+| Q5 | PDF enviado sem redação da PII; Consentimento de extração por documento; registro de autor, modelo e custo. A restrição a `ADMIN` **caiu** (ver Q17) | `docs/adr/0005-pii-enviada-sem-redacao-com-consentimento-por-documento.md`, revisto por `0011` |
 | Q6 | Extração gravada em `extractions` antes da chamada, executada em goroutine fora de transação, resposta bruta persistida, frontend por polling | `docs/adr/0006-extracao-persistida-antes-da-chamada-executada-em-goroutine.md` |
 | Q7 | Relatórios de IA ficam fora da v3.0, adiados para v3.1 com grill próprio | esta tabela (decisão de escopo, reversível, sem ADR) |
 | Q8 | Catálogo `health_indicators` global, semeado na migração `007`; chave `code` interno mais `unit` canônica; analito não catalogado gera pendência | `docs/adr/0007-catalogo-semeado-com-codigo-interno-como-chave.md` |
 | Q9 | Saída estruturada (`responseSchema`), esquema em Go como fonte única, lista plana, `value_text` sempre e `value_num` opcional, `prompt_version` e `schema_version` na Extração | `docs/adr/0008-saida-estruturada-com-esquema-em-go-e-versoes-gravadas.md` |
-| Q10 | Observações nascem em Revisão; `ADMIN` confere contra o PDF e confirma ou rejeita em bloco; só então valem | `docs/adr/0009-observacoes-nascem-em-revisao-confirmadas-em-bloco.md` |
+| Q10 | Observações nascem em Revisão; o dono do documento (ou `ADMIN`) confere contra o PDF e confirma ou rejeita em bloco; só então valem | `docs/adr/0009-observacoes-nascem-em-revisao-confirmadas-em-bloco.md` |
 | Q11 | Extrair sempre. Cobertura pelo Laudo evolutivo não bloqueia nem avisa; a colisão continua resolvida por Q3. Decidido com base em custo medido, ver seção 6 | esta tabela (decisão reversível, sem ADR) |
 | Q12 | A Extração enriquece `files` com `collected_at`, `lab_name` e `report_number`, e sugere `custom_name` só se vazio; nada sobrescreve campo humano, e só grava na confirmação do bloco | `docs/adr/0010-extracao-enriquece-metadados-do-documento.md` |
 | Q13 | `gemini_model` em `app_config`, escolhido na aba admin a partir de lista curta declarada em Go, com o custo por Extração ao lado; padrão `gemini-3.1-flash-lite`. `GEMINI_API_KEY` permanece em variável de ambiente | esta tabela (decisão reversível, sem ADR) |
 | Q14 | Quatro fases: 1 esquema, 2 extração sem interface, 3 revisão, 4 visualização. A fase 2 é entregável sozinha, provada por endpoint e inspeção do banco | `docs/v3/plano.md` |
 | Q15 | Gráfico em SVG escrito à mão, sem biblioteca. Nenhuma dependência nova no frontend | esta tabela (decisão reversível, sem ADR) |
+| Q16 | Um documento guarda **uma** Extração: a nova apaga as anteriores e o que elas deixaram em revisão. Mais um "zerar" explícito, que apaga tudo daquele documento | esta tabela (decisão reversível, sem ADR) |
+| Q17 | Extração liberada ao **dono do documento**; `ADMIN` alcança todos. Catálogo e escolha de modelo seguem restritos a `ADMIN` | `docs/adr/0011-extracao-liberada-ao-dono-do-documento.md` |
 
 Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de coleta, Faixa de referência, Procedência, Laudo evolutivo, Extração, Consentimento de extração, Revisão.
 
@@ -41,7 +43,7 @@ Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de 
 
 ## 3. Perguntas em aberto
 
-Nenhuma. A fronteira do grill está vazia: Q1 a Q14 fechadas. Perguntas novas surgirão da execução das fases, e de v3.1 (relatórios de IA), que tem grill próprio.
+Nenhuma pendente de decisão. Q1 a Q17 fechadas. As perguntas novas devem vir do teste no UNRAID, que o usuário fará a seguir, e da v3.1 (relatórios de IA), que tem grill próprio.
 
 ---
 
@@ -80,7 +82,7 @@ Nenhuma. A fronteira do grill está vazia: Q1 a Q14 fechadas. Perguntas novas su
 **Operação e CI**
 - Volume único `./data` com `db/` e `uploads/`. `DATABASE_URL` e `SESSION_SECRET` obrigatórias; `FILES_PATH`, `PORT`, `SESSION_SECURE`, `TRUST_PROXY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` opcionais.
 - GitHub Actions publica em `ghcr.io/edalcin/medlog` (linux/amd64). Roda lint, typecheck e build do frontend.
-- Existem **14** arquivos `_test.go` (handlers, models e db) que **não rodam no CI**. Os três novos da v3.0 são `internal/db/migrate_test.go`, `internal/handlers/extractions_test.go` e `internal/handlers/review_test.go`.
+- Existem **16** arquivos `_test.go` (handlers, models e db) que **não rodam no CI**. Os quatro novos da v3.0 são `internal/db/migrate_test.go`, `internal/handlers/extractions_test.go`, `internal/handlers/review_test.go` e `internal/handlers/series_test.go`.
 - Interface admin: `internal/handlers/admin.go` (11 endpoints) e `frontend/src/routes/Admin.svelte`, agora com **10 abas**, incluindo backup, restore e "Extração por IA".
 - `npm run check` **não existe** e `svelte-check` **não está instalado**. A verificação de frontend disponível é `npm run build`, que roda o compilador Svelte e reprova runa mal usada. Adicionar `svelte-check` é decisão em aberto, nunca proposta ao usuário como necessária.
 
@@ -186,6 +188,20 @@ Lacuna encontrada depois da fase 4 e corrigida: **`GEMINI_API_KEY` não estava d
 
 Na mesma passada: `README.md` ganhou o bloco de funcionalidades da v3.0 e um guia de cinco passos para extrair um laudo; `TECHNICAL.md` saiu de "v2" para "v3", com as três tabelas novas no schema, as rotas de extração e de série, a seção de extração por IA (fluxo, cliente Gemini, catálogo, privacidade) e a cobertura de testes real, incluindo o aviso de que os testes não rodam no CI; `UNRAID.md` ganhou o aviso de backup antes de atualizar, a nota da migração `007` e dois casos de troubleshooting (chave ausente e PDF que não renderiza no `<iframe>`).
 
+### Uso real e correções: **fase 2 provada com a API de verdade**
+
+A chamada real ao Gemini foi autorizada e executada pelo usuário, com `gemini-3.7-flash`, sobre o laudo de referência. **A prova pendente da fase 2 deixou de ser pendência.** O mapeamento fechou, e os três defeitos abaixo saíram desse uso — nenhum deles teria aparecido contra provedor falso.
+
+**Defeito encontrado no primeiro uso real (2026-08-23), já corrigido:** com `gemini-3.7-flash`, o laudo voltou sem nenhuma faixa de referência — nem no hemograma, onde ela é impressa em coluna à direita, nem na tabela evolutiva, que tem coluna própria. O mapeamento não tinha culpa: repassa `referenceText` intacto. A causa é a documentada pelo provedor — campo ausente de `required` pode ser omitido pelo modelo para poupar tokens. Correções, todas em `prompt`/`schema` versão `2`: todo campo da observação passou a `required`, nulidade migrou de `anyOf` para `"nullable": true`, o prompt ganhou regra explícita sobre a coluna de referência (vale linha a linha, e na tabela evolutiva vale para todas as colunas de coleta) e sobre preencher `refMin`/`refMax` em intervalo único. Além disso, `deriveRange` em `internal/handlers/extractions.go` lê os limites do texto literal quando o modelo os deixa nulos, recusando faixa condicional. Na interface, o selo "faixa não informada" virou "sem marcador": ele sempre falou do marcador `(1)` do laboratório, nunca da faixa, e a redação confundia.
+
+**Segundo defeito do uso real, também corrigido:** extrações se acumulavam. Reextrair o mesmo documento deixava as Observações da tentativa anterior paradas em revisão — as que a nova resposta não repetiu —, então o documento continuava marcado como "aguardando revisão" mesmo depois de confirmar o bloco novo, e a lista mostrava "2 extrações". Agora **um documento guarda uma extração**: ao terminar, a nova apaga as anteriores daquele documento e o que elas tinham deixado em revisão. Observação já confirmada sobrevive, porque `extraction_id` é `ON DELETE SET NULL`. Somado a isso, `DELETE /api/files/{id}/extractions` (link **zerar** na lista de documentos) apaga extrações e Observações daquele documento, confirmadas inclusive, para recomeçar do zero com outro modelo. Dois testes com mutação conferida: `TestReview_NewExtractionSupersedesLeftoverReview` e `TestReview_ResetFileStartsFromScratch`.
+
+**Fato do desenho que apareceu ao escrever o teste, vale saber:** a chave única de Observação é `(user_id, indicator_id, collected_at, provenance)` e **ignora o documento**. Dois PDFs que cubram a mesma coleta do mesmo indicador compartilham uma linha só, e a extração mais recente vence. É o que ADR 0003 quis, mas surpreende quem espera uma linha por documento.
+
+**Terceiro defeito do uso real, corrigido:** o laudo imprime o marcador de alteração colado ao número — `9.000(1)` — e o modelo devolveu esses resultados sem `valueNum`. Quatro das seis coletas de leucócitos caíram na lista de "não numéricos" em vez do gráfico. Junto veio um erro pior, este nosso: `deriveRange` lia `3.650` como três vírgula seiscentos e cinquenta, porque tratava o ponto como decimal. A faixa de referência de leucócitos apareceu como 3,65–8,12, mil vezes menor, e arrastou o eixo do gráfico para valores negativos. Agora `parseNumberBR` segue a convenção brasileira — ponto agrupa milhar, vírgula abre decimal —, `deriveValue` recupera o número descartando o marcador, e o marcador passou a responder `out_of_range` quando o modelo o deixa nulo. Prompt na versão `3` explica o marcador ao modelo. Verificado na tela com a série real de leucócitos: seis pontos no gráfico, faixa 3.650–8.120 desenhada, quatro pontos vermelhos, nenhuma seção de "não numéricos".
+
+**Mudança de permissão pedida pelo usuário (ADR 0011):** a extração deixou de ser exclusiva de `ADMIN`. Qualquer usuário extrai, revisa e confirma os próprios documentos; o `ADMIN` alcança os de todos. Documento ou extração alheia responde **404**, nunca 403. Seguem restritos a `ADMIN`: promover analito ao catálogo (é global) e escolher o modelo (é configuração de servidor). O ADR 0005 ficou marcado como parcialmente superado — PII sem redação e consentimento por documento continuam valendo. Teste novo `TestExtraction_UserExtractsOwnDocument`, com mutação conferida, e verificação com usuária comum na aplicação real: sem link de Admin, com botão de extrair no próprio PDF, 404 no documento do outro e 403 na configuração de modelo.
+
 Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou alterar um termo, gerar ADR em `docs/adr/` se for difícil de reverter, e atualizar este arquivo. Commit sempre em `main`, branch único.
 
 ---
@@ -202,7 +218,11 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 | `86ff55a` | fase 3: tela de revisão, confirmar/rejeitar, aba admin, correção de N+1 |
 | `893c83c` | continuidade atualizada para retomada da fase 4 |
 | `cfa4abf` | fase 4: série temporal, gráfico SVG sem dependência |
-| `(esta sessão)` | documentação de usuário e deploy alinhada à v3.0, `GEMINI_API_KEY` documentada |
+| `5468f19` | documentação de usuário e deploy alinhada à v3.0, `GEMINI_API_KEY` documentada |
+| `470ef3d` | correção da faixa de referência sumindo na resposta do modelo (prompt/schema `2`) |
+| `7141f9a` | um documento guarda uma extração, mais o "zerar" explícito |
+| `bbb0bcd` | extração liberada ao dono do documento (ADR 0011) e leitura correta dos números do laudo |
+| `(esta sessão)` | continuidade reorganizada para o teste no UNRAID |
 
 **Reproduzir a verificação inteira, sem gastar token nenhum:**
 
@@ -211,28 +231,28 @@ go build ./... && go vet ./... && go test ./... -count=1
 cd frontend && npm run build
 ```
 
-**Subir a aplicação de verdade para olhar a interface:** binário com `DATABASE_URL`, `SESSION_SECRET`, `FILES_PATH`, `PORT`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`. A extração aponta para documento **já existente** no sistema, anexado pelo fluxo normal de arquivos: não há upload no caminho de extração. O disparo fica na lista de documentos, só para `ADMIN` e só para PDF, atrás do diálogo de consentimento.
+**Subir a aplicação de verdade para olhar a interface:** binário com `DATABASE_URL`, `SESSION_SECRET`, `FILES_PATH`, `PORT`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`. A extração aponta para documento **já existente** no sistema, anexado pelo fluxo normal de arquivos: não há upload no caminho de extração. O disparo fica na lista de documentos, para o dono do documento e para o `ADMIN`, só em PDF, atrás do diálogo de consentimento.
 
-### A decisão esperando o usuário
+### O que espera o usuário (sessão encerrada em 2026-08-23)
 
-**Autorizar a chamada real ao Gemini.** É a prova que falta da fase 2, definida no plano, e a única pendência da v3.0. Envia o laudo de referência, com nome completo e data de nascimento, ao Google, e gasta cerca de US$ 0,02. `GEMINI_API_KEY` estava presente no ambiente da sessão anterior. Sem essa autorização, a fase 2 permanece provada apenas contra provedor falso — o que cobre contrato, persistência e interpretação, mas não a qualidade real do mapeamento do modelo.
+**1. Teste da imagem no UNRAID.** O usuário vai subir `ghcr.io/edalcin/medlog:latest` (ou `:unraid-test`, mesmo digest) e exercitar o fluxo inteiro: extrair, revisar, confirmar, ver a série, zerar e reextrair. Volta com observações. Toda a correção desta sessão está nessa imagem, publicada de `bbb0bcd`.
 
-**Defeito encontrado no primeiro uso real (2026-08-23), já corrigido:** com `gemini-3.7-flash`, o laudo voltou sem nenhuma faixa de referência — nem no hemograma, onde ela é impressa em coluna à direita, nem na tabela evolutiva, que tem coluna própria. O mapeamento não tinha culpa: repassa `referenceText` intacto. A causa é a documentada pelo provedor — campo ausente de `required` pode ser omitido pelo modelo para poupar tokens. Correções, todas em `prompt`/`schema` versão `2`: todo campo da observação passou a `required`, nulidade migrou de `anyOf` para `"nullable": true`, o prompt ganhou regra explícita sobre a coluna de referência (vale linha a linha, e na tabela evolutiva vale para todas as colunas de coleta) e sobre preencher `refMin`/`refMax` em intervalo único. Além disso, `deriveRange` em `internal/handlers/extractions.go` lê os limites do texto literal quando o modelo os deixa nulos, recusando faixa condicional. Na interface, o selo "faixa não informada" virou "sem marcador": ele sempre falou do marcador `(1)` do laboratório, nunca da faixa, e a redação confundia.
+Roteiro sugerido, na ordem em que as coisas quebraram antes: conferir se a faixa de referência agora aparece no hemograma **e** na tabela evolutiva; conferir se os valores com marcador `(1)` entram no gráfico em vez da lista de não numéricos; conferir se a faixa de leucócitos sai como 3.650–8.120 e não 3,65–8,12; reextrair o mesmo PDF e conferir que continua com **uma** extração; e entrar como usuário não-`ADMIN` para extrair um documento próprio.
 
-**Segundo defeito do uso real, também corrigido:** extrações se acumulavam. Reextrair o mesmo documento deixava as Observações da tentativa anterior paradas em revisão — as que a nova resposta não repetiu —, então o documento continuava marcado como "aguardando revisão" mesmo depois de confirmar o bloco novo, e a lista mostrava "2 extrações". Agora **um documento guarda uma extração**: ao terminar, a nova apaga as anteriores daquele documento e o que elas tinham deixado em revisão. Observação já confirmada sobrevive, porque `extraction_id` é `ON DELETE SET NULL`. Somado a isso, `DELETE /api/files/{id}/extractions` (link **zerar** na lista de documentos) apaga extrações e Observações daquele documento, confirmadas inclusive, para recomeçar do zero com outro modelo. Dois testes com mutação conferida: `TestReview_NewExtractionSupersedesLeftoverReview` e `TestReview_ResetFileStartsFromScratch`.
+**2. Uma oferta em aberto, não implementada:** reprocessar a resposta bruta já paga, sem nova chamada à API. Hoje, corrigir interpretação exige reextrair, o que custa dinheiro — apesar de o ADR 0006 ter guardado `raw_response` justamente para evitar isso, e de `gemini.ParseRaw` já existir. Falta só o endpoint e o botão. Foi oferecido ao usuário e não foi pedido; entra se o teste no UNRAID mostrar que vale.
 
-**Fato do desenho que apareceu ao escrever o teste, vale saber:** a chave única de Observação é `(user_id, indicator_id, collected_at, provenance)` e **ignora o documento**. Dois PDFs que cubram a mesma coleta do mesmo indicador compartilham uma linha só, e a extração mais recente vence. É o que ADR 0003 quis, mas surpreende quem espera uma linha por documento.
+**3. Depois disso, v3.1:** relatórios de saúde gerados por IA, com grill próprio, ainda não iniciado. A fronteira já registrada em Q7 é não produzir texto que se leia como diagnóstico médico.
 
-**Terceiro defeito do uso real, corrigido:** o laudo imprime o marcador de alteração colado ao número — `9.000(1)` — e o modelo devolveu esses resultados sem `valueNum`. Quatro das seis coletas de leucócitos caíram na lista de "não numéricos" em vez do gráfico. Junto veio um erro pior, este nosso: `deriveRange` lia `3.650` como três vírgula seiscentos e cinquenta, porque tratava o ponto como decimal. A faixa de referência de leucócitos apareceu como 3,65–8,12, mil vezes menor, e arrastou o eixo do gráfico para valores negativos. Agora `parseNumberBR` segue a convenção brasileira — ponto agrupa milhar, vírgula abre decimal —, `deriveValue` recupera o número descartando o marcador, e o marcador passou a responder `out_of_range` quando o modelo o deixa nulo. Prompt na versão `3` explica o marcador ao modelo. Verificado na tela com a série real de leucócitos: seis pontos no gráfico, faixa 3.650–8.120 desenhada, quatro pontos vermelhos, nenhuma seção de "não numéricos".
-
-**Mudança de permissão pedida pelo usuário (ADR 0011):** a extração deixou de ser exclusiva de `ADMIN`. Qualquer usuário extrai, revisa e confirma os próprios documentos; o `ADMIN` alcança os de todos. Documento ou extração alheia responde **404**, nunca 403. Seguem restritos a `ADMIN`: promover analito ao catálogo (é global) e escolher o modelo (é configuração de servidor). O ADR 0005 ficou marcado como parcialmente superado — PII sem redação e consentimento por documento continuam valendo. Teste novo `TestExtraction_UserExtractsOwnDocument`, com mutação conferida, e verificação com usuária comum na aplicação real: sem link de Admin, com botão de extrair no próprio PDF, 404 no documento do outro e 403 na configuração de modelo.
-
-Depois disso, a v3.1 (relatórios de saúde gerados por IA) tem grill próprio, ainda não iniciado.
+**Higiene de segurança pendente do lado do usuário:** a `GEMINI_API_KEY` real apareceu na saída de um comando durante esta sessão (expansão de variável de ambiente pelo `docker compose config`). Ela **nunca** entrou no git — `.env` está no `.gitignore` e `git log -S` não encontra a chave em commit nenhum —, mas convém rotacioná-la no Google AI Studio.
 
 ### Armadilhas que já custaram tempo, para não repetir
 
 - `ALTER TABLE ... DROP COLUMN` falha se a coluna estiver indexada: no `Down` da `007`, o índice é dropado antes. SQLite embutido é 3.49.2, folgado para `DROP COLUMN` (3.35+).
 - `responseSchema` e `responseMimeType` precisam ir em camelCase; em snake_case a API ignora **em silêncio** e devolve texto livre.
+- O marcador `(1)` vem **colado** no número: `9.000(1)`. `deriveValue` o descarta para achar o valor, e ele responde `out_of_range` quando o modelo deixa o campo nulo. Sem isso, o resultado cai como "não numérico" e some do gráfico.
+- Número de laudo brasileiro: **ponto agrupa milhar, vírgula abre decimal** (`parseNumberBR`). Ler ao contrário deslocou a faixa de leucócitos por um fator de mil e jogou o eixo do gráfico para negativo.
+- Rota de extração é escopada por dono, com 404 para o de fora. Ao acrescentar rota nova nesse conjunto, passe por `mayReachExtraction` ou `mayReachFile`: esquecer é vazamento silencioso.
+- Nunca use `git checkout <arquivo>` para desfazer uma mutação de teste feita com `sed`: apaga junto todo o trabalho não commitado daquele arquivo. Use `cp` para um backup antes.
 - Campo fora de `required` no `responseSchema` **é descartado pelo modelo para poupar tokens de saída** — está na documentação do provedor. Foi assim que a faixa de referência sumiu num laudo real, com `gemini-3.7-flash`: o layout imprime a faixa em coluna à direita, e o modelo tratou o campo opcional como dispensável. Desde o prompt/schema `2`, **todo** campo da observação é obrigatório; o que pode faltar vai como `null`.
 - Nulidade no `responseSchema` vai como `"nullable": true`, convenção do provedor. `anyOf` misturado com irmãos e `"type": ["number","null"]` dão 400 ou comportamento silenciosamente errado.
 - Faixa impressa não vira automaticamente `ref_min`/`ref_max`: `deriveRange` lê o intervalo do texto literal e **recusa** qualquer coisa condicional (sexo, idade, jejum, etnia, risco) ou aberta. É transcrição, não cálculo — ADR 0004 continua valendo.
