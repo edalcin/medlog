@@ -6,7 +6,7 @@ status: accepted
 
 Os laudos laboratoriais trazem, além do resultado corrente, uma tabela evolutiva com os resultados de coletas anteriores — no laudo de referência, seis coletas cobrindo de 2018 a 2025. Decidimos ingerir também esses valores, porque entregam anos de série temporal a partir do primeiro laudo processado, em vez de exigir acúmulo de coletas futuras.
 
-Cada Observação carrega `provenance`: `primary` quando extraída do bloco principal do laudo, com método, unidade e faixa de referência completos; `evolutive` quando extraída da tabela comparativa, que traz apenas valor e data. Na colisão entre as duas, `primary` sobrescreve `evolutive`, nunca o contrário.
+Cada Observação carrega `provenance`: `primary` quando extraída do bloco principal do laudo, com método, unidade e faixa de referência completos; `evolutive` quando extraída da tabela comparativa, que traz apenas valor e data. Na colisão entre as duas, `primary` prevalece — emendado pelo ADR 0013, que resolve a colisão na leitura da série, não sobrescrevendo a linha na escrita.
 
 ## Considered Options
 

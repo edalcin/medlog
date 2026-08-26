@@ -22,12 +22,20 @@ _Avoid_: Coleta, exame, relatório, boletim
 A data em que a amostra foi retirada, comum a todas as Observações de um Laudo. É a data que ordena a série temporal. Distinta da data de liberação (por analito) e da data de impressão do Laudo. Fica também em `files.collected_at`, preenchida pela Extração, para situar o documento no tempo; a Observação mantém a sua, porque o Laudo evolutivo produz Observações de outras datas a partir do mesmo documento.
 _Avoid_: Data do exame, data do laudo
 
+**Faixa de normalidade**:
+Os valores de um Indicador considerados normais para as características do usuário — gênero, idade e o que mais aquele Indicador condicionar. Vem de pesquisa em fonte confiável, guardada junto ao Indicador, e nunca do Laudo. É o que a tela mostra: parágrafo antes da lista de Medidas e banda no gráfico.
+_Avoid_: Faixa ideal, faixa esperada, valor normal, intervalo normal
+
+**Característica do usuário**:
+O que do usuário condiciona uma Faixa de normalidade: sexo biológico e data de nascimento, de onde sai a idade. Fisiologia, nunca identidade — a faixa de hemoglobina responde a eritropoiese e volume sanguíneo, e o PSA só se aplica a quem tem próstata. Fato estável da pessoa, editado por ela na tela de Configuração. Estado de uma coleta — jejum, gravidez, tabagismo, risco cardiovascular — não é Característica, porque valeria retroativamente para todo o histórico.
+_Avoid_: Gênero, perfil, dados demográficos, condição
+
 **Faixa de referência**:
-O intervalo esperado para uma Observação, tal como impresso no Laudo. Guardada como texto fiel (`reference_text`), sempre; com limites numéricos (`ref_min`, `ref_max`) apenas quando o Laudo apresenta faixa única e inequívoca; e com `out_of_range` lido do marcador de alteração do próprio laboratório. O MedLog não calcula faixa nem decide se um resultado está alterado.
-_Avoid_: Valor de referência, valor normal, intervalo normal
+O intervalo que o laboratório imprimiu no Laudo ao lado daquele resultado, com as condições que ele mesmo aplicou. Guardada fiel (`reference_text`), com limites numéricos (`ref_min`, `ref_max`) só quando o Laudo apresenta faixa única e inequívoca, e com `out_of_range` lido do marcador de alteração do próprio laboratório. Guardada, não exibida: quem julga a normalidade na tela é a Faixa de normalidade. O MedLog não calcula esta faixa nem decide se um resultado está alterado.
+_Avoid_: Faixa do laudo, valor de referência
 
 **Procedência**:
-De qual parte do Laudo a Observação foi extraída. `primary` designa o bloco principal, com método, unidade e faixa de referência; `evolutive` designa a tabela comparativa de coletas anteriores, que traz apenas valor e data. Na colisão, `primary` prevalece.
+De qual parte do Laudo a Observação foi extraída. `primary` designa o bloco principal, com método, unidade e faixa de referência; `evolutive` designa a tabela comparativa de coletas anteriores, que traz apenas valor e data. Havendo as duas para a mesma Data de coleta, a série mostra a `primary`; a `evolutive` fica guardada e só aparece onde não há `primary`.
 _Avoid_: Origem, fonte, tipo
 
 **Laudo evolutivo**:

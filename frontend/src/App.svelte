@@ -16,6 +16,7 @@
   import Files from './routes/Files.svelte'
   import ExtractionReview from './routes/ExtractionReview.svelte'
   import HealthSeries from './routes/HealthSeries.svelte'
+  import Config from './routes/Config.svelte'
 
   import './app.css'
 
@@ -34,6 +35,7 @@
     '/sharing': Sharing,
     '/extractions/:id/review': ExtractionReview,
     '/admin': Admin,
+    '/config': Config,
   }
 
   onMount(async () => {

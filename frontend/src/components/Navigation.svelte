@@ -48,6 +48,13 @@
       {#if $currentUser.role === 'ADMIN'}
         <span class="badge badge-yellow">Admin</span>
       {/if}
+      <a
+        href="/config"
+        use:link
+        class="btn btn-ghost btn-sm theme-btn"
+        class:active={$location === '/config'}
+        title="Configurações"
+      >⚙</a>
       <button
         class="btn btn-ghost btn-sm theme-btn"
         onclick={cycleTheme}
@@ -79,6 +86,7 @@
     {#if $isAdmin}
       <button class="mobile-link" onclick={() => navigate('/admin')} class:active={$location === '/admin'}>Admin</button>
     {/if}
+    <button class="mobile-link" onclick={() => navigate('/config')} class:active={$location === '/config'}>Configurações</button>
     <hr class="mobile-divider" />
     <button class="mobile-link" onclick={handleSignout}>Sair</button>
   </div>
@@ -162,6 +170,10 @@
     padding: 4px 8px;
     min-width: 32px;
     justify-content: center;
+  }
+
+  .nav-user a.active {
+    color: var(--accent);
   }
 
   .hamburger {

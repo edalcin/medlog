@@ -19,24 +19,27 @@ type Indicator struct {
 // literal printed on the report; ValueNum is set only when the result is a
 // number without qualifier, so ">90" never becomes 90.
 type Observation struct {
-	ID            string    `json:"id"`
-	UserID        string    `json:"userId"`
-	IndicatorID   string    `json:"indicatorId"`
-	IndicatorCode string    `json:"indicatorCode,omitempty"`
-	IndicatorName string    `json:"indicatorName,omitempty"`
-	SourceFileID  *string   `json:"sourceFileId,omitempty"`
-	ExtractionID  *string   `json:"extractionId,omitempty"`
-	CollectedAt   time.Time `json:"collectedAt"`
-	ValueText     string    `json:"valueText"`
-	ValueNum      *float64  `json:"valueNum,omitempty"`
-	Unit          *string   `json:"unit,omitempty"`
-	ReferenceText *string   `json:"referenceText,omitempty"`
-	RefMin        *float64  `json:"refMin,omitempty"`
-	RefMax        *float64  `json:"refMax,omitempty"`
-	OutOfRange    *bool     `json:"outOfRange,omitempty"`
-	Provenance    string    `json:"provenance"`
-	Status        string    `json:"status"`
-	CreatedAt     time.Time `json:"createdAt"`
+	ID            string  `json:"id"`
+	UserID        string  `json:"userId"`
+	IndicatorID   string  `json:"indicatorId"`
+	IndicatorCode string  `json:"indicatorCode,omitempty"`
+	IndicatorName string  `json:"indicatorName,omitempty"`
+	SourceFileID  *string `json:"sourceFileId,omitempty"`
+	// Nome do arquivo do Laudo de origem, lido por JOIN: a rota de download é
+	// GET /api/files/{filename}, e o ID sozinho não monta a URL.
+	SourceFilename *string   `json:"sourceFilename,omitempty"`
+	ExtractionID   *string   `json:"extractionId,omitempty"`
+	CollectedAt    time.Time `json:"collectedAt"`
+	ValueText      string    `json:"valueText"`
+	ValueNum       *float64  `json:"valueNum,omitempty"`
+	Unit           *string   `json:"unit,omitempty"`
+	ReferenceText  *string   `json:"referenceText,omitempty"`
+	RefMin         *float64  `json:"refMin,omitempty"`
+	RefMax         *float64  `json:"refMax,omitempty"`
+	OutOfRange     *bool     `json:"outOfRange,omitempty"`
+	Provenance     string    `json:"provenance"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 // Extraction is the record of one send to the AI provider. It is created
@@ -264,20 +267,21 @@ func ObservationInsertBatch(ctx context.Context, db *sql.DB, list []Observation)
 }
 
 const observationSelectSQL = `
-SELECT o.id, o.user_id, o.indicator_id, i.code, i.name, o.source_file_id, o.extraction_id,
+SELECT o.id, o.user_id, o.indicator_id, i.code, i.name, o.source_file_id, f.filename, o.extraction_id,
        o.collected_at, o.value_text, o.value_num, o.unit, o.reference_text, o.ref_min, o.ref_max,
        o.out_of_range, o.provenance, o.status, o.created_at
 FROM health_observations o
-JOIN health_indicators i ON i.id = o.indicator_id`
+JOIN health_indicators i ON i.id = o.indicator_id
+LEFT JOIN files f ON f.id = o.source_file_id`
 
 func scanObservations(rows *sql.Rows) ([]Observation, error) {
 	list := []Observation{}
 	for rows.Next() {
 		var o Observation
 		if err := rows.Scan(&o.ID, &o.UserID, &o.IndicatorID, &o.IndicatorCode, &o.IndicatorName,
-			&o.SourceFileID, &o.ExtractionID, &o.CollectedAt, &o.ValueText, &o.ValueNum, &o.Unit,
-			&o.ReferenceText, &o.RefMin, &o.RefMax, &o.OutOfRange, &o.Provenance, &o.Status,
-			&o.CreatedAt); err != nil {
+			&o.SourceFileID, &o.SourceFilename, &o.ExtractionID, &o.CollectedAt, &o.ValueText,
+			&o.ValueNum, &o.Unit, &o.ReferenceText, &o.RefMin, &o.RefMax, &o.OutOfRange,
+			&o.Provenance, &o.Status, &o.CreatedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, o)
@@ -297,11 +301,22 @@ func ObservationFindByExtraction(ctx context.Context, db *sql.DB, extractionID s
 	return scanObservations(rows)
 }
 
-// ObservationFindSeries returns the confirmed time series of one indicator.
-// Only confirmed observations exist as far as a chart is concerned.
+// ObservationFindSeries returns the confirmed time series of one indicator,
+// one Observation per collected_at. Quando a mesma Data de coleta tem uma
+// linha "primary" e uma "evolutive" (o índice único as mantém as duas —
+// nada é apagado), a "primary" prevalece na leitura; a "evolutive" só
+// aparece quando não existe "primary" irmã naquela data (ADR 0013).
+// collected_at é comparado como texto cru, nunca formatado, porque é assim
+// que o índice de deduplicação o entende.
 func ObservationFindSeries(ctx context.Context, db *sql.DB, userID, indicatorCode string) ([]Observation, error) {
 	rows, err := db.QueryContext(ctx, observationSelectSQL+
-		` WHERE o.user_id = ? AND i.code = ? AND o.status = ? ORDER BY o.collected_at`,
+		` WHERE o.user_id = ? AND i.code = ? AND o.status = ?
+		    AND NOT (o.provenance = 'evolutive' AND EXISTS (
+		        SELECT 1 FROM health_observations p
+		        WHERE p.user_id = o.user_id AND p.indicator_id = o.indicator_id
+		          AND p.collected_at = o.collected_at AND p.provenance = 'primary'
+		    ))
+		  ORDER BY o.collected_at`,
 		userID, indicatorCode, ObservationConfirmed)
 	if err != nil {
 		return nil, err

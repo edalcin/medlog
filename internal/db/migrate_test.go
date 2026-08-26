@@ -55,8 +55,10 @@ func TestMigrate007HealthIndicators(t *testing.T) {
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		t.Fatalf("set dialect: %v", err)
 	}
-	if err := goose.Down(database, "."); err != nil {
-		t.Fatalf("goose down: %v", err)
+	// DownTo(6), não Down(): o topo da pilha muda a cada migração nova, e um
+	// único Down passou a desfazer só a 008. A asserção é sobre a 007.
+	if err := goose.DownTo(database, ".", 6); err != nil {
+		t.Fatalf("goose down to 006: %v", err)
 	}
 	if _, err := database.Exec("SELECT 1 FROM health_indicators LIMIT 0"); err == nil {
 		t.Error("health_indicators survived rollback")

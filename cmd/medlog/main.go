@@ -137,6 +137,7 @@ func registerRoutes(r chi.Router, database *sql.DB, filesPath, databaseURL strin
 		r.Get("/users/others", userH.ListOthers)
 		r.Put("/users/me/password", userH.MeUpdatePassword)
 		r.Patch("/users/me/theme", userH.MeUpdateTheme)
+		r.Patch("/users/me", userH.MeUpdate)
 		r.Get("/dashboard", dashH.Get)
 
 		// Série de indicadores: dado do próprio usuário, não é rota de ADMIN.

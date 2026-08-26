@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -216,4 +218,78 @@ func (h *UserHandler) MeUpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// MeUpdate atualiza o perfil do próprio usuário logado (nome, e-mail, sexo
+// biológico e data de nascimento). O e-mail é a credencial de login, então
+// trocá-lo exige confirmar a senha atual (ADR 0014).
+func (h *UserHandler) MeUpdate(w http.ResponseWriter, r *http.Request) {
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	var req struct {
+		Name            *string `json:"name"`
+		Email           *string `json:"email"`
+		BiologicalSex   *string `json:"biologicalSex"`
+		BirthDate       *string `json:"birthDate"`
+		CurrentPassword *string `json:"currentPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, "requisição inválida", http.StatusBadRequest)
+		return
+	}
+
+	if req.BiologicalSex != nil && *req.BiologicalSex != "M" && *req.BiologicalSex != "F" {
+		writeError(w, "sexo biológico deve ser M ou F", http.StatusBadRequest)
+		return
+	}
+
+	if req.BirthDate != nil {
+		birth, err := time.Parse("2006-01-02", *req.BirthDate)
+		if err != nil {
+			writeError(w, "data de nascimento deve estar no formato AAAA-MM-DD", http.StatusBadRequest)
+			return
+		}
+		now := time.Now().UTC()
+		if !birth.Before(now) {
+			writeError(w, "data de nascimento não pode ser no futuro", http.StatusBadRequest)
+			return
+		}
+		if birth.Before(now.AddDate(-130, 0, 0)) {
+			writeError(w, "data de nascimento implausível", http.StatusBadRequest)
+			return
+		}
+	}
+
+	if req.Email != nil {
+		if req.CurrentPassword == nil || *req.CurrentPassword == "" {
+			writeError(w, "senha atual é obrigatória para trocar o e-mail", http.StatusBadRequest)
+			return
+		}
+		var currentHash string
+		if err := h.DB.QueryRowContext(r.Context(),
+			"SELECT password_hash FROM users WHERE id=?", userID).Scan(&currentHash); err != nil {
+			writeDBError(w, err)
+			return
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(*req.CurrentPassword)); err != nil {
+			writeError(w, "senha atual incorreta", http.StatusUnauthorized)
+			return
+		}
+	}
+
+	in := models.UpdateUserInput{
+		Name:          req.Name,
+		Email:         req.Email,
+		BiologicalSex: req.BiologicalSex,
+		BirthDate:     req.BirthDate,
+	}
+	u, err := models.UserUpdate(r.Context(), h.DB, userID, in)
+	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			writeError(w, "e-mail já está em uso", http.StatusConflict)
+			return
+		}
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": u})
 }

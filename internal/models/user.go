@@ -8,23 +8,25 @@ import (
 )
 
 type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Username  *string   `json:"username,omitempty"`
-	Name      string    `json:"name"`
-	Role      string    `json:"role"`
-	Theme     string    `json:"theme"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID            string    `json:"id"`
+	Email         string    `json:"email"`
+	Username      *string   `json:"username,omitempty"`
+	Name          string    `json:"name"`
+	Role          string    `json:"role"`
+	Theme         string    `json:"theme"`
+	BiologicalSex *string   `json:"biologicalSex"`
+	BirthDate     *string   `json:"birthDate"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 func UserFindByEmail(ctx context.Context, db *sql.DB, email string) (*User, string, error) {
 	var u User
 	var hash string
 	err := db.QueryRowContext(ctx,
-		`SELECT id, email, username, name, role, theme, created_at, updated_at, password_hash
+		`SELECT id, email, username, name, role, theme, biological_sex, birth_date, created_at, updated_at, password_hash
 		 FROM users WHERE email = ?`, email,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.CreatedAt, &u.UpdatedAt, &hash)
+	).Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.BiologicalSex, &u.BirthDate, &u.CreatedAt, &u.UpdatedAt, &hash)
 	if err != nil {
 		return nil, "", err
 	}
@@ -34,8 +36,8 @@ func UserFindByEmail(ctx context.Context, db *sql.DB, email string) (*User, stri
 func UserFindByID(ctx context.Context, db *sql.DB, id string) (*User, error) {
 	var u User
 	err := db.QueryRowContext(ctx,
-		`SELECT id, email, username, name, role, theme, created_at, updated_at FROM users WHERE id = ?`, id,
-	).Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.CreatedAt, &u.UpdatedAt)
+		`SELECT id, email, username, name, role, theme, biological_sex, birth_date, created_at, updated_at FROM users WHERE id = ?`, id,
+	).Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.BiologicalSex, &u.BirthDate, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +46,7 @@ func UserFindByID(ctx context.Context, db *sql.DB, id string) (*User, error) {
 
 func UserFindAll(ctx context.Context, db *sql.DB) ([]User, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, email, username, name, role, theme, created_at, updated_at FROM users ORDER BY name`)
+		`SELECT id, email, username, name, role, theme, biological_sex, birth_date, created_at, updated_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +54,7 @@ func UserFindAll(ctx context.Context, db *sql.DB) ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.BiologicalSex, &u.BirthDate, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)
@@ -88,10 +90,12 @@ func UserCreate(ctx context.Context, db *sql.DB, id string, in CreateUserInput) 
 }
 
 type UpdateUserInput struct {
-	Name  *string
-	Email *string
-	Role  *string
-	Theme *string
+	Name          *string
+	Email         *string
+	Role          *string
+	Theme         *string
+	BiologicalSex *string
+	BirthDate     *string
 }
 
 func UserUpdate(ctx context.Context, db *sql.DB, id string, in UpdateUserInput) (*User, error) {
@@ -114,6 +118,14 @@ func UserUpdate(ctx context.Context, db *sql.DB, id string, in UpdateUserInput) 
 	if in.Theme != nil {
 		sets = append(sets, "theme=?")
 		args = append(args, *in.Theme)
+	}
+	if in.BiologicalSex != nil {
+		sets = append(sets, "biological_sex=?")
+		args = append(args, *in.BiologicalSex)
+	}
+	if in.BirthDate != nil {
+		sets = append(sets, "birth_date=?")
+		args = append(args, *in.BirthDate)
 	}
 	if len(sets) == 0 {
 		return UserFindByID(ctx, db, id)

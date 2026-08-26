@@ -10,6 +10,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"medlog/internal/auth"
+	"medlog/internal/models"
 )
 
 type AuthHandler struct{ DB *sql.DB }
@@ -61,9 +62,12 @@ func (h *AuthHandler) SignIn(w http.ResponseWriter, r *http.Request) {
 		uuid.New().String(), user.ID, user.Name, user.Email, time.Now().UTC(), ip, userAgent,
 	)
 
-	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]string{
-		"id": user.ID, "email": user.Email, "name": user.Name, "role": user.Role, "theme": user.Theme,
-	}})
+	u, err := models.UserFindByID(r.Context(), h.DB, user.ID)
+	if err != nil {
+		writeError(w, "erro ao carregar usuário", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": u})
 }
 
 func (h *AuthHandler) SignOut(w http.ResponseWriter, r *http.Request) {
@@ -75,11 +79,11 @@ func (h *AuthHandler) SignOut(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]string{
-		"id":    auth.Manager.GetString(r.Context(), auth.SessionKeyUserID),
-		"email": auth.Manager.GetString(r.Context(), auth.SessionKeyEmail),
-		"name":  auth.Manager.GetString(r.Context(), auth.SessionKeyName),
-		"role":  auth.Manager.GetString(r.Context(), auth.SessionKeyRole),
-		"theme": auth.Manager.GetString(r.Context(), auth.SessionKeyTheme),
-	}})
+	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
+	u, err := models.UserFindByID(r.Context(), h.DB, userID)
+	if err != nil {
+		writeError(w, "sessão inválida", http.StatusUnauthorized)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": u})
 }

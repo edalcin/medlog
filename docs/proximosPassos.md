@@ -2,8 +2,8 @@
 
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
-**Última atualização:** 2026-08-23
-**Fase atual:** v3.0 completa e em uso real. As quatro fases estão concluídas, a extração já rodou contra a API de verdade, e três defeitos encontrados nesse uso foram corrigidos. **Próximo passo: o usuário testa a imagem no UNRAID e volta com observações.**
+**Última atualização:** 2026-08-26
+**Fase atual:** v3.0 em uso real, e um ciclo novo aberto pelo uso: **v3.1 — Faixa de normalidade e gráfico interativo**. Catorze decisões fechadas em grill (Q18 a Q31), ADRs `0012` a `0015`. **Próximo passo: o usuário revisa `docs/faixas-de-normalidade.md`; o resto do trabalho não depende dessa revisão e corre antes.**
 
 ---
 
@@ -33,17 +33,31 @@ Documento de origem: `docs/v3/MedLog V3.0.md`.
 | Q12 | A Extração enriquece `files` com `collected_at`, `lab_name` e `report_number`, e sugere `custom_name` só se vazio; nada sobrescreve campo humano, e só grava na confirmação do bloco | `docs/adr/0010-extracao-enriquece-metadados-do-documento.md` |
 | Q13 | `gemini_model` em `app_config`, escolhido na aba admin a partir de lista curta declarada em Go, com o custo por Extração ao lado; padrão `gemini-3.1-flash-lite`. `GEMINI_API_KEY` permanece em variável de ambiente | esta tabela (decisão reversível, sem ADR) |
 | Q14 | Quatro fases: 1 esquema, 2 extração sem interface, 3 revisão, 4 visualização. A fase 2 é entregável sozinha, provada por endpoint e inspeção do banco | `docs/v3/plano.md` |
-| Q15 | Gráfico em SVG escrito à mão, sem biblioteca. Nenhuma dependência nova no frontend | esta tabela (decisão reversível, sem ADR) |
+| Q15 | ~~Gráfico em SVG escrito à mão, sem biblioteca~~ — **revertida pela Q18**: Chart.js entra empacotado | esta tabela, revista pelo `docs/adr/0012` |
 | Q16 | Um documento guarda **uma** Extração: a nova apaga as anteriores e o que elas deixaram em revisão. Mais um "zerar" explícito, que apaga tudo daquele documento | esta tabela (decisão reversível, sem ADR) |
 | Q17 | Extração liberada ao **dono do documento**; `ADMIN` alcança todos. Catálogo e escolha de modelo seguem restritos a `ADMIN` | `docs/adr/0011-extracao-liberada-ao-dono-do-documento.md` |
+| Q18 | Chart.js como dependência npm empacotada pelo Vite. CDN proibido: a CSP fixa `script-src 'self'` e o PWA promete offline | `docs/adr/0012-chart-js-empacotado-no-bundle-nunca-por-cdn.md` |
+| Q19 | Interação do gráfico: tooltip com data, valor, unidade e Procedência, mais clique no ponto abrindo o Laudo. Zoom só quando alguma série passar de ~50 pontos; comparar dois Indicadores é escopo próprio | esta tabela (decisão reversível, sem ADR) |
+| Q20 | Eixo X `linear` em milissegundos com `ticks.callback` em pt-BR, reaproveitando `lib/date.ts`. Eixo `time` exigiria `chartjs-adapter-date-fns` mais `date-fns`; eixo `category` achataria intervalos irregulares | esta tabela (decisão reversível, sem ADR) |
+| Q21 | `primary` prevalece sobre `evolutive` na **leitura** da série, nunca na escrita. O índice único inclui `provenance`, então as duas linhas sempre coexistiram e a tela repetia o valor | `docs/adr/0013-primary-prevalece-na-leitura-nao-na-escrita.md` |
+| Q22 | Procedência continua visível na série (coluna ou selo, mais formato do ponto no gráfico). Matar o valor repetido não é matar a rastreabilidade | esta tabela (decisão reversível, sem ADR) |
+| Q23 | **Faixa de normalidade** é conceito novo, distinto da Faixa de referência do Laudo. A do Laudo continua extraída e gravada (ADR 0004 intacto), e sai da tela | `CONTEXT.md`, mais `docs/adr/0015` |
+| Q24 | `users` ganha `biological_sex` (`M`/`F`) e `birth_date`. Sexo biológico, não identidade: é fisiologia que condiciona a faixa. Jejum, gravidez, tabagismo e risco cardiovascular ficam fora, por serem estado da coleta, não característica do usuário | `docs/adr/0014-perfil-guarda-sexo-biologico-e-nascimento.md` |
+| Q25 | Tela de Configuração do próprio usuário (`/config`): nome, e-mail, senha, sexo biológico, nascimento. `PATCH /users/me` novo, exigindo senha atual para troca de e-mail. Tema fica no botão da navegação | `docs/adr/0014` |
+| Q26 | Faixa de normalidade em tabela própria `indicator_normal_ranges`, com `sex`, `age_min`/`age_max`, `min`/`max`, `text` e `source` **obrigatório**. Nulo em `sex`/idade significa "qualquer"; nulo em `min`/`max` significa "sem banda" | `docs/adr/0015-faixa-de-normalidade-em-tabela-propria-com-fonte-obrigatoria.md` |
+| Q27 | Regra única de resolução: casa a linha mais específica; se o perfil não desempatar, mostra todos os candidatos no parágrafo e **não** desenha banda, com aviso e link para `/config` | esta tabela (decisão reversível, sem ADR) |
+| Q28 | O selo de alteração continua sendo do laboratório, com o rótulo dizendo a origem ("fora da faixa do laboratório"). O MedLog não assina veredito clínico próprio | esta tabela, mais `CONTEXT.md` |
+| Q29 | Indicador promovido depois nasce **sem** faixa; a tela diz "não cadastrada". Faixa nova entra por migração, pesquisada e com fonte. IA preenchendo faixa clínica está fora | consequência do ADR 0015 |
+| Q30 | As 55 faixas vão primeiro para `docs/faixas-de-normalidade.md`, com fonte e URL por linha e divergências entre sociedades médicas marcadas, para revisão humana. Só então a migração `009` semeia | esta tabela (decisão de processo) |
+| Q31 | A faixa é resolvida pela idade de **hoje**, banda retangular. Só há usuários adultos. Vira polígono em degraus quando entrar série de criança — teto declarado em comentário `ponytail:` no código | esta tabela (decisão reversível, sem ADR) |
 
-Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de coleta, Faixa de referência, Procedência, Laudo evolutivo, Extração, Consentimento de extração, Revisão.
+Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de coleta, **Faixa de normalidade**, **Característica do usuário**, Faixa de referência, Procedência, Laudo evolutivo, Extração, Consentimento de extração, Revisão.
 
 ---
 
 ## 3. Perguntas em aberto
 
-Nenhuma pendente de decisão. Q1 a Q17 fechadas. As perguntas novas devem vir do teste no UNRAID, que o usuário fará a seguir, e da v3.1 (relatórios de IA), que tem grill próprio.
+Nenhuma pendente de decisão. Q1 a Q31 fechadas. O que falta é **revisão de dado**, não decisão de desenho: o usuário lê `docs/faixas-de-normalidade.md` e corrige as faixas com que discordar, em particular onde as fontes divergem (vitamina D entre SBEM/SBPC-ML e Endocrine Society, limite superior do TSH, metas de LDL por risco). A migração `009` é gerada a partir do documento aprovado.
 
 ---
 
@@ -208,42 +222,75 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 
 ## 8. Como retomar numa sessão nova
 
-**Onde o trabalho está:** branch `main`, working tree limpo.
+**Onde o trabalho está:** branch `main`, último commit `910224b`. **Working tree SUJO: nada desta sessão foi commitado.** O primeiro ato da sessão nova é conferir `git status` e commitar o que está descrito abaixo, ou descartar conscientemente.
 
-| Commit | Conteúdo |
+### 8.1 O que esta sessão (2026-08-26) fez
+
+Grill de 14 perguntas fechado (Q18–Q31 na seção 2), quatro ADRs novos, e a implementação de tudo que **não** depende de revisão humana de dado clínico.
+
+**Verificado, não presumido — os quatro comandos passaram no fim da sessão:**
+
+```
+go build ./...            # limpo
+go vet ./...              # limpo
+go test ./...             # ok: internal/db, internal/handlers, internal/models
+cd frontend && npm run build   # limpo (só o aviso pré-existente de StarRating)
+```
+
+**Não verificado:** nenhuma tela foi aberta no navegador. Gráfico novo, tela de Configuração e aviso de perfil incompleto compilam e passam o build, mas **ninguém olhou**. É o primeiro item da retomada.
+
+**Arquivos novos:**
+
+| Arquivo | Conteúdo |
 |---|---|
-| `9b02108` | grill fechado, ADRs 0004–0010, plano faseado |
-| `1568d72` | fase 1: migração `007`, catálogo com 55 Indicadores |
-| `014036c` | fase 2: cliente Gemini, endpoints, interpretação em Revisão |
-| `86ff55a` | fase 3: tela de revisão, confirmar/rejeitar, aba admin, correção de N+1 |
-| `893c83c` | continuidade atualizada para retomada da fase 4 |
-| `cfa4abf` | fase 4: série temporal, gráfico SVG sem dependência |
-| `5468f19` | documentação de usuário e deploy alinhada à v3.0, `GEMINI_API_KEY` documentada |
-| `470ef3d` | correção da faixa de referência sumindo na resposta do modelo (prompt/schema `2`) |
-| `7141f9a` | um documento guarda uma extração, mais o "zerar" explícito |
-| `bbb0bcd` | extração liberada ao dono do documento (ADR 0011) e leitura correta dos números do laudo |
-| `(esta sessão)` | continuidade reorganizada para o teste no UNRAID |
+| `docs/adr/0012…0015` | Chart.js empacotado; primary prevalece na leitura; perfil com sexo biológico; faixa em tabela própria |
+| `internal/migrations/008_normal_ranges.sql` | `users.biological_sex`, `users.birth_date`, tabela `indicator_normal_ranges` **vazia** |
+| `internal/models/health_test.go` | `TestObservationFindSeries_PrimaryPrevailsOverEvolutive`, guarda do ADR 0013 |
+| `frontend/src/routes/Config.svelte` | tela `/config`: nome, e-mail, senha, sexo biológico, nascimento |
+| `docs/faixas/*.md` | **as seis tabelas de faixas pesquisadas** — o insumo da revisão humana |
 
-**Reproduzir a verificação inteira, sem gastar token nenhum:**
+**Arquivos alterados:** `CONTEXT.md` (termos Faixa de normalidade, Característica do usuário, Faixa de referência reescrita), `docs/adr/0003` (emendado pelo 0013), `internal/models/health.go` (dedup na leitura, `LEFT JOIN files` para `source_filename`), `internal/models/user.go`, `internal/handlers/users.go` (`MeUpdate`), `internal/handlers/auth.go` (`Me` e `SignIn` devolvem o `User` completo), `cmd/medlog/main.go` (`PATCH /users/me`), `internal/db/migrate_test.go` (`DownTo(6)`), e no frontend `package.json` (chart.js 4.5.1), `api.ts`, `App.svelte`, `Navigation.svelte`, `HealthSeries.svelte`.
 
-```
-go build ./... && go vet ./... && go test ./... -count=1
-cd frontend && npm run build
-```
+### 8.2 O primeiro passo da sessão nova
 
-**Subir a aplicação de verdade para olhar a interface:** binário com `DATABASE_URL`, `SESSION_SECRET`, `FILES_PATH`, `PORT`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`. A extração aponta para documento **já existente** no sistema, anexado pelo fluxo normal de arquivos: não há upload no caminho de extração. O disparo fica na lista de documentos, para o dono do documento e para o `ADMIN`, só em PDF, atrás do diálogo de consentimento.
+**Abrir a interface e olhar.** Subir o binário com `DATABASE_URL`, `SESSION_SECRET`, `FILES_PATH`, `PORT`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` e conferir, nesta ordem:
 
-### O que espera o usuário (sessão encerrada em 2026-08-23)
+1. `/indicators` desenha o gráfico em Chart.js, com tooltip mostrando data, valor, unidade e procedência.
+2. Clique num ponto abre o Laudo de origem em outra aba (`/api/files/{sourceFilename}`).
+3. **A duplicata sumiu:** uma linha por Data de coleta, preferindo "laudo" sobre "laudo evolutivo".
+4. O aviso de perfil incompleto aparece no topo de `/indicators` e leva a `/config`.
+5. `/config` salva nome, sexo biológico e nascimento; trocar o e-mail exige senha atual; senha errada dá 401 e e-mail repetido dá 409.
+6. O gráfico continua legível no tema claro **e** no escuro (as cores saem de `getComputedStyle` sobre as variáveis de `app.css`, relidas só quando o gráfico é recriado — trocar de tema sem trocar de indicador não recolore; teto conhecido e anotado).
 
-**1. Teste da imagem no UNRAID.** O usuário vai subir `ghcr.io/edalcin/medlog:latest` (ou `:unraid-test`, mesmo digest) e exercitar o fluxo inteiro: extrair, revisar, confirmar, ver a série, zerar e reextrair. Volta com observações. Toda a correção desta sessão está nessa imagem, publicada de `bbb0bcd`.
+### 8.3 O que espera decisão do usuário
 
-Roteiro sugerido, na ordem em que as coisas quebraram antes: conferir se a faixa de referência agora aparece no hemograma **e** na tabela evolutiva; conferir se os valores com marcador `(1)` entram no gráfico em vez da lista de não numéricos; conferir se a faixa de leucócitos sai como 3.650–8.120 e não 3,65–8,12; reextrair o mesmo PDF e conferir que continua com **uma** extração; e entrar como usuário não-`ADMIN` para extrair um documento próprio.
+**Revisar `docs/faixas/*.md`.** Seis tabelas, uma por painel, com fonte e URL em cada linha. É dado clínico: nada disso vai ao banco antes de aprovação. Pontos que exigem escolha humana, todos já marcados nos arquivos:
 
-**2. Uma oferta em aberto, não implementada:** reprocessar a resposta bruta já paga, sem nova chamada à API. Hoje, corrigir interpretação exige reextrair, o que custa dinheiro — apesar de o ADR 0006 ter guardado `raw_response` justamente para evitar isso, e de `gemini.ParseRaw` já existir. Falta só o endpoint e o botão. Foi oferecido ao usuário e não foi pedido; entra se o teste no UNRAID mostrar que vale.
+- **Vitamina D**: SBEM/SBPC-ML (20 ng/mL população geral, 30 para grupos de risco) contra Endocrine Society 2011 (30 ng/mL). As três linhas estão registradas, nenhuma escolhida.
+- **TSH**: limite superior divergente entre Manual Fleury (4,5 a 10,4 mUI/L conforme idade) e estudos brasileiros (~3,5 e ~4,6). Lacuna declarada entre 18 e 19 anos.
+- **LDL e não-HDL**: `min`/`max` deliberadamente **vazios** — a diretriz SBC 2025 define meta por risco cardiovascular, que é estratificação médica. Os cinco números estão no texto.
+- **CEA e CA 19-9**: sem faixa de normalidade, por decisão fundamentada. Só limite de ensaio, rotulado como tal. CA 19-9 divergente entre 35 e 37 U/mL.
+- **Cinco percentuais do leucograma** (`neutrophils_pct` e irmãos): sem faixa citável — o Fleury publica só o absoluto. Ficam sem banda.
+- **HOMA-IR**: sem consenso citável, `min`/`max` vazios.
+- **RDW**: consolidado numa linha (11,8–14,2%); a fonte publica 0,1 de diferença entre sexos. Diz se prefere duas linhas.
+- **Mayo Clinic Laboratories** bloqueou acesso automatizado (HTTP 403) em vários exames; os valores vieram de PDF público do próprio Mayo, espelho e Wayback. Confirmação humana recomendada antes de semear.
 
-**3. Depois disso, v3.1:** relatórios de saúde gerados por IA, com grill próprio, ainda não iniciado. A fronteira já registrada em Q7 é não produzir texto que se leia como diagnóstico médico.
+### 8.4 O que falta implementar, depois da aprovação
 
-**Higiene de segurança pendente do lado do usuário:** a `GEMINI_API_KEY` real apareceu na saída de um comando durante esta sessão (expansão de variável de ambiente pelo `docker compose config`). Ela **nunca** entrou no git — `.env` está no `.gitignore` e `git log -S` não encontra a chave em commit nenhum —, mas convém rotacioná-la no Google AI Studio.
+1. **Migração `009`**: semeia `indicator_normal_ranges` a partir das tabelas aprovadas. Uma linha por faixa, `source` obrigatório. Amilase e lipase saíram em duas linhas no arquivo de pesquisa (uma para `min`, outra para `max`) e devem virar uma só no SQL.
+2. **Resolução da faixa**: consulta que casa `biological_sex` e a idade de hoje contra `indicator_normal_ranges`, escolhendo a linha mais específica. Se o perfil não desempatar, devolve **todos** os candidatos (Q27) — o parágrafo lista as duas faixas e o gráfico não desenha banda.
+3. **Exibição**: parágrafo com a Faixa de normalidade antes da lista de Medidas; **remover** a coluna "Faixa de referência" da lista; renomear o selo para "fora da faixa do laboratório" (Q28). A banda do gráfico troca de fonte mexendo **só** em `pickReferenceBand()` em `HealthSeries.svelte` — a função foi isolada para isso, com comentário citando o ADR 0015.
+4. **Indicador sem faixa**: a tela diz "faixa de normalidade não cadastrada" (Q29). Nunca deixar a IA preencher.
+
+### 8.5 Pendências herdadas, ainda válidas
+
+**Teste da imagem no UNRAID** (`ghcr.io/edalcin/medlog:latest`), que não aconteceu na sessão anterior: extrair, revisar, confirmar, ver a série, zerar e reextrair.
+
+**Oferta em aberto, não pedida:** reprocessar a resposta bruta já paga, sem nova chamada à API. `raw_response` e `gemini.ParseRaw` já existem; falta endpoint e botão.
+
+**Depois:** v3.1, relatórios de saúde por IA, com grill próprio. Fronteira registrada em Q7: nada que se leia como diagnóstico médico.
+
+**Higiene de segurança pendente do lado do usuário:** a `GEMINI_API_KEY` real apareceu na saída de um comando em sessão anterior (`docker compose config`). Nunca entrou no git, mas convém rotacioná-la no Google AI Studio.
 
 ### Armadilhas que já custaram tempo, para não repetir
 
@@ -260,3 +307,9 @@ Roteiro sugerido, na ordem em que as coisas quebraram antes: conferir se a faixa
 - A resposta bruta é gravada **antes** de interpretar, inclusive quando a chamada falha. Corrigir parsing nunca deve custar uma nova chamada: use `gemini.ParseRaw`.
 - Extração `pending` encontrada no arranque é chamada perdida, não progresso: `ExtractionMarkStale` a marca como falha.
 - O PDF pode não renderizar no `<iframe>` se o navegador estiver configurado para baixar PDFs. Não é defeito do servidor; a tela oferece abrir em outra aba.
+- Teste que faz rollback de migração deve usar `goose.DownTo(db, ".", N)`, nunca `goose.Down`: `Down` desfaz só o topo da pilha, então a migração nova quebra o teste da anterior. Mordeu na `008`.
+- O catálogo de Indicadores é **semeado** pela `007`: teste que precisa de um Indicador deve **ler** `health_indicators` por `code`, nunca chamar `IndicatorCreate` — colide com o `UNIQUE` do seed.
+- `Observation.sourceFileId` é UUID e **não** monta a URL de download: a rota é `/api/files/{filename}`, e `filename` é `{id}.{ext}` com extensão variável. Por isso `observationSelectSQL` tem `LEFT JOIN files` e devolve `source_filename`.
+- `<canvas role="img">` é erro de acessibilidade no Svelte 5 (`a11y_no_interactive_element_to_noninteractive_role`). `aria-label` sozinho basta.
+- A CSP em `internal/middleware/security.go` fixa `script-src 'self'`: **nenhuma** biblioteca por CDN funciona neste projeto, e o `vite-plugin-pwa` ainda promete offline. Dependência de frontend entra por npm e sai empacotada pelo Vite (ADR 0012).
+- O bundle passou de ~790 kB para 989 kB minificado (326 kB gzip) com o Chart.js. É JavaScript estático dentro de uma imagem de ~30 MB, não Node em runtime — a regra do docker enxuto continua respeitada.

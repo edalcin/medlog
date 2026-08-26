@@ -5,6 +5,9 @@ export interface User {
   name: string
   role: 'ADMIN' | 'USER'
   theme: 'SYSTEM' | 'LIGHT' | 'DARK'
+  /** Sexo biológico, usado só para resolver a Faixa de normalidade (ADR 0014). */
+  biologicalSex: 'M' | 'F' | null
+  birthDate: string | null
 }
 
 export interface Specialty {
@@ -365,6 +368,10 @@ export const updateUserPassword = (id: string, password: string) =>
 export const changePassword = (currentPassword: string, newPassword: string) =>
   request<{ ok: boolean }>('PUT', '/users/me/password', { currentPassword, newPassword })
 
+/** Atualiza o perfil do próprio usuário. `currentPassword` é obrigatório quando `email` é enviado (ADR 0014). */
+export const updateMe = (body: Partial<{ name: string; email: string; biologicalSex: 'M' | 'F' | null; birthDate: string | null; currentPassword: string }>) =>
+  request<{ data: User }>('PATCH', '/users/me', body).then(r => r.data)
+
 export const updateTheme = (theme: 'LIGHT' | 'DARK' | 'SYSTEM') =>
   request<{ data: User }>('PATCH', '/users/me/theme', { theme }).then(r => r.data)
 
@@ -517,6 +524,9 @@ export interface Observation {
   refMin?: number
   refMax?: number
   outOfRange?: boolean
+  sourceFileId?: string
+  /** Nome do arquivo do Laudo de origem: a rota de download é /api/files/{filename}. */
+  sourceFilename?: string
   provenance: 'primary' | 'evolutive'
   status: 'review' | 'confirmed'
 }
