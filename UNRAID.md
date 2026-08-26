@@ -82,6 +82,8 @@ docker pull ghcr.io/edalcin/medlog:latest
 
 **Atualizando para a v3.0:** a migração `007` cria as tabelas de indicadores de saúde, semeia o catálogo com 55 Indicadores e acrescenta `collected_at`, `lab_name` e `report_number` em `files`. Roda sozinha, não pede nada, e não altera dado existente. Para usar a extração, acrescente `GEMINI_API_KEY` no mesmo passo.
 
+**Atualizando para a v3.1:** as migrações `008` e `009` acrescentam `biological_sex` e `birth_date` em `users` (ambas nulas, ninguém é obrigado a preencher) e criam e semeiam `indicator_normal_ranges` com 78 Faixas de normalidade, cada uma citando a fonte. Rodam sozinhas e não alteram dado existente. Sem sexo biológico e data de nascimento no perfil, a tela de Indicadores mostra as faixas possíveis mas não desenha a banda — preencha em **Configurações**.
+
 ---
 
 ## Backup e Restauração

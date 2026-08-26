@@ -518,7 +518,9 @@ O PDF vai ao provedor **sem redação de PII** — nome completo, data de nascim
 
 Conceito distinto da Faixa de referência impressa no Laudo: vem de fonte citável e depende de Característica do usuário (sexo biológico e idade), enquanto a do Laudo é transcrição do papel.
 
-- Tabela `indicator_normal_ranges` (migração `008`), com `sex`, `age_min`/`age_max`, `min`/`max`, `text` e `source` **obrigatório**. Nulo em `sex` ou idade significa "qualquer"; nulo em `min`/`max` significa "sem banda para desenhar", e a faixa ainda existe como texto
+- Tabela `indicator_normal_ranges` (migração `008`), semeada pela **`009`** com 78 faixas cobrindo os 55 Indicadores: 47 com banda de dois lados, 17 de um lado só, 14 sem número. Colunas `sex`, `age_min`/`age_max`, `min`/`max`, `text` e `source` **obrigatório**. Nulo em `sex` ou idade significa "qualquer"; nulo em `min`/`max` significa "sem banda para desenhar", e a faixa ainda existe como texto
+- A `009` semeia **uma linha por (Indicador, sexo, faixa de idade)**. Duas linhas de igual especificidade servindo ao mesmo perfil dariam empate permanente, e o efeito seria a banda nunca ser desenhada — falha silenciosa. `internal/db/migrate009_test.go` varre sexo × idade de 18 a 100 para garantir que isso não acontece
+- Divergência entre sociedades médicas fica **no texto da linha**, nunca em linha própria: vitamina D semeia a posição SBEM/SBPC-ML (20–60 ng/mL) e TSH semeia o manual Fleury por faixa etária, com os números divergentes citados no texto
 - `models.NormalRangeResolve` casa as linhas contra o perfil e escolhe a **mais específica**. Característica desconhecida não filtra nada: com o sexo em branco, as linhas de homem e de mulher continuam candidatas, o empate sobrevive, a tela lista todas e **não** desenha banda
 - Idade é a de **hoje**, em anos completos, e a banda é um retângulo. Série de criança exigiria polígono em degraus — teto anotado em comentário `ponytail:`
 - Indicador sem faixa cadastrada responde vazio, e a tela diz "não cadastrada". A IA nunca preenche faixa clínica

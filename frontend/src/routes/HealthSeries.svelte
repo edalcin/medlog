@@ -85,6 +85,19 @@
     return `${who}, ${age}`
   }
 
+  /** Os limites da Faixa de normalidade em número, que é o que se procura na
+   * tela. O `text` da faixa costuma ser descrição ("população adulta
+   * brasileira saudável"), não o intervalo, então mostrar só ele esconderia
+   * justamente o dado. Faixa de um lado só vira "acima de" ou "até"; faixa
+   * sem limite nenhum devolve null e aí o texto fala por si. */
+  function formatBand(c: api.NormalRange): string | null {
+    const unit = current?.unit ? ' ' + current.unit : ''
+    if (c.min != null && c.max != null) return `${fmtNumber(c.min)} a ${fmtNumber(c.max)}${unit}`
+    if (c.min != null) return `acima de ${fmtNumber(c.min)}${unit}`
+    if (c.max != null) return `até ${fmtNumber(c.max)}${unit}`
+    return null
+  }
+
   function fmtNumber(v: number): string {
     return v.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
   }
@@ -377,10 +390,12 @@
               Faixa de normalidade não cadastrada para este indicador.
             </p>
           {:else if normalRange.resolved}
+            {@const c = normalRange.candidates[0]}
+            {@const band = formatBand(c)}
             <p class="range">
-              {normalRange.candidates[0].text}
+              {#if band}<strong>{band}</strong>{' — '}{/if}{c.text}
               <span class="muted">
-                — {describeCandidate(normalRange.candidates[0])}, fonte: {normalRange.candidates[0].source}
+                ({describeCandidate(c)}, fonte: {c.source})
               </span>
             </p>
           {:else}
@@ -393,7 +408,7 @@
             <ul class="plain">
               {#each normalRange.candidates as c (c.text + c.source)}
                 <li>
-                  <span class="value">{c.text}</span>
+                  <span class="value">{formatBand(c) ?? c.text}</span>
                   <span class="muted">— {describeCandidate(c)}, fonte: {c.source}</span>
                 </li>
               {/each}

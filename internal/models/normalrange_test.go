@@ -15,6 +15,19 @@ func str(s string) *string   { return &s }
 func integer(i int) *int     { return &i }
 func flt(f float64) *float64 { return &f }
 
+// clearRanges apaga as faixas que a migração 009 semeou para um Indicador.
+// Sem isso o teste disputaria com o dado real: a 009 semeia 78 faixas, e uma
+// fixture somada a elas mede a soma, não a regra. Mesma armadilha do catálogo
+// semeado pela 007.
+func clearRanges(t *testing.T, database *sql.DB, code string) {
+	t.Helper()
+	if _, err := database.Exec(
+		`DELETE FROM indicator_normal_ranges
+		 WHERE indicator_id = (SELECT id FROM health_indicators WHERE code = ?)`, code); err != nil {
+		t.Fatalf("limpar faixas de %q: %v", code, err)
+	}
+}
+
 // seedRange insere uma faixa para um Indicador do catálogo semeado pela 007.
 // O catálogo nunca é criado pelo teste: IndicatorCreate colidiria com o seed.
 func seedRange(t *testing.T, database *sql.DB, code string, r models.NormalRange) {
@@ -36,6 +49,7 @@ func TestNormalRangeResolve_SexPicksOneRow(t *testing.T) {
 	database := appdb.SetupTestDB(t)
 	ctx := context.Background()
 
+	clearRanges(t, database, "hemoglobin")
 	seedRange(t, database, "hemoglobin", models.NormalRange{
 		Sex: str("M"), Min: flt(13.0), Max: flt(16.5), Text: "13,0 a 16,5 g/dL", Source: "Fleury"})
 	seedRange(t, database, "hemoglobin", models.NormalRange{
@@ -62,6 +76,7 @@ func TestNormalRangeResolve_UnknownSexKeepsBothCandidates(t *testing.T) {
 	database := appdb.SetupTestDB(t)
 	ctx := context.Background()
 
+	clearRanges(t, database, "hemoglobin")
 	seedRange(t, database, "hemoglobin", models.NormalRange{
 		Sex: str("M"), Min: flt(13.0), Max: flt(16.5), Text: "13,0 a 16,5 g/dL", Source: "Fleury"})
 	seedRange(t, database, "hemoglobin", models.NormalRange{
@@ -87,6 +102,7 @@ func TestNormalRangeResolve_MostSpecificWins(t *testing.T) {
 	database := appdb.SetupTestDB(t)
 	ctx := context.Background()
 
+	clearRanges(t, database, "tsh")
 	seedRange(t, database, "tsh", models.NormalRange{
 		Min: flt(0.55), Max: flt(4.78), Text: "0,55 a 4,78 mUI/L", Source: "Fleury, adulto"})
 	seedRange(t, database, "tsh", models.NormalRange{
@@ -116,6 +132,7 @@ func TestNormalRangeResolve_MostSpecificWins(t *testing.T) {
 func TestNormalRangeResolve_NoRangeIsEmptyNotError(t *testing.T) {
 	database := appdb.SetupTestDB(t)
 
+	clearRanges(t, database, "homa_ir")
 	res, err := models.NormalRangeResolve(context.Background(), database, "homa_ir", str("M"), str("1980-05-15"))
 	if err != nil {
 		t.Fatalf("NormalRangeResolve: %v", err)
@@ -130,6 +147,7 @@ func TestNormalRangeResolve_NoRangeIsEmptyNotError(t *testing.T) {
 func TestNormalRangeResolve_TextOnlyRangeHasNoBand(t *testing.T) {
 	database := appdb.SetupTestDB(t)
 
+	clearRanges(t, database, "ldl_cholesterol")
 	seedRange(t, database, "ldl_cholesterol", models.NormalRange{
 		Text:   "Meta definida por risco cardiovascular",
 		Source: "Diretriz SBC 2025",

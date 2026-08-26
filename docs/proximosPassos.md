@@ -3,7 +3,7 @@
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
 **Última atualização:** 2026-08-26 (segunda sessão do dia)
-**Fase atual:** v3.0 em uso real; ciclo **v3.1 — Faixa de normalidade e gráfico interativo** em execução. Trinta e uma decisões fechadas (Q1 a Q31), ADRs `0001` a `0015`. A verificação visual pendente **foi feita** e achou dois defeitos, já corrigidos. A resolução da Faixa de normalidade **está implementada**. **Falta só o dado clínico: o usuário revisa `docs/faixas/*.md` e a migração `009` semeia.**
+**Fase atual:** v3.0 em uso real; ciclo **v3.1 — Faixa de normalidade e gráfico interativo** entregue no essencial. Trinta e uma decisões fechadas (Q1 a Q31), ADRs `0001` a `0015`, migrações `001` a `009`. A verificação visual pendente foi feita e achou dois defeitos, corrigidos. A Faixa de normalidade **está implementada e semeada**: 78 faixas, 55 Indicadores, fonte citada em cada linha. **Em aberto: só a decisão de desenho da banda de um lado só (seção 8.4).**
 
 ---
 
@@ -46,9 +46,9 @@ Documento de origem: `docs/v3/MedLog V3.0.md`.
 | Q25 | Tela de Configuração do próprio usuário (`/config`): nome, e-mail, senha, sexo biológico, nascimento. `PATCH /users/me` novo, exigindo senha atual para troca de e-mail. Tema fica no botão da navegação | `docs/adr/0014` |
 | Q26 | Faixa de normalidade em tabela própria `indicator_normal_ranges`, com `sex`, `age_min`/`age_max`, `min`/`max`, `text` e `source` **obrigatório**. Nulo em `sex`/idade significa "qualquer"; nulo em `min`/`max` significa "sem banda" | `docs/adr/0015-faixa-de-normalidade-em-tabela-propria-com-fonte-obrigatoria.md` |
 | Q27 | Regra única de resolução: casa a linha mais específica; se o perfil não desempatar, mostra todos os candidatos no parágrafo e **não** desenha banda, com aviso e link para `/config` | esta tabela (decisão reversível, sem ADR) |
-| Q28 | O selo de alteração continua sendo do laboratório, com o rótulo dizendo a origem ("fora da faixa do laboratório"). O MedLog não assina veredito clínico próprio. **Rótulo já aplicado**; a remoção da coluna "Faixa de referência" espera a `009`, para a tela não ficar sem banda no intervalo | esta tabela, mais `CONTEXT.md` |
+| Q28 | O selo de alteração continua sendo do laboratório, com o rótulo dizendo a origem ("fora da faixa do laboratório"). O MedLog não assina veredito clínico próprio. **Rótulo aplicado.** A remoção da coluna "Faixa de referência" e a troca da fonte da banda seguem pendentes: 17 das 78 faixas semeadas têm **um lado só**, e faixa de um lado não desenha retângulo — trocar hoje apagaria a banda desses indicadores. Precisa de decisão de desenho (seção 8.4) | esta tabela, mais `CONTEXT.md` |
 | Q29 | Indicador promovido depois nasce **sem** faixa; a tela diz "não cadastrada". Faixa nova entra por migração, pesquisada e com fonte. IA preenchendo faixa clínica está fora | consequência do ADR 0015 |
-| Q30 | As 55 faixas vão primeiro para `docs/faixas-de-normalidade.md`, com fonte e URL por linha e divergências entre sociedades médicas marcadas, para revisão humana. Só então a migração `009` semeia | esta tabela (decisão de processo) |
+| Q30 | As 55 faixas foram primeiro para `docs/faixas/*.md`, com fonte e URL por linha e divergências marcadas. O usuário optou por **semear o consenso brasileiro** e manter as divergências registradas no texto de cada linha, em vez de revisar linha por linha; a `009` semeou 78 faixas | esta tabela (decisão de processo), mais seção 8.3 |
 | Q31 | A faixa é resolvida pela idade de **hoje**, banda retangular. Só há usuários adultos. Vira polígono em degraus quando entrar série de criança — teto declarado em comentário `ponytail:` no código | esta tabela (decisão reversível, sem ADR) |
 
 Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de coleta, **Faixa de normalidade**, **Característica do usuário**, Faixa de referência, Procedência, Laudo evolutivo, Extração, Consentimento de extração, Revisão.
@@ -272,36 +272,46 @@ A lista de seis itens da sessão anterior foi conferida com a aplicação de ver
 
 **Armadilha de verificação:** `MouseEvent` sintético tem `offsetX/offsetY` em zero, e o Chart.js calcula a posição por esse campo — todo clique simulado acerta a origem e nunca um ponto. Hit-test de gráfico exige mouse real (CDP). Além disso, aba em segundo plano não roda `requestAnimationFrame`, e o canvas fica **em branco** mesmo com o gráfico criado.
 
-### 8.3 O que espera decisão do usuário
+### 8.3 As decisões clínicas: **tomadas**
 
-**Revisar `docs/faixas/*.md`.** Seis tabelas, uma por painel, com fonte e URL em cada linha. É dado clínico: nada disso vai ao banco antes de aprovação. Pontos que exigem escolha humana, todos já marcados nos arquivos:
+O usuário decidiu, nesta sessão: **semear o consenso brasileiro** e deixar registradas as divergências, em vez de esperar revisão linha por linha. Também escolheu **RDW numa linha só** (11,8–14,2%), não duas por sexo.
 
-- **Vitamina D**: SBEM/SBPC-ML (20 ng/mL população geral, 30 para grupos de risco) contra Endocrine Society 2011 (30 ng/mL). As três linhas estão registradas, nenhuma escolhida.
-- **TSH**: limite superior divergente entre Manual Fleury (4,5 a 10,4 mUI/L conforme idade) e estudos brasileiros (~3,5 e ~4,6). Lacuna declarada entre 18 e 19 anos.
-- **LDL e não-HDL**: `min`/`max` deliberadamente **vazios** — a diretriz SBC 2025 define meta por risco cardiovascular, que é estratificação médica. Os cinco números estão no texto.
-- **CEA e CA 19-9**: sem faixa de normalidade, por decisão fundamentada. Só limite de ensaio, rotulado como tal. CA 19-9 divergente entre 35 e 37 U/mL.
-- **Cinco percentuais do leucograma** (`neutrophils_pct` e irmãos): sem faixa citável — o Fleury publica só o absoluto. Ficam sem banda.
-- **HOMA-IR**: sem consenso citável, `min`/`max` vazios.
-- **RDW**: consolidado numa linha (11,8–14,2%); a fonte publica 0,1 de diferença entre sexos. Diz se prefere duas linhas.
-- **Mayo Clinic Laboratories** bloqueou acesso automatizado (HTTP 403) em vários exames; os valores vieram de PDF público do próprio Mayo, espelho e Wayback. Confirmação humana recomendada antes de semear.
+Como cada ponto ficou na migração `009`:
 
-### 8.4 Faixa de normalidade: **código pronto, dado pendente**
+| Ponto | Decisão aplicada |
+|---|---|
+| **Vitamina D** | Semeada a posição brasileira, SBEM/SBPC-ML, 20–60 ng/mL para população geral. A meta de 30–60 para grupos de risco e os 30–100 da Endocrine Society 2011 ficam **no texto da linha**, não semeados — a atualização de 2024 da própria Endocrine Society abandonou esses cortes |
+| **TSH** | Semeadas as quatro faixas etárias do manual Fleury (0,45–4,5 dos 20 aos 59; sobe até 0,48–10,4 acima de 80), que são as impressas nos laudos brasileiros. Os limites mais baixos dos estudos Rosário/Calsolari ficam no texto. Lacuna de 18 e 19 anos permanece: a fonte começa a faixa adulta em 20 anos |
+| **LDL e não-HDL** | `min`/`max` vazios, como já estava decidido: meta por risco cardiovascular é estratificação médica. Os cinco números por categoria estão no texto |
+| **CEA e CA 19-9** | `min`/`max` vazios. O limite de ensaio (CEA 3,0 µg/L em não fumantes; CA 19-9 35 ou 37 U/mL conforme o kit) fica no texto, **rotulado como limite de ensaio**, para a tela não desenhar banda que finge ser normalidade |
+| **Cinco percentuais do leucograma** | `min`/`max` vazios, com o texto dizendo que o Fleury publica só o absoluto e apontando o Indicador absoluto correspondente |
+| **HOMA-IR** | `min`/`max` vazios, sem consenso citável |
+| **RDW** | Uma linha, 11,8–14,2%, conforme a escolha do usuário |
+| **Mayo Clinic (HTTP 403)** | Semeado. Não é divergência: nenhuma segunda fonte contradiz esses números, e eles vieram de PDF público do próprio Mayo, espelho e Wayback. Tratar o bloqueio como disputa esvaziaria metade do catálogo e deixaria a tela inútil |
 
-A resolução e a exibição foram implementadas nesta sessão. Elas não dependiam da revisão clínica: o que depende dela é o **dado**, e só ele.
+### 8.4 Faixa de normalidade: **implementada e semeada**
 
-**Implementado e verificado:**
+**Resolução e exibição** (`internal/models/normalrange.go`, `internal/handlers/series.go`, `frontend/src/routes/HealthSeries.svelte`):
 
-- `internal/models/normalrange.go` — `NormalRangeResolve(ctx, db, code, sex, birthDate)`. Filtra em Go, não em SQL: são poucas linhas por Indicador, e a regra de especificidade fica legível. Característica desconhecida **não filtra nada**, então o empate sobrevive e a banda não é desenhada (Q27). Idade em anos completos hoje (Q31), com `ponytail:` marcando o teto de série de criança.
-- `internal/handlers/series.go` — `GET /api/health-series/{code}` agora devolve `{observations, normalRange}` numa só resposta. Contrato mudou; o único chamador (`getSeries` em `api.ts`) foi migrado junto, sem apelido nem rota velha.
-- `frontend/src/routes/HealthSeries.svelte` — parágrafo "Faixa de normalidade" antes da lista de Medidas, nos três estados: resolvida (texto, a quem se aplica, fonte), ambígua (aviso, link para `/config` e **todas** as candidatas) e não cadastrada (Q29). Selo renomeado para **"fora da faixa do laboratório"** (Q28).
-- `internal/models/normalrange_test.go` — cinco testes: sexo escolhe uma linha, sexo desconhecido mantém as duas, a linha mais específica vence a genérica, indicador sem faixa responde vazio em vez de erro, faixa só de texto não traz limites. Mutação conferida: trocar `len(candidates) == 1` por `>= 1` faz o teste de empate falhar.
+- `NormalRangeResolve(ctx, db, code, sex, birthDate)` filtra em Go, não em SQL: são poucas linhas por Indicador, e a regra de especificidade fica legível. Característica desconhecida **não filtra nada**, então o empate sobrevive e a banda não é desenhada (Q27). Idade em anos completos hoje (Q31), com `ponytail:` marcando o teto de série de criança.
+- `GET /api/health-series/{code}` devolve `{observations, normalRange}` numa só resposta. O contrato mudou e o único chamador (`getSeries` em `api.ts`) foi migrado junto, sem apelido nem rota velha.
+- Parágrafo "Faixa de normalidade" antes da lista de Medidas, nos três estados: resolvida, ambígua (aviso, link para `/config` e **todas** as candidatas) e não cadastrada (Q29). Selo renomeado para **"fora da faixa do laboratório"** (Q28).
+- `formatBand()` mostra os **números** em destaque: `13,3 a 16,5 g/dL`, `acima de 40 mg/dL`, `até 99 mg/dL`. Foi correção de um defeito real encontrado na tela — o `text` da faixa costuma ser descrição ("população adulta brasileira saudável") e não o intervalo, então mostrar só ele escondia exatamente o dado que se procura.
 
-**Verificado na tela**, com faixas de teste semeadas à mão: glicose resolvida ("70 a 99 mg/dL (jejum) — qualquer sexo, 18 anos ou mais, fonte: SBD 2024"), HDL resolvida por sexo para usuário `M`, HDL ambígua com o sexo em branco (aviso, link e as duas candidatas), e glicose "não cadastrada" depois de apagar a faixa.
+**Migração `009_seed_normal_ranges.sql`: 78 linhas, cobrindo os 55 Indicadores.** 47 com banda de dois lados, 17 de um lado só, 14 sem número (texto explicando por quê). `indicator_id` vem de subconsulta por `code`, nunca de UUID digitado.
 
-**Falta, e só isso:**
+**Regra de seleção que não é óbvia lendo o SQL, e é a parte que mais importa:** **uma linha por (Indicador, sexo, faixa de idade)**. Semear a pesquisa crua teria quebrado a resolução em silêncio — vitamina D tinha três posições e TSH tinha faixas acadêmicas cobrindo as mesmas idades das comerciais, todas com a **mesma especificidade**, o que daria empate permanente e **nenhuma banda desenhada para sempre**. Dez linhas foram deliberadamente não semeadas, com o conteúdo delas dobrado no texto da linha que ficou.
 
-1. **Migração `009`**: semeia `indicator_normal_ranges` a partir de `docs/faixas/*.md` **aprovado**. Uma linha por faixa, `source` obrigatório. Amilase e lipase saíram em duas linhas no arquivo de pesquisa (uma para `min`, outra para `max`) e devem virar uma só no SQL.
-2. **Trocar a fonte da banda do gráfico** e **remover a coluna "Faixa de referência"** da lista de Medidas. Deixado deliberadamente para a mesma mudança da `009`: hoje a banda vem de `pickReferenceBand()`, que lê `refMin`/`refMax` do Laudo, e trocar a fonte antes de existir dado deixaria o gráfico **sem banda nenhuma** — regressão numa tela em uso real. Quando a `009` semear, a troca é dentro de `pickReferenceBand()` e mais nada.
+**Defeito de transcrição encontrado e corrigido:** quatro linhas de `docs/faixas/faixas-marcadores.md` (`psa_free`, `psa_free_total_ratio`, `cea`, `ca_19_9`) tinham **uma coluna vazia sobrando**, o que deslocava tudo em uma casa: `text` recebia a unidade ("ng/mL") e `source` recebia a descrição. O gerador passou a exigir exatamente 9 colunas e a falhar alto; o documento foi corrigido, e agora documento e migração batem.
+
+**Cobertura:** `internal/db/migrate009_test.go` guarda as invariantes de **dado**, não de esquema: 78 linhas, nenhuma órfã, nenhum Indicador do catálogo sem linha, nenhum texto ou fonte em branco, nenhuma faixa invertida, amilase e lipase numa linha só (28–100 e 13–60), e — a que mais vale — **nenhum empate de mesma especificidade** para qualquer sexo e idade de 18 a 100. Mutação conferida: reintroduzir a linha de vitamina D da Endocrine Society faz o teste apontar o empate pelo nome.
+
+**Verificado na tela**, com base recém-migrada: hemoglobina resolve pela linha masculina (13,3 a 16,5 g/dL), glicose mostra "até 99 mg/dL" (faixa de um lado), TSH resolve pela faixa de 20 a 59 anos, PSA resolve pela **década de idade** ("até 2,5 ng/mL — homens, 40 a 49 anos" para nascimento em 1980), e LDL mostra as cinco metas por risco sem número em destaque, porque não há banda.
+
+**O que continua faltando, e por que não foi feito agora:**
+
+1. **Trocar a fonte da banda do gráfico** e **remover a coluna "Faixa de referência"** da lista de Medidas (Q23/Q28). A troca é dentro de `pickReferenceBand()` e mais nada — mas **descobriu-se um problema de desenho que precisa de decisão**: 17 das faixas semeadas têm **um lado só** (HDL "acima de 40", glicose "até 99", eGFR "acima de 60", colesterol total "até 190", triglicérides "até 150"), e uma faixa de um lado não desenha retângulo. Trocar a fonte hoje **apagaria a banda** desses indicadores, que hoje a têm pela Faixa de referência do Laudo. Opções: meia-banda (sombrear do piso para cima, ou do zero até o teto), banda só quando os dois lados existem e Laudo como reserva, ou aceitar a perda. É decisão de desenho, não de implementação.
+2. **Lacuna de 18 e 19 anos** em TSH e nos lipídios da SBC, cujas fontes começam a faixa adulta em 20 anos. Nessa idade a tela diz "não cadastrada", que é a verdade. Só há usuários adultos acima disso hoje.
 
 ### 8.5 Pendências herdadas, ainda válidas
 
@@ -339,3 +349,8 @@ A resolução e a exibição foram implementadas nesta sessão. Elas não depend
 - O service worker do `vite-plugin-pwa` serve o bundle antigo com teimosia: bundle novo aparece só depois de `unregister()`, `caches.delete()` e recarga com query nova. E `go:embed` assa `internal/embed/dist` na compilação — `npm run build` sem `go build` depois não muda nada no binário.
 - `MouseEvent` sintético tem `offsetX/offsetY` em zero, e o Chart.js hit-testa por esse campo: clique simulado por `dispatchEvent` **sempre** acerta a origem, nunca um ponto. Verificação de gráfico exige mouse real (CDP `page.mouse`).
 - Aba em segundo plano não roda `requestAnimationFrame`: o Chart.js cria a instância, dimensiona o canvas e **não pinta**. Canvas em branco não prova gráfico quebrado — prova aba escondida.
+- Tabela markdown é fonte de dado frágil: quatro linhas de `docs/faixas/faixas-marcadores.md` tinham **uma coluna vazia sobrando**, e um parser tolerante deslocou tudo em uma casa sem reclamar — `text` virou "ng/mL" e `source` virou a descrição. Gerador que lê tabela markdown **tem** de exigir a contagem exata de colunas e falhar alto; tolerância silenciosa aqui produz dado clínico errado no banco.
+- Faixa de normalidade só resolve se houver **uma linha por (Indicador, sexo, faixa de idade)**. Duas linhas de igual especificidade que sirvam ao mesmo perfil dão empate permanente, e o efeito é a banda **nunca** ser desenhada — falha silenciosa, não erro. Semear a pesquisa crua (três posições de vitamina D, faixas acadêmicas de TSH sobre as mesmas idades) causaria exatamente isso. O teste `TestMigrate009SeedsNormalRanges` varre sexo × idade de 18 a 100 justamente para pegar isso.
+- A migração `009` semeia dado, então teste que precisa de faixa própria deve **apagar** as linhas daquele Indicador antes de inserir a sua (`clearRanges`). Mesma armadilha do catálogo semeado pela `007`, e ela reapareceu igual.
+- Faixa de normalidade costuma ser de **um lado só** (17 das 78): "acima de 40", "até 99". Banda de gráfico precisa dos dois lados, então trocar a fonte da banda da Faixa de referência do Laudo para a Faixa de normalidade **apaga** a banda desses indicadores. Não é detalhe de implementação: é decisão de desenho.
+- O `text` da faixa é descrição, não intervalo ("Hemoglobina, população adulta brasileira saudável"). Mostrar só o texto esconde o número, que é o que a pessoa foi procurar na tela. Os limites têm de ser formatados a partir de `min`/`max`.
