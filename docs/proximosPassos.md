@@ -3,7 +3,7 @@
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
 **Última atualização:** 2026-08-26 (segunda sessão do dia)
-**Fase atual:** v3.0 em uso real; ciclo **v3.1 — Faixa de normalidade e gráfico interativo** entregue no essencial. Trinta e uma decisões fechadas (Q1 a Q31), ADRs `0001` a `0015`, migrações `001` a `009`. A verificação visual pendente foi feita e achou dois defeitos, corrigidos. A Faixa de normalidade **está implementada e semeada**: 78 faixas, 55 Indicadores, fonte citada em cada linha. **Em aberto: só a decisão de desenho da banda de um lado só (seção 8.4).**
+**Fase atual:** v3.0 em uso real; ciclo **v3.1 — Faixa de normalidade e gráfico interativo** entregue no essencial. Q1 a Q31 fechadas, ADRs `0001` a `0015`, migrações `001` a `009`. A verificação visual pendente foi feita e achou dois defeitos, corrigidos. A Faixa de normalidade **está implementada e semeada**: 78 faixas, 55 Indicadores, fonte citada em cada linha. **Em aberto: só a Q32, banda de faixa de um lado só (seção 3, detalhe em 8.4).**
 
 ---
 
@@ -57,16 +57,18 @@ Glossário do domínio em `CONTEXT.md`: Indicador, Observação, Laudo, Data de 
 
 ## 3. Perguntas em aberto
 
-Nenhuma pendente de decisão. Q1 a Q31 fechadas. O que falta é **revisão de dado**, não decisão de desenho: o usuário lê `docs/faixas-de-normalidade.md` e corrige as faixas com que discordar, em particular onde as fontes divergem (vitamina D entre SBEM/SBPC-ML e Endocrine Society, limite superior do TSH, metas de LDL por risco). A migração `009` é gerada a partir do documento aprovado.
+Q1 a Q31 estão fechadas, e a revisão de dado clínico que a seção 3 cobrava deixou de ser pendência: o usuário decidiu semear o consenso brasileiro (ver 8.3) e a migração `009` semeou 78 faixas.
+
+**Uma pergunta nova, aberta pela execução — Q32, banda de faixa de um lado só.** 17 das 78 faixas semeadas têm só um limite ("acima de 40", "até 99"), e banda de gráfico precisa dos dois. Trocar a fonte da banda da Faixa de referência do Laudo para a Faixa de normalidade, como Q23 e Q28 previram, **apagaria a banda** desses indicadores. Opções, sem escolha feita: meia-banda (sombrear do piso para cima, ou do zero até o teto), banda só quando os dois limites existem com o Laudo como reserva, ou aceitar a perda. É decisão de desenho, e enquanto ela não vier a coluna "Faixa de referência" fica na tela. Detalhe em 8.4.
 
 ---
 
 ## 4. Fatos do repositório (levantados, não presumir de novo)
 
 **Stack e restrições**
-- Go 1.24, `chi` v5, `modernc.org/sqlite` v1.37.1 puro Go, `CGO_ENABLED=0`. Imagem final `alpine:3.21`, ~30MB. Qualquer dependência com C está fora.
-- Gemini é a **primeira e única dependência de rede externa** do projeto, em `internal/gemini/gemini.go`, escrita só com `net/http` e `encoding/json`. Nenhuma dependência foi somada em nenhuma fase: `go.mod` e `go.sum` estão intocados desde o começo da v3.0.
-- Migrações: `goose` v3, SQL embutido via `go:embed` em `internal/migrations/`. Existem `001`–`007`; **a próxima é `008`**.
+- `go.mod` declara **`go 1.25.0`** (a toolchain instalada é a 1.26.2, mas a diretiva é que fixa a versão da linguagem: `new(expr)`, do Go 1.26, **não** está disponível enquanto a diretiva for 1.25). `chi` v5.3.2, `modernc.org/sqlite` v1.37.1 puro Go, `CGO_ENABLED=0`. Imagem final `alpine:3.21`, ~30MB. Qualquer dependência com C está fora.
+- Gemini é a **primeira e única dependência de rede externa** do projeto, em `internal/gemini/gemini.go`, escrita só com `net/http` e `encoding/json`. **`go.mod` e `go.sum` seguem intocados desde o começo da v3.0** — nenhuma dependência Go foi somada em nenhuma fase. No frontend, `package.json` **deixou de estar intocado**: entrou `chart.js` 4.5.1 (ADR 0012), e é a única adição.
+- Migrações: `goose` v3, SQL embutido via `go:embed` em `internal/migrations/`. Existem `001`–`009`; **a próxima é `010`**. A `008` cria `indicator_normal_ranges` vazia e acrescenta `users.biological_sex` e `users.birth_date`; a `009` semeia 78 Faixas de normalidade.
 - `internal/db/db.go`: uma única conexão física (`MaxOpenConns=1`), WAL, `foreign_keys=ON`, `busy_timeout=5000`.
 - PKs são UUID TEXT (`google/uuid`). Timestamps `DATETIME` gravados pelo driver com `_time_format=sqlite`, o que produz `YYYY-MM-DD HH:MM:SS+00:00` para todo valor escrito pelo Go. **Formato único importa:** o índice de deduplicação de Observações compara `collected_at` como texto, então um caminho de código que grave em outro formato passa a duplicar em silêncio. Há teste protegendo isso (`TestReview_ReExtractionDoesNotDuplicate`).
 - Sem extensão JSON em uso.
@@ -74,7 +76,7 @@ Nenhuma pendente de decisão. Q1 a Q31 fechadas. O que falta é **revisão de da
 - Frontend Svelte 5 compilado pelo Vite e embutido no binário via `go:embed` (`internal/embed/dist`).
 
 **Multiusuário e autenticação**
-- `users.role` com `ADMIN` | `USER`. Middlewares `RequireAuth` e `RequireAdmin` em `internal/auth/middleware.go`.
+- `users.role` com `ADMIN` | `USER`. Middlewares `RequireAuth` e `RequireAdmin` em `internal/auth/middleware.go`. Desde a migração `008`, `users` também tem `biological_sex` (`M`/`F`, nula) e `birth_date` (`DATE`, nula), lidas com `date(birth_date)` para o JSON sair `AAAA-MM-DD`.
 - Todas as tabelas de domínio têm `user_id` com `ON DELETE CASCADE`. Há compartilhamento familiar.
 - Sessões via `alexedwards/scs` com store SQLite.
 - `app_config(key TEXT PK, value TEXT)` (migração 003) guarda `session_secret_hash` e, desde a fase 2, `gemini_model`. Credencial nunca entra aqui: `SESSION_SECRET` e `GEMINI_API_KEY` vivem no ambiente, e do primeiro só o hash é gravado.
@@ -89,14 +91,14 @@ Nenhuma pendente de decisão. Q1 a Q31 fechadas. O que falta é **revisão de da
 **Domínio existente**
 - **Não existe entidade Exame.** Um exame é registrado como `Consultation` com `Files` anexados e categorizados por `FileCategory`.
 - Vocabulário misto: Go e SQL em `snake_case` inglês, JSON da API em `camelCase`, rótulos de UI em português.
-- Nenhuma entidade de resultado, valor medido ou indicador existe hoje.
-- Nenhuma biblioteca de gráficos no frontend. Continua sendo verdade, e é decisão da fase 4.
+- **Deixou de ser verdade que não há entidade de resultado:** `health_indicators` (55 linhas, semeadas pela `007`), `health_observations`, `extractions` e `indicator_normal_ranges` (78 linhas, semeadas pela `009`) existem e estão em uso.
+- **Deixou de ser verdade que não há biblioteca de gráficos:** `chart.js` 4.5.1 entrou pela ADR 0012, empacotado pelo Vite. CDN continua impossível: a CSP fixa `script-src 'self'`.
 - Envelope de resposta JSON: `{data, error, ok}`, com helpers `writeJSON` / `writeError` em `internal/handlers/helpers.go`.
 
 **Operação e CI**
 - Volume único `./data` com `db/` e `uploads/`. `DATABASE_URL` e `SESSION_SECRET` obrigatórias; `FILES_PATH`, `PORT`, `SESSION_SECURE`, `TRUST_PROXY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` opcionais.
 - GitHub Actions publica em `ghcr.io/edalcin/medlog` (linux/amd64). Roda lint, typecheck e build do frontend.
-- Existem **16** arquivos `_test.go` (handlers, models e db) que **não rodam no CI**. Os quatro novos da v3.0 são `internal/db/migrate_test.go`, `internal/handlers/extractions_test.go`, `internal/handlers/review_test.go` e `internal/handlers/series_test.go`.
+- Existem **17** arquivos `_test.go` (handlers, models e db) que **não rodam no CI**. Os oito da v3.0/v3.1 são `internal/db/migrate_test.go`, `internal/db/migrate009_test.go`, `internal/handlers/extractions_test.go`, `internal/handlers/review_test.go`, `internal/handlers/series_test.go`, `internal/handlers/users_me_test.go`, `internal/models/health_test.go` e `internal/models/normalrange_test.go`.
 - Interface admin: `internal/handlers/admin.go` (11 endpoints) e `frontend/src/routes/Admin.svelte`, agora com **10 abas**, incluindo backup, restore e "Extração por IA".
 - `npm run check` **não existe** e `svelte-check` **não está instalado**. A verificação de frontend disponível é `npm run build`, que roda o compilador Svelte e reprova runa mal usada. Adicionar `svelte-check` é decisão em aberto, nunca proposta ao usuário como necessária.
 
@@ -188,7 +190,7 @@ Backend: `IndicatorSeriesIndex` em `internal/models/health.go` e `internal/handl
 
 Frontend: `frontend/src/routes/HealthSeries.svelte`, rota `/indicators` em `App.svelte`, link "Indicadores" em `Navigation.svelte` (desktop e mobile), e `getSeriesIndex` / `getSeries` em `lib/api.ts`.
 
-**Q15, decidida na execução:** o gráfico é SVG escrito à mão dentro do próprio componente, cerca de 60 linhas de geometria. Nenhuma biblioteca entrou, então `package.json` continua intocado desde o começo da v3.0, como `go.mod`. Escalas linear em tempo e em valor, banda de referência como um `<rect>`, linha como `<polyline>`, pontos como `<circle>` com `<title>` nativo servindo de tooltip — zero JavaScript de interação.
+**Q15, decidida na execução — e depois revertida pela Q18, registro histórico:** o gráfico *era* SVG escrito à mão dentro do próprio componente, cerca de 60 linhas de geometria, com banda como `<rect>`, linha como `<polyline>` e pontos como `<circle>` com `<title>` nativo de tooltip. A Q18 trocou por Chart.js (ADR 0012) porque eixo linear com banda, tooltip rico e clique-para-abrir-o-laudo não valiam mais a manutenção da geometria manual. **Nada disso descreve o código de hoje.**
 
 Regras do plano honradas e verificadas na tela: só Observação `confirmed` aparece; ponto `evolutive` é vazado e o `primary` é sólido; `out_of_range` pinta o ponto de vermelho; Observação sem `value_num` fica só na lista e não no gráfico; a faixa é desenhada apenas quando `ref_min` **e** `ref_max` existem — HDL, que só tem "Superior a 40", não ganha banda, como esperado.
 
@@ -222,7 +224,7 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 
 ## 8. Como retomar numa sessão nova
 
-**Onde o trabalho está:** branch `main`, último commit desta sessão. A sessão anterior (grill Q18–Q31, ADRs `0012`–`0015`, migração `008`, `/config`, Chart.js) foi commitada em `c6d8bad`.
+**Onde o trabalho está:** branch `main`, working tree limpo, tudo commitado e sincronizado. Três commits cobrem a v3.1: `c6d8bad` (grill Q18–Q31, ADRs `0012`–`0015`, migração `008`, `/config`, Chart.js), `50a02a2` (dois defeitos de `/config` corrigidos, resolução da Faixa de normalidade) e `d784ec8` (migração `009` com as 78 faixas, limites em destaque na tela).
 
 ### 8.1 O que a sessão anterior (2026-08-26, primeira) fez
 
@@ -237,7 +239,7 @@ go test ./...             # ok: internal/db, internal/handlers, internal/models
 cd frontend && npm run build   # limpo (só o aviso pré-existente de StarRating)
 ```
 
-**Não verificado:** nenhuma tela foi aberta no navegador. Gráfico novo, tela de Configuração e aviso de perfil incompleto compilam e passam o build, mas **ninguém olhou**. É o primeiro item da retomada.
+**Não verificado na sessão anterior, e já resolvido:** nenhuma tela tinha sido aberta no navegador. A seção 8.2 cumpriu essa verificação e achou dois defeitos reais.
 
 **Arquivos novos:**
 
@@ -310,16 +312,16 @@ Como cada ponto ficou na migração `009`:
 
 **O que continua faltando, e por que não foi feito agora:**
 
-1. **Trocar a fonte da banda do gráfico** e **remover a coluna "Faixa de referência"** da lista de Medidas (Q23/Q28). A troca é dentro de `pickReferenceBand()` e mais nada — mas **descobriu-se um problema de desenho que precisa de decisão**: 17 das faixas semeadas têm **um lado só** (HDL "acima de 40", glicose "até 99", eGFR "acima de 60", colesterol total "até 190", triglicérides "até 150"), e uma faixa de um lado não desenha retângulo. Trocar a fonte hoje **apagaria a banda** desses indicadores, que hoje a têm pela Faixa de referência do Laudo. Opções: meia-banda (sombrear do piso para cima, ou do zero até o teto), banda só quando os dois lados existem e Laudo como reserva, ou aceitar a perda. É decisão de desenho, não de implementação.
+1. **Q32 — trocar a fonte da banda do gráfico** e **remover a coluna "Faixa de referência"** da lista de Medidas (Q23/Q28). A troca é dentro de `pickReferenceBand()` e mais nada — mas **descobriu-se um problema de desenho que precisa de decisão**: 17 das faixas semeadas têm **um lado só** (HDL "acima de 40", glicose "até 99", eGFR "acima de 60", colesterol total "até 190", triglicérides "até 150"), e uma faixa de um lado não desenha retângulo. Trocar a fonte hoje **apagaria a banda** desses indicadores, que hoje a têm pela Faixa de referência do Laudo. Opções: meia-banda (sombrear do piso para cima, ou do zero até o teto), banda só quando os dois lados existem e Laudo como reserva, ou aceitar a perda. É decisão de desenho, não de implementação.
 2. **Lacuna de 18 e 19 anos** em TSH e nos lipídios da SBC, cujas fontes começam a faixa adulta em 20 anos. Nessa idade a tela diz "não cadastrada", que é a verdade. Só há usuários adultos acima disso hoje.
 
 ### 8.5 Pendências herdadas, ainda válidas
 
-**Teste da imagem no UNRAID** (`ghcr.io/edalcin/medlog:latest`), que não aconteceu na sessão anterior: extrair, revisar, confirmar, ver a série, zerar e reextrair.
+**Teste da imagem no UNRAID** (`ghcr.io/edalcin/medlog:latest`), que ainda não aconteceu: extrair, revisar, confirmar, ver a série, zerar e reextrair. Agora com um passo a mais, porque as migrações `008` e `009` entram nessa atualização: conferir que sobem sozinhas sobre um banco com dado real, que `/config` grava sexo e nascimento, e que a tela de Indicadores mostra a Faixa de normalidade com a fonte.
 
 **Oferta em aberto, não pedida:** reprocessar a resposta bruta já paga, sem nova chamada à API. `raw_response` e `gemini.ParseRaw` já existem; falta endpoint e botão.
 
-**Depois:** v3.1, relatórios de saúde por IA, com grill próprio. Fronteira registrada em Q7: nada que se leia como diagnóstico médico.
+**Depois:** relatórios de saúde por IA, com grill próprio — a Q7 os adiou para "v3.1", mas esse nome ficou com o ciclo da Faixa de normalidade, então passam a ser **v3.2**. Fronteira registrada em Q7: nada que se leia como diagnóstico médico.
 
 **Higiene de segurança pendente do lado do usuário:** a `GEMINI_API_KEY` real apareceu na saída de um comando em sessão anterior (`docker compose config`). Nunca entrou no git, mas convém rotacioná-la no Google AI Studio.
 
