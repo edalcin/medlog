@@ -24,7 +24,10 @@ func UserFindByEmail(ctx context.Context, db *sql.DB, email string) (*User, stri
 	var u User
 	var hash string
 	err := db.QueryRowContext(ctx,
-		`SELECT id, email, username, name, role, theme, biological_sex, birth_date, created_at, updated_at, password_hash
+		// date(birth_date): a coluna é DATE e o driver a devolveria como
+		// time.Time, o que serializa em RFC3339 e um <input type="date">
+		// recusa. date() devolve TEXT AAAA-MM-DD, que é o contrato da API.
+		`SELECT id, email, username, name, role, theme, biological_sex, date(birth_date), created_at, updated_at, password_hash
 		 FROM users WHERE email = ?`, email,
 	).Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.BiologicalSex, &u.BirthDate, &u.CreatedAt, &u.UpdatedAt, &hash)
 	if err != nil {
@@ -36,7 +39,7 @@ func UserFindByEmail(ctx context.Context, db *sql.DB, email string) (*User, stri
 func UserFindByID(ctx context.Context, db *sql.DB, id string) (*User, error) {
 	var u User
 	err := db.QueryRowContext(ctx,
-		`SELECT id, email, username, name, role, theme, biological_sex, birth_date, created_at, updated_at FROM users WHERE id = ?`, id,
+		`SELECT id, email, username, name, role, theme, biological_sex, date(birth_date), created_at, updated_at FROM users WHERE id = ?`, id,
 	).Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Role, &u.Theme, &u.BiologicalSex, &u.BirthDate, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		return nil, err
@@ -46,7 +49,7 @@ func UserFindByID(ctx context.Context, db *sql.DB, id string) (*User, error) {
 
 func UserFindAll(ctx context.Context, db *sql.DB) ([]User, error) {
 	rows, err := db.QueryContext(ctx,
-		`SELECT id, email, username, name, role, theme, biological_sex, birth_date, created_at, updated_at FROM users ORDER BY name`)
+		`SELECT id, email, username, name, role, theme, biological_sex, date(birth_date), created_at, updated_at FROM users ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}

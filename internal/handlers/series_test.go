@@ -125,7 +125,13 @@ func TestSeries_OnlyConfirmedAndOwnData(t *testing.T) {
 		t.Errorf("egfr count = %d/%d, want 1/0 (non-numeric is listed, not plotted)", e.Count, e.NumericCount)
 	}
 
-	series := getJSON[[]models.Observation](t, router, "/api/health-series/glucose_serum")
+	// A rota devolve Observações e Faixa de normalidade numa só resposta.
+	type seriesPayload struct {
+		Observations []models.Observation         `json:"observations"`
+		NormalRange  models.NormalRangeResolution `json:"normalRange"`
+	}
+	payload := getJSON[seriesPayload](t, router, "/api/health-series/glucose_serum")
+	series := payload.Observations
 	if len(series) != 3 {
 		t.Fatalf("series has %d points, want 3 (other user's value must not leak)", len(series))
 	}
@@ -143,7 +149,7 @@ func TestSeries_OnlyConfirmedAndOwnData(t *testing.T) {
 	}
 
 	// An indicator with no confirmed data answers empty, not an error.
-	if got := getJSON[[]models.Observation](t, router, "/api/health-series/tsh"); len(got) != 0 {
-		t.Errorf("tsh series has %d points, want 0 while still in review", len(got))
+	if got := getJSON[seriesPayload](t, router, "/api/health-series/tsh"); len(got.Observations) != 0 {
+		t.Errorf("tsh series has %d points, want 0 while still in review", len(got.Observations))
 	}
 }

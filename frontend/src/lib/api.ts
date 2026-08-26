@@ -622,5 +622,28 @@ export interface IndicatorSeries {
 export const getSeriesIndex = () =>
   request<{ data: IndicatorSeries[] }>('GET', '/health-series').then(r => r.data)
 
+/** Faixa de normalidade resolvida para o perfil de quem pede (ADR 0015).
+ * `candidates` vazio significa "não cadastrada"; `resolved: false` com mais de
+ * uma candidata significa que o perfil não desempatou, e aí não se desenha
+ * banda nenhuma. */
+export interface NormalRange {
+  sex?: 'M' | 'F'
+  ageMin?: number
+  ageMax?: number
+  min?: number
+  max?: number
+  text: string
+  source: string
+}
+
+export interface NormalRangeResolution {
+  candidates: NormalRange[]
+  resolved: boolean
+  ageYears?: number
+}
+
 export const getSeries = (code: string) =>
-  request<{ data: Observation[] }>('GET', `/health-series/${encodeURIComponent(code)}`).then(r => r.data)
+  request<{ data: { observations: Observation[]; normalRange: NormalRangeResolution } }>(
+    'GET',
+    `/health-series/${encodeURIComponent(code)}`
+  ).then(r => r.data)

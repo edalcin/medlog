@@ -9,13 +9,14 @@
   import Chart from 'chart.js/auto'
   import type { ChartDataset } from 'chart.js'
   import * as api from '../lib/api'
-  import type { IndicatorSeries, Observation } from '../lib/api'
+  import type { IndicatorSeries, NormalRangeResolution, Observation } from '../lib/api'
   import { localDate } from '../lib/date'
   import { currentUser } from '../lib/auth'
 
   let indicators = $state<IndicatorSeries[]>([])
   let selected = $state('')
   let observations = $state<Observation[]>([])
+  let normalRange = $state<NormalRangeResolution | null>(null)
   let loading = $state(true)
   let loadingSeries = $state(false)
   let error = $state('')
@@ -56,11 +57,14 @@
     selected = code
     loadingSeries = true
     try {
-      observations = await api.getSeries(code)
+      const payload = await api.getSeries(code)
+      observations = payload.observations
+      normalRange = payload.normalRange
       error = ''
     } catch (e: unknown) {
       error = e instanceof Error ? e.message : 'Erro ao carregar a série'
       observations = []
+      normalRange = null
     } finally {
       loadingSeries = false
     }
@@ -68,6 +72,17 @@
 
   function fmtDate(iso: string): string {
     return localDate(iso).toLocaleDateString('pt-BR')
+  }
+
+  /** Diz em uma frase a quem a faixa se aplica. Nulo em sexo ou idade
+   * significa "qualquer", e o texto reflete isso em vez de omitir. */
+  function describeCandidate(c: api.NormalRange): string {
+    const who = c.sex === 'M' ? 'homens' : c.sex === 'F' ? 'mulheres' : 'qualquer sexo'
+    let age = 'qualquer idade'
+    if (c.ageMin != null && c.ageMax != null) age = `${c.ageMin} a ${c.ageMax} anos`
+    else if (c.ageMin != null) age = `${c.ageMin} anos ou mais`
+    else if (c.ageMax != null) age = `até ${c.ageMax} anos`
+    return `${who}, ${age}`
   }
 
   function fmtNumber(v: number): string {
@@ -218,7 +233,10 @@
               title: items => (items[0] ? fmtDate(pts[items[0].dataIndex].collectedAt) : ''),
               label: item => {
                 const o = pts[item.dataIndex]
-                const value = `${o.valueText}${o.unit ? ' ' + o.unit : ''}`
+                // Unidade impressa no laudo quando existe; a canônica do catálogo
+                // (ADR 0007) cobre a Observação que veio sem ela.
+                const unit = o.unit ?? current?.unit
+                const value = `${o.valueText}${unit ? ' ' + unit : ''}`
                 const provenance = o.provenance === 'evolutive' ? 'laudo evolutivo' : 'laudo'
                 return `${value} — ${provenance}`
               },
@@ -349,6 +367,40 @@
           </div>
         {/if}
 
+        <!-- Faixa de normalidade (ADR 0015): conceito distinto da Faixa de
+             referência impressa no Laudo, que segue na coluna da tabela
+             abaixo até a migração 009 semear os dados clínicos revisados. -->
+        <div class="block">
+          <h3>Faixa de normalidade</h3>
+          {#if !normalRange || normalRange.candidates.length === 0}
+            <p class="hint">
+              Faixa de normalidade não cadastrada para este indicador.
+            </p>
+          {:else if normalRange.resolved}
+            <p class="range">
+              {normalRange.candidates[0].text}
+              <span class="muted">
+                — {describeCandidate(normalRange.candidates[0])}, fonte: {normalRange.candidates[0].source}
+              </span>
+            </p>
+          {:else}
+            <p class="hint">
+              Há mais de uma faixa possível para este indicador e o seu perfil não permite escolher
+              entre elas. Complete sexo biológico e data de nascimento em
+              <a href="/config" use:link>Configurações</a> para ver a que se aplica a você. Até então o
+              gráfico não desenha a banda.
+            </p>
+            <ul class="plain">
+              {#each normalRange.candidates as c (c.text + c.source)}
+                <li>
+                  <span class="value">{c.text}</span>
+                  <span class="muted">— {describeCandidate(c)}, fonte: {c.source}</span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
+
         {#if observations.length > 0}
           <div class="block">
             <h3>Medidas</h3>
@@ -367,7 +419,7 @@
                     <td>{fmtDate(o.collectedAt)}</td>
                     <td>
                       {o.valueText}{o.unit ? ' ' + o.unit : ''}
-                      {#if o.outOfRange === true}<span class="badge warn">fora da faixa</span>{/if}
+                      {#if o.outOfRange === true}<span class="badge warn">fora da faixa do laboratório</span>{/if}
                     </td>
                     <td class="muted">{o.referenceText ?? 'não informada'}</td>
                     <td class="muted">{o.provenance === 'evolutive' ? 'laudo evolutivo' : 'laudo'}</td>
@@ -572,6 +624,11 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .range {
+    margin-top: 8px;
+    font-size: 13px;
   }
 
   .plain li {

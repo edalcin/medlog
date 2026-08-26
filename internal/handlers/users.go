@@ -259,20 +259,25 @@ func (h *UserHandler) MeUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// A senha só é exigida quando o e-mail de fato muda. O formulário de
+	// Configurações manda o e-mail em toda gravação, então comparar com o
+	// gravado é o que separa "trocar credencial" de "salvar sexo e nascimento".
 	if req.Email != nil {
-		if req.CurrentPassword == nil || *req.CurrentPassword == "" {
-			writeError(w, "senha atual é obrigatória para trocar o e-mail", http.StatusBadRequest)
-			return
-		}
-		var currentHash string
+		var currentHash, currentEmail string
 		if err := h.DB.QueryRowContext(r.Context(),
-			"SELECT password_hash FROM users WHERE id=?", userID).Scan(&currentHash); err != nil {
+			"SELECT password_hash, email FROM users WHERE id=?", userID).Scan(&currentHash, &currentEmail); err != nil {
 			writeDBError(w, err)
 			return
 		}
-		if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(*req.CurrentPassword)); err != nil {
-			writeError(w, "senha atual incorreta", http.StatusUnauthorized)
-			return
+		if *req.Email != currentEmail {
+			if req.CurrentPassword == nil || *req.CurrentPassword == "" {
+				writeError(w, "senha atual é obrigatória para trocar o e-mail", http.StatusBadRequest)
+				return
+			}
+			if err := bcrypt.CompareHashAndPassword([]byte(currentHash), []byte(*req.CurrentPassword)); err != nil {
+				writeError(w, "senha atual incorreta", http.StatusUnauthorized)
+				return
+			}
 		}
 	}
 

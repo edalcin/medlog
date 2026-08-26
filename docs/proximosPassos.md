@@ -2,8 +2,8 @@
 
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
-**Última atualização:** 2026-08-26
-**Fase atual:** v3.0 em uso real, e um ciclo novo aberto pelo uso: **v3.1 — Faixa de normalidade e gráfico interativo**. Catorze decisões fechadas em grill (Q18 a Q31), ADRs `0012` a `0015`. **Próximo passo: o usuário revisa `docs/faixas-de-normalidade.md`; o resto do trabalho não depende dessa revisão e corre antes.**
+**Última atualização:** 2026-08-26 (segunda sessão do dia)
+**Fase atual:** v3.0 em uso real; ciclo **v3.1 — Faixa de normalidade e gráfico interativo** em execução. Trinta e uma decisões fechadas (Q1 a Q31), ADRs `0001` a `0015`. A verificação visual pendente **foi feita** e achou dois defeitos, já corrigidos. A resolução da Faixa de normalidade **está implementada**. **Falta só o dado clínico: o usuário revisa `docs/faixas/*.md` e a migração `009` semeia.**
 
 ---
 
@@ -46,7 +46,7 @@ Documento de origem: `docs/v3/MedLog V3.0.md`.
 | Q25 | Tela de Configuração do próprio usuário (`/config`): nome, e-mail, senha, sexo biológico, nascimento. `PATCH /users/me` novo, exigindo senha atual para troca de e-mail. Tema fica no botão da navegação | `docs/adr/0014` |
 | Q26 | Faixa de normalidade em tabela própria `indicator_normal_ranges`, com `sex`, `age_min`/`age_max`, `min`/`max`, `text` e `source` **obrigatório**. Nulo em `sex`/idade significa "qualquer"; nulo em `min`/`max` significa "sem banda" | `docs/adr/0015-faixa-de-normalidade-em-tabela-propria-com-fonte-obrigatoria.md` |
 | Q27 | Regra única de resolução: casa a linha mais específica; se o perfil não desempatar, mostra todos os candidatos no parágrafo e **não** desenha banda, com aviso e link para `/config` | esta tabela (decisão reversível, sem ADR) |
-| Q28 | O selo de alteração continua sendo do laboratório, com o rótulo dizendo a origem ("fora da faixa do laboratório"). O MedLog não assina veredito clínico próprio | esta tabela, mais `CONTEXT.md` |
+| Q28 | O selo de alteração continua sendo do laboratório, com o rótulo dizendo a origem ("fora da faixa do laboratório"). O MedLog não assina veredito clínico próprio. **Rótulo já aplicado**; a remoção da coluna "Faixa de referência" espera a `009`, para a tela não ficar sem banda no intervalo | esta tabela, mais `CONTEXT.md` |
 | Q29 | Indicador promovido depois nasce **sem** faixa; a tela diz "não cadastrada". Faixa nova entra por migração, pesquisada e com fonte. IA preenchendo faixa clínica está fora | consequência do ADR 0015 |
 | Q30 | As 55 faixas vão primeiro para `docs/faixas-de-normalidade.md`, com fonte e URL por linha e divergências entre sociedades médicas marcadas, para revisão humana. Só então a migração `009` semeia | esta tabela (decisão de processo) |
 | Q31 | A faixa é resolvida pela idade de **hoje**, banda retangular. Só há usuários adultos. Vira polígono em degraus quando entrar série de criança — teto declarado em comentário `ponytail:` no código | esta tabela (decisão reversível, sem ADR) |
@@ -222,11 +222,11 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 
 ## 8. Como retomar numa sessão nova
 
-**Onde o trabalho está:** branch `main`, último commit `910224b`. **Working tree SUJO: nada desta sessão foi commitado.** O primeiro ato da sessão nova é conferir `git status` e commitar o que está descrito abaixo, ou descartar conscientemente.
+**Onde o trabalho está:** branch `main`, último commit desta sessão. A sessão anterior (grill Q18–Q31, ADRs `0012`–`0015`, migração `008`, `/config`, Chart.js) foi commitada em `c6d8bad`.
 
-### 8.1 O que esta sessão (2026-08-26) fez
+### 8.1 O que a sessão anterior (2026-08-26, primeira) fez
 
-Grill de 14 perguntas fechado (Q18–Q31 na seção 2), quatro ADRs novos, e a implementação de tudo que **não** depende de revisão humana de dado clínico.
+Grill de 14 perguntas fechado (Q18–Q31 na seção 2), quatro ADRs novos, e a implementação de tudo que **não** depende de revisão humana de dado clínico. **Nada foi olhado no navegador** — o que a seção 8.2 então cobrou, e cumpriu.
 
 **Verificado, não presumido — os quatro comandos passaram no fim da sessão:**
 
@@ -251,16 +251,26 @@ cd frontend && npm run build   # limpo (só o aviso pré-existente de StarRating
 
 **Arquivos alterados:** `CONTEXT.md` (termos Faixa de normalidade, Característica do usuário, Faixa de referência reescrita), `docs/adr/0003` (emendado pelo 0013), `internal/models/health.go` (dedup na leitura, `LEFT JOIN files` para `source_filename`), `internal/models/user.go`, `internal/handlers/users.go` (`MeUpdate`), `internal/handlers/auth.go` (`Me` e `SignIn` devolvem o `User` completo), `cmd/medlog/main.go` (`PATCH /users/me`), `internal/db/migrate_test.go` (`DownTo(6)`), e no frontend `package.json` (chart.js 4.5.1), `api.ts`, `App.svelte`, `Navigation.svelte`, `HealthSeries.svelte`.
 
-### 8.2 O primeiro passo da sessão nova
+### 8.2 A verificação visual: **feita**, e achou dois defeitos
 
-**Abrir a interface e olhar.** Subir o binário com `DATABASE_URL`, `SESSION_SECRET`, `FILES_PATH`, `PORT`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` e conferir, nesta ordem:
+A lista de seis itens da sessão anterior foi conferida com a aplicação de verdade em `:3399`, num banco novo semeado com série de glicose (incluindo uma coleta com `primary` **e** `evolutive` na mesma data, para provar a dedup) e de HDL. Resultado item por item:
 
-1. `/indicators` desenha o gráfico em Chart.js, com tooltip mostrando data, valor, unidade e procedência.
-2. Clique num ponto abre o Laudo de origem em outra aba (`/api/files/{sourceFilename}`).
-3. **A duplicata sumiu:** uma linha por Data de coleta, preferindo "laudo" sobre "laudo evolutivo".
-4. O aviso de perfil incompleto aparece no topo de `/indicators` e leva a `/config`.
-5. `/config` salva nome, sexo biológico e nascimento; trocar o e-mail exige senha atual; senha errada dá 401 e e-mail repetido dá 409.
-6. O gráfico continua legível no tema claro **e** no escuro (as cores saem de `getComputedStyle` sobre as variáveis de `app.css`, relidas só quando o gráfico é recriado — trocar de tema sem trocar de indicador não recolore; teto conhecido e anotado).
+1. **`/indicators` desenha em Chart.js** — confirmado por `canvas` presente, `svg.chart` ausente e pixels pintados. Tooltip traz data, valor, **unidade** e procedência.
+2. **Clique no ponto abre o Laudo** — confirmado interceptando `window.open`: `/api/files/{sourceFilename}` com `_blank` e `noopener`. O cursor vira `pointer` só quando a Observação tem Laudo de origem.
+3. **A duplicata sumiu** — a coleta de 12/06/2025 aparece uma vez, com valor `primary` (108), e a linha `evolutive` (110) fica de fora. Confirmado na tela e na resposta da API.
+4. **Aviso de perfil incompleto** — aparece no topo e leva a `/config`; desaparece quando sexo e nascimento existem.
+5. **`/config` salva** — depois de corrigir dois defeitos (abaixo). 400 sem senha, 401 com senha errada, 409 com e-mail repetido, 200 quando o e-mail não muda.
+6. **Tema claro e escuro** — ambos legíveis, verificados por captura de tela. O teto anotado continua: trocar de tema sem recriar o gráfico não recolore.
+
+**Defeito 1, corrigido — era impossível salvar o perfil pela interface.** `MeUpdate` exigia a senha atual sempre que o campo `email` **estava presente** no corpo, em vez de quando o e-mail **mudava**. O formulário de Configurações manda o e-mail em toda gravação, então salvar só sexo e nascimento devolvia 400 "senha atual é obrigatória para trocar o e-mail". A correção lê `email` junto com `password_hash` e compara. O `curl` da sessão anterior não pegou isso porque omitia `email`.
+
+**Defeito 2, corrigido — a data de nascimento voltava e o campo aparecia vazio.** `birth_date` é coluna `DATE`, e o driver a devolve como `time.Time`, que serializa `1980-05-15T00:00:00Z`. Um `<input type="date">` **recusa** esse valor e fica em branco, então reabrir `/config` mostrava o nascimento vazio e uma nova gravação o apagaria. Os três `SELECT` de `internal/models/user.go` passaram a usar `date(birth_date)`, que devolve TEXT `AAAA-MM-DD`.
+
+**Cobertura:** `internal/handlers/users_me_test.go`, três testes, com mutação conferida nos dois defeitos — reverter a comparação de e-mail e remover o `date()` faz o teste falhar com a mensagem exata do defeito original.
+
+**Armadilha de ambiente, não defeito:** o service worker do `vite-plugin-pwa` serve o bundle antigo com teimosia. Bundle novo só aparece depois de `unregister()` + `caches.delete()` + recarregar com query nova. Antes disso a tela mostrava o SVG da geração anterior, o que se parece muito com "o Chart.js não entrou". E `go:embed` assa o `dist` na compilação: `npm run build` sem `go build` depois não muda nada.
+
+**Armadilha de verificação:** `MouseEvent` sintético tem `offsetX/offsetY` em zero, e o Chart.js calcula a posição por esse campo — todo clique simulado acerta a origem e nunca um ponto. Hit-test de gráfico exige mouse real (CDP). Além disso, aba em segundo plano não roda `requestAnimationFrame`, e o canvas fica **em branco** mesmo com o gráfico criado.
 
 ### 8.3 O que espera decisão do usuário
 
@@ -275,12 +285,23 @@ cd frontend && npm run build   # limpo (só o aviso pré-existente de StarRating
 - **RDW**: consolidado numa linha (11,8–14,2%); a fonte publica 0,1 de diferença entre sexos. Diz se prefere duas linhas.
 - **Mayo Clinic Laboratories** bloqueou acesso automatizado (HTTP 403) em vários exames; os valores vieram de PDF público do próprio Mayo, espelho e Wayback. Confirmação humana recomendada antes de semear.
 
-### 8.4 O que falta implementar, depois da aprovação
+### 8.4 Faixa de normalidade: **código pronto, dado pendente**
 
-1. **Migração `009`**: semeia `indicator_normal_ranges` a partir das tabelas aprovadas. Uma linha por faixa, `source` obrigatório. Amilase e lipase saíram em duas linhas no arquivo de pesquisa (uma para `min`, outra para `max`) e devem virar uma só no SQL.
-2. **Resolução da faixa**: consulta que casa `biological_sex` e a idade de hoje contra `indicator_normal_ranges`, escolhendo a linha mais específica. Se o perfil não desempatar, devolve **todos** os candidatos (Q27) — o parágrafo lista as duas faixas e o gráfico não desenha banda.
-3. **Exibição**: parágrafo com a Faixa de normalidade antes da lista de Medidas; **remover** a coluna "Faixa de referência" da lista; renomear o selo para "fora da faixa do laboratório" (Q28). A banda do gráfico troca de fonte mexendo **só** em `pickReferenceBand()` em `HealthSeries.svelte` — a função foi isolada para isso, com comentário citando o ADR 0015.
-4. **Indicador sem faixa**: a tela diz "faixa de normalidade não cadastrada" (Q29). Nunca deixar a IA preencher.
+A resolução e a exibição foram implementadas nesta sessão. Elas não dependiam da revisão clínica: o que depende dela é o **dado**, e só ele.
+
+**Implementado e verificado:**
+
+- `internal/models/normalrange.go` — `NormalRangeResolve(ctx, db, code, sex, birthDate)`. Filtra em Go, não em SQL: são poucas linhas por Indicador, e a regra de especificidade fica legível. Característica desconhecida **não filtra nada**, então o empate sobrevive e a banda não é desenhada (Q27). Idade em anos completos hoje (Q31), com `ponytail:` marcando o teto de série de criança.
+- `internal/handlers/series.go` — `GET /api/health-series/{code}` agora devolve `{observations, normalRange}` numa só resposta. Contrato mudou; o único chamador (`getSeries` em `api.ts`) foi migrado junto, sem apelido nem rota velha.
+- `frontend/src/routes/HealthSeries.svelte` — parágrafo "Faixa de normalidade" antes da lista de Medidas, nos três estados: resolvida (texto, a quem se aplica, fonte), ambígua (aviso, link para `/config` e **todas** as candidatas) e não cadastrada (Q29). Selo renomeado para **"fora da faixa do laboratório"** (Q28).
+- `internal/models/normalrange_test.go` — cinco testes: sexo escolhe uma linha, sexo desconhecido mantém as duas, a linha mais específica vence a genérica, indicador sem faixa responde vazio em vez de erro, faixa só de texto não traz limites. Mutação conferida: trocar `len(candidates) == 1` por `>= 1` faz o teste de empate falhar.
+
+**Verificado na tela**, com faixas de teste semeadas à mão: glicose resolvida ("70 a 99 mg/dL (jejum) — qualquer sexo, 18 anos ou mais, fonte: SBD 2024"), HDL resolvida por sexo para usuário `M`, HDL ambígua com o sexo em branco (aviso, link e as duas candidatas), e glicose "não cadastrada" depois de apagar a faixa.
+
+**Falta, e só isso:**
+
+1. **Migração `009`**: semeia `indicator_normal_ranges` a partir de `docs/faixas/*.md` **aprovado**. Uma linha por faixa, `source` obrigatório. Amilase e lipase saíram em duas linhas no arquivo de pesquisa (uma para `min`, outra para `max`) e devem virar uma só no SQL.
+2. **Trocar a fonte da banda do gráfico** e **remover a coluna "Faixa de referência"** da lista de Medidas. Deixado deliberadamente para a mesma mudança da `009`: hoje a banda vem de `pickReferenceBand()`, que lê `refMin`/`refMax` do Laudo, e trocar a fonte antes de existir dado deixaria o gráfico **sem banda nenhuma** — regressão numa tela em uso real. Quando a `009` semear, a troca é dentro de `pickReferenceBand()` e mais nada.
 
 ### 8.5 Pendências herdadas, ainda válidas
 
@@ -313,3 +334,8 @@ cd frontend && npm run build   # limpo (só o aviso pré-existente de StarRating
 - `<canvas role="img">` é erro de acessibilidade no Svelte 5 (`a11y_no_interactive_element_to_noninteractive_role`). `aria-label` sozinho basta.
 - A CSP em `internal/middleware/security.go` fixa `script-src 'self'`: **nenhuma** biblioteca por CDN funciona neste projeto, e o `vite-plugin-pwa` ainda promete offline. Dependência de frontend entra por npm e sai empacotada pelo Vite (ADR 0012).
 - O bundle passou de ~790 kB para 989 kB minificado (326 kB gzip) com o Chart.js. É JavaScript estático dentro de uma imagem de ~30 MB, não Node em runtime — a regra do docker enxuto continua respeitada.
+- Coluna declarada `DATE` ou `DATETIME` volta do driver como `time.Time`, e escanear isso num `*string` produz RFC3339 (`1980-05-15T00:00:00Z`). Um `<input type="date">` **recusa** esse valor em silêncio e fica vazio. Quando o contrato da API é data pura, use `date(coluna)` no `SELECT`: sem tipo declarado, o driver devolve TEXT.
+- Guarda de credencial deve comparar **valor novo contra valor gravado**, nunca "o campo veio no corpo". O formulário manda todos os campos sempre; exigir senha por presença de `email` travou o salvamento inteiro do perfil. Teste com `curl` que omite o campo não pega esse defeito — só o formulário de verdade pega.
+- O service worker do `vite-plugin-pwa` serve o bundle antigo com teimosia: bundle novo aparece só depois de `unregister()`, `caches.delete()` e recarga com query nova. E `go:embed` assa `internal/embed/dist` na compilação — `npm run build` sem `go build` depois não muda nada no binário.
+- `MouseEvent` sintético tem `offsetX/offsetY` em zero, e o Chart.js hit-testa por esse campo: clique simulado por `dispatchEvent` **sempre** acerta a origem, nunca um ponto. Verificação de gráfico exige mouse real (CDP `page.mouse`).
+- Aba em segundo plano não roda `requestAnimationFrame`: o Chart.js cria a instância, dimensiona o canvas e **não pinta**. Canvas em branco não prova gráfico quebrado — prova aba escondida.

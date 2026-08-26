@@ -253,6 +253,8 @@ GET    /api/auth/me
 GET    /api/users/others         Lista outros usuários (id+nome) para sharing
 PUT    /api/users/me/password    Alterar própria senha (verifica senha atual)
 PATCH  /api/users/me/theme       Alterar tema (LIGHT|DARK|SYSTEM)
+PATCH  /api/users/me             Próprio perfil: nome, e-mail, sexo biológico, nascimento.
+                                 Senha atual só é exigida quando o e-mail muda de verdade
 
 GET    /api/dashboard
 
@@ -290,7 +292,7 @@ PATCH  /api/files/{id}
 DELETE /api/files/{id}
 
 GET    /api/health-series        Indicadores com Observação confirmada do usuário
-GET    /api/health-series/{code} Série temporal de um Indicador
+GET    /api/health-series/{code} Série do Indicador e Faixa de normalidade: {observations, normalRange}
 
 POST   /api/extractions          Exige consent: true; responde 202 com a linha pending
 GET    /api/extractions/{id}     Alvo do polling: a chamada dura mais que o timeout de 30s
@@ -504,10 +506,23 @@ O PDF vai ao provedor **sem redação de PII** — nome completo, data de nascim
 
 - `GET /api/health-series` e `/api/health-series/{code}` são rotas de **usuário**, não de admin: ler o próprio indicador é uso comum. O escopo é sempre o usuário da sessão — o compartilhamento familiar cobre profissionais e clínicas, nunca resultado de exame
 - Só Observação `confirmed` existe para a série. O que está em Revisão não aparece nem no índice
-- O gráfico é **SVG escrito à mão** em `HealthSeries.svelte`: nenhuma biblioteca de gráficos entrou no bundle
-- Faixa de referência desenhada só quando `ref_min` **e** `ref_max` existem, usando a coleta mais recente que traz os dois
+- O gráfico é **Chart.js** (`chart.js/auto`, dependência npm empacotada pelo Vite, ADR 0012). CDN é impossível aqui: a CSP fixa `script-src 'self'` e o PWA promete offline
+- Eixo X `linear` em milissegundos, com `ticks.callback` formatando em pt-BR — eixo `time` exigiria `chartjs-adapter-date-fns` mais `date-fns`, e `category` achataria coletas irregulares
+- Tooltip traz Data de coleta, valor com unidade e Procedência; clique no ponto abre o Laudo de origem (`/api/files/{sourceFilename}`)
+- Leitura da série prefere `primary` sobre `evolutive` na mesma Data de coleta (ADR 0013). A preferência é **só de leitura**: as duas linhas coexistem no banco, porque o índice único inclui `provenance`
+- Faixa desenhada só quando `ref_min` **e** `ref_max` existem, usando a coleta mais recente que traz os dois. A fonte da banda está isolada em `pickReferenceBand()`, que é o único ponto a mudar quando a migração `009` semear as Faixas de normalidade
 - Ponto `evolutive` é vazado, `primary` é sólido, `out_of_range` é vermelho
 - Observação sem `value_num` aparece em lista, nunca no eixo
+
+### Faixa de normalidade (ADR 0015)
+
+Conceito distinto da Faixa de referência impressa no Laudo: vem de fonte citável e depende de Característica do usuário (sexo biológico e idade), enquanto a do Laudo é transcrição do papel.
+
+- Tabela `indicator_normal_ranges` (migração `008`), com `sex`, `age_min`/`age_max`, `min`/`max`, `text` e `source` **obrigatório**. Nulo em `sex` ou idade significa "qualquer"; nulo em `min`/`max` significa "sem banda para desenhar", e a faixa ainda existe como texto
+- `models.NormalRangeResolve` casa as linhas contra o perfil e escolhe a **mais específica**. Característica desconhecida não filtra nada: com o sexo em branco, as linhas de homem e de mulher continuam candidatas, o empate sobrevive, a tela lista todas e **não** desenha banda
+- Idade é a de **hoje**, em anos completos, e a banda é um retângulo. Série de criança exigiria polígono em degraus — teto anotado em comentário `ponytail:`
+- Indicador sem faixa cadastrada responde vazio, e a tela diz "não cadastrada". A IA nunca preenche faixa clínica
+- `GET /api/health-series/{code}` devolve `{observations, normalRange}` numa só resposta: a tela não desenha sem os dois, e um segundo pedido só somaria piscada
 ---
 
 ## Backup e Restauração

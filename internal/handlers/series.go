@@ -29,14 +29,33 @@ func (h *SeriesHandler) Index(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"data": list})
 }
 
-// Series returns one indicator's confirmed observations, oldest first. The
-// non-numeric ones travel too: the screen lists them instead of plotting them.
+// Series returns one indicator's confirmed observations, oldest first, plus
+// the Faixa de normalidade resolved for whoever is signed in. The
+// non-numeric observations travel too: the screen lists them instead of
+// plotting them.
+//
+// Both travel in one response on purpose: the screen cannot draw the band
+// without the range, and a second round trip would only add a flicker.
 func (h *SeriesHandler) Series(w http.ResponseWriter, r *http.Request) {
 	userID := auth.Manager.GetString(r.Context(), auth.SessionKeyUserID)
-	list, err := models.ObservationFindSeries(r.Context(), h.DB, userID, chi.URLParam(r, "code"))
+	code := chi.URLParam(r, "code")
+	list, err := models.ObservationFindSeries(r.Context(), h.DB, userID, code)
 	if err != nil {
 		writeDBError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": list})
+	u, err := models.UserFindByID(r.Context(), h.DB, userID)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	normal, err := models.NormalRangeResolve(r.Context(), h.DB, code, u.BiologicalSex, u.BirthDate)
+	if err != nil {
+		writeDBError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{
+		"observations": list,
+		"normalRange":  normal,
+	}})
 }
