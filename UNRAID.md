@@ -71,6 +71,8 @@ Aguardar a linha `server listening on :3000` e acessar `http://ip-do-unraid:3000
 2. Clicar **Update** no container `medlog`
 3. Migrações do banco rodam automaticamente na inicialização
 
+Pushar no `main` publica `ghcr.io/edalcin/medlog:latest` sozinho via GitHub Actions, mas isso **não** atualiza o container do Unraid: o CI só publica a imagem no registro, quem puxa e recria o container é você, pelos passos acima. Verifique se o fix chegou conferindo os logs (`docker logs medlog | head -5`, o horário de início) ou o hash do bundle JS servido — nunca presuma que um commit no GitHub já está no ar.
+
 ### Via terminal
 
 ```bash
@@ -183,6 +185,10 @@ Corrigido na imagem atual. Acontecia quando o perfil do usuário estava sem sexo
 ### "Cannot read properties of null (reading 'forEach')" na tela de Revisão
 
 Corrigido na imagem atual. Acontecia quando o modelo de IA respondia sem nenhum analito fora do catálogo: o campo `unmapped` chegava como `null` em vez de lista vazia, e a tela quebrava ao montar o formulário de promoção de analitos. Mesma solução: atualizar para a imagem mais recente.
+
+### Tela de Revisão trava em "Carregando revisão..."
+
+Corrigido na imagem atual. Mesma causa dos dois casos acima, num `{#each}` diferente: quando o laudo tem dois analitos fora do catálogo com o mesmo rótulo e a mesma data de coleta (ex.: "Bastonetes" registrado em % e em /mm3 na mesma coleta), a tela quebrava ao montar a lista de pendências, mesmo com a extração já concluída com sucesso no backend — o selo "Em andamento" que aparecia era o último estado renderizado antes da tela travar, não o estado real. Mesma solução: atualizar para a imagem mais recente.
 
 ---
 
