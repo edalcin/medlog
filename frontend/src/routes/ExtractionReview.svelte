@@ -439,7 +439,7 @@
               acima continuam de fora, e capturá-los exige uma nova extração do documento.
             </p>
             <ul class="pend-list">
-              {#each review.unmapped as u, i (u.label + u.collectedAt)}
+              {#each review.unmapped as u, i (i)}
                 <li class="pend">
                   <div class="pend-head">
                     <span class="pend-label">{u.label}</span>
