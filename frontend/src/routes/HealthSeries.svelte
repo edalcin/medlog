@@ -406,7 +406,7 @@
               gráfico não desenha a banda.
             </p>
             <ul class="plain">
-              {#each normalRange.candidates as c (c.text + c.source)}
+              {#each normalRange.candidates as c (`${c.sex}|${c.ageMin}|${c.ageMax}`)}
                 <li>
                   <span class="value">{formatBand(c) ?? c.text}</span>
                   <span class="muted">— {describeCandidate(c)}, fonte: {c.source}</span>
