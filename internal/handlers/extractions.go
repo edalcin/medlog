@@ -464,7 +464,10 @@ func (h *ExtractionHandler) Review(w http.ResponseWriter, r *http.Request) {
 	payload := reviewPayload{Extraction: extraction, File: file, Observations: observations, Unmapped: []gemini.Unmapped{}}
 	if raw, err := models.ExtractionRawResponse(r.Context(), h.DB, id); err == nil && raw != "" {
 		if result, _, err := gemini.ParseRaw(raw); err == nil {
-			payload.Unmapped = result.Unmapped
+			// result.Unmapped is nil (not []) whenever the model's raw JSON
+			// omitted or null'd "unmapped" — Go marshals a nil slice as JSON
+			// null, and the frontend does .forEach on it unguarded.
+			payload.Unmapped = append([]gemini.Unmapped{}, result.Unmapped...)
 			payload.Metadata = metadataFields(file, result)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -551,5 +552,60 @@ func TestReview_PromoteIndicatorIsExplicit(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusConflict {
 		t.Errorf("duplicate promote status = %d, want 409", w.Code)
+	}
+}
+
+// answerFixtureNoUnmapped omits the "unmapped" key entirely, the way a model
+// answers when every analyte maps to the catalog. Go unmarshals a missing
+// JSON array into a nil slice, and a nil slice marshals back out as JSON
+// null, not []. The frontend's ExtractionReview.svelte does
+// review.unmapped.forEach(...) with no null guard, so a null here crashes
+// the review screen outright.
+const answerFixtureNoUnmapped = `{
+  "collectedAt": "2026-05-08",
+  "labName": "Clínica Felippe Mattoso",
+  "reportNumber": "5580135733",
+  "observations": [
+    {"code":"glucose_serum","collectedAt":"2026-05-08","valueText":"105","valueNum":105,
+     "unit":"mg/dL","referenceText":"70 a 99 mg/dL","refMin":70,"refMax":99,"outOfRange":true,"provenance":"primary"}
+  ]
+}`
+
+// TestReview_UnmappedNeverSerializesAsNull guards the exact bug a user hit:
+// "Cannot read properties of null (reading 'forEach')" on the review screen.
+// It happens whenever the model's raw answer has no "unmapped" array — Go's
+// nil-slice-marshals-to-null footgun leaks straight into the API contract.
+func TestReview_UnmappedNeverSerializesAsNull(t *testing.T) {
+	database := appdb.SetupTestDB(t)
+	auth.InitSessions(database, false)
+	ctx := context.Background()
+	filesPath := t.TempDir()
+
+	adminID := seedAdmin(t, ctx, database)
+	file := seedPDF(t, ctx, database, filesPath, adminID)
+	provider := newFakeProvider(t, answerFixtureNoUnmapped)
+	h := &handlers.ExtractionHandler{DB: database, FilesPath: filesPath, Client: provider.client()}
+	router := reviewRouter(h, adminID)
+
+	body, _ := json.Marshal(map[string]any{"fileId": file.ID, "consent": true})
+	req := httptest.NewRequest(http.MethodPost, "/api/extractions", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	var created struct{ Data models.Extraction }
+	json.NewDecoder(w.Body).Decode(&created)
+	waitForStatus(t, database, created.Data.ID, models.ExtractionSucceeded)
+
+	req = httptest.NewRequest(http.MethodGet, "/api/extractions/"+created.Data.ID+"/review", nil)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("review status = %d; body: %s", w.Code, w.Body.String())
+	}
+	raw := w.Body.String()
+	if strings.Contains(raw, `"unmapped":null`) {
+		t.Fatalf("review JSON has unmapped:null, want []: %s", raw)
+	}
+	if !strings.Contains(raw, `"unmapped":[]`) {
+		t.Errorf("review JSON missing unmapped:[], got: %s", raw)
 	}
 }
