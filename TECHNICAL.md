@@ -6,7 +6,7 @@
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Backend | Go 1.24 |
+| Backend | Go 1.25 |
 | Router | go-chi/chi v5 |
 | Sessões | alexedwards/scs v2 (armazenadas no SQLite) |
 | Migrações | pressly/goose v3 |
@@ -61,6 +61,8 @@ internal/
     db.go                       # sql.Open + PRAGMA WAL + foreign keys
     migrate.go                  # goose executa migrations no startup
     testhelper.go               # SetupTestDB(:memory:) para testes
+    migrate_test.go             # Up/Down de cada migração, catálogo com 55 linhas
+    migrate009_test.go          # 78 Faixas de normalidade: sem empate de especificidade (sexo × idade 18–100)
   handlers/                     # Handlers HTTP por domínio
     auth.go                     # SignIn, SignOut, Me
     consultations.go
@@ -71,17 +73,21 @@ internal/
     files.go
     phones.go                   # CRUD telefones de profissionais/clínicas
     sharing.go                  # Compartilhamento entre usuários
-    users.go                    # CRUD usuários + /me/password + /me/theme + /others
+    users.go                    # CRUD usuários + /me (perfil) + /me/password + /me/theme + /others
     admin.go                    # Admin: stats, bulk-delete, backup/restore, login-logs
     extractions.go              # Extração por IA: disparo, status, revisão, confirmar/rejeitar
-    series.go                   # Série temporal de indicadores (rotas de usuário, não de admin)
+    series.go                   # Série temporal de indicadores + Faixa de normalidade (rotas de usuário, não de admin)
     dashboard.go                # Dashboard com cache TTL 5min
     helpers.go                  # parsePagination, writeJSON, writePagedJSON, writeDBError
     auth_test.go
     consultations_test.go
     professionals_test.go
+    files_test.go
+    files_upload_test.go
+    dashboard_test.go
+    users_me_test.go            # PATCH /users/me: guarda de senha só na troca real de e-mail, date() no nascimento
     extractions_test.go         # Extração contra provedor falso (httptest)
-    review_test.go              # Revisão, confirmação em bloco e não-duplicação
+    review_test.go              # Revisão, confirmação em bloco, não-duplicação, contrato unmapped nunca null
     series_test.go              # Série: só confirmed, escopo por usuário
   middleware/
     security.go                 # CSP, X-Frame-Options, HSTS, nosniff
@@ -89,7 +95,7 @@ internal/
   gemini/
     gemini.go                   # Cliente Gemini: PDF inline, responseSchema, contagem de tokens
   models/                       # Funções SQL (sem ORM)
-    user.go
+    user.go                     # inclui biological_sex/birth_date, sempre lido com date()
     consultation.go
     professional.go
     clinic.go
@@ -99,11 +105,14 @@ internal/
     sharing.go                  # ProfessionalSharing*, ClinicSharing*
     login_log.go                # LoginLogFindAll
     health.go                   # Indicator*, Observation*, Extraction* (v3.0)
+    normalrange.go              # NormalRangeResolve: casa Característica do usuário contra indicator_normal_ranges (v3.1)
     appconfig.go                # ConfigGet/ConfigSet sobre app_config
     helpers.go                  # inClause, anySlice (batch queries)
     user_test.go
     consultation_test.go
     professional_test.go
+    health_test.go              # dedup por procedência na leitura (ADR 0013)
+    normalrange_test.go         # resolução por especificidade, empate não desenha banda
   embed/                        # Build do Svelte embutido
   migrations/                   # SQL embutidos para goose (fonte canônica)
     001_initial_schema.sql
@@ -113,10 +122,13 @@ internal/
     005_fix_datetime_format.sql
     006_file_hash_index.sql
     007_health_indicators.sql   # Catálogo + observações + extrações (v3.0)
+    008_normal_ranges.sql       # users.biological_sex/birth_date + indicator_normal_ranges vazia (v3.1)
+    009_seed_normal_ranges.sql  # Semeia 78 Faixas de normalidade com fonte citada (v3.1)
     migrations.go               # //go:embed *.sql
 frontend/
   src/lib/api.ts                # Cliente API tipado (todos os endpoints)
-  src/lib/auth.ts               # Stores + setTheme + signout
+  src/lib/auth.ts                # Stores + setTheme + signout
+  src/lib/date.ts                # Formatação de data pt-BR reaproveitada pelo Chart.js
   src/routes/
     Dashboard.svelte
     ConsultationList.svelte
@@ -129,11 +141,17 @@ frontend/
     Admin.svelte                # Tabs admin, incluindo login logs e "Extração por IA"
     Files.svelte                # Lista de documentos + disparo de extração
     ExtractionReview.svelte     # Revisão em bloco ao lado do PDF
-    HealthSeries.svelte         # Série temporal, gráfico SVG escrito à mão
+    HealthSeries.svelte         # Série temporal em Chart.js, banda de Faixa de normalidade, clique abre o Laudo
+    Config.svelte                # Perfil: nome, e-mail, senha, sexo biológico, nascimento
     SignIn.svelte
   src/components/
-    Navigation.svelte           # Cyclo de tema SYSTEM/LIGHT/DARK
+    Navigation.svelte           # Ciclo de tema SYSTEM/LIGHT/DARK
     FileUpload.svelte
+    FileAttachModal.svelte
+    FileEditModal.svelte
+    CategorySelect.svelte
+    StarRating.svelte
+    TipTapEditor.svelte
     InlineCreate.svelte         # Suporta specialties, clinics (c/ address), professionals
     MarkdownPreview.svelte      # marked.parse()
 ```
@@ -146,6 +164,7 @@ frontend/
 users
   id, email, username, name, password_hash
   role (ADMIN|USER), theme (SYSTEM|LIGHT|DARK)
+  biological_sex (M|F, nullable), birth_date (DATE, nullable)   # v3.1 — Característica do usuário, resolve a Faixa de normalidade
   created_at, updated_at
 
 specialties
@@ -223,6 +242,12 @@ health_observations                        # v3.0 — uma medição de um Indica
   provenance (primary|evolutive), status (review|confirmed), created_at
   INDEX(user_id, indicator_id, collected_at)                        # a consulta da série
   UNIQUE(user_id, indicator_id, collected_at, provenance)           # reextrair substitui, não duplica
+
+indicator_normal_ranges                    # v3.1 — Faixa de normalidade, distinta da faixa impressa no laudo
+  id, indicator_id → health_indicators
+  sex (M|F, nullable = qualquer), age_min, age_max (nullable = sem piso/teto)
+  min, max (nullable = sem banda, mas a faixa ainda existe como texto)
+  text NOT NULL, source NOT NULL                                    # citação obrigatória, nunca inventada
 
 sessions                        # gerenciado pelo alexedwards/scs
   token, data, expiry
@@ -351,7 +376,7 @@ POST   /api/health-indicators    Promove analito pendente ao catálogo (catálog
 
 ### Pré-requisitos
 
-- Go 1.24+
+- Go 1.25+
 - Node.js 20+
 
 ### Setup
@@ -545,11 +570,11 @@ go test ./...
 ```
 
 Cobertura:
-- `internal/models/` — user, consultation, professional (crud + batch specialties + count)
-- `internal/handlers/` — auth (rate limit), consultations (pagination), professionals (list format)
-- `internal/db/` — `TestMigrate007`: a migração sobe e desce, o catálogo tem 55 linhas, `provenance` inválida é rejeitada pelo CHECK
+- `internal/models/` — user, consultation, professional (crud + batch specialties + count); `health_test.go` (dedup por procedência na leitura, ADR 0013); `normalrange_test.go` (resolução por especificidade, empate não desenha banda)
+- `internal/handlers/` — auth (rate limit), consultations (pagination), professionals (list format); `users_me_test.go` (perfil: guarda de senha só na troca real de e-mail, nascimento como TEXT)
+- `internal/db/` — `TestMigrate007`: a migração sobe e desce, o catálogo tem 55 linhas, `provenance` inválida é rejeitada pelo CHECK; `TestMigrate009` (`migrate009_test.go`): 78 Faixas de normalidade semeadas, nenhuma órfã, nenhum empate de especificidade para sexo × idade de 18 a 100
 - `internal/handlers/extractions_test.go` — extração ponta a ponta contra provedor falso em `httptest`: consentimento obrigatório, linha antes da chamada, resposta bruta persistida, analito fora do catálogo virando pendência
-- `internal/handlers/review_test.go` — confirmação em bloco, metadado humano preservado, reextração que substitui em vez de duplicar
+- `internal/handlers/review_test.go` — confirmação em bloco, metadado humano preservado, reextração que substitui em vez de duplicar, e `TestReview_UnmappedNeverSerializesAsNull`: o campo `unmapped` do JSON de revisão nunca serializa como `null` quando o modelo omite a chave (slice nil do Go vira `null`, e o frontend fazia `.forEach` sem guarda)
 - `internal/handlers/series_test.go` — série só com `confirmed`, escopo por usuário, ordem por data de coleta
 
 Helpers:
@@ -564,7 +589,7 @@ Helpers:
 
 Build multi-stage:
 1. `node:20-alpine` → compila o Svelte
-2. `golang:1.24-alpine` → compila o binário Go com frontend embutido (`CGO_ENABLED=0`)
+2. `golang:1.25-alpine` → compila o binário Go com frontend embutido (`CGO_ENABLED=0`)
 3. `alpine:3.21` → imagem final (~30MB) com apenas o binário
 
 Sem dependência de banco externo — SQLite é embedded.

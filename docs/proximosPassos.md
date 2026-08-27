@@ -2,8 +2,7 @@
 
 Documento de continuidade entre sessões. Registra o que já foi decidido, o que está em aberto e os fatos do repositório levantados, para que uma sessão nova retome sem reinvestigar.
 
-**Última atualização:** 2026-08-26 (segunda sessão do dia)
-**Fase atual:** v3.0 em uso real; ciclo **v3.1 — Faixa de normalidade e gráfico interativo** entregue no essencial. Q1 a Q31 fechadas, ADRs `0001` a `0015`, migrações `001` a `009`. A verificação visual pendente foi feita e achou dois defeitos, corrigidos. A Faixa de normalidade **está implementada e semeada**: 78 faixas, 55 Indicadores, fonte citada em cada linha. **Em aberto: só a Q32, banda de faixa de um lado só (seção 3, detalhe em 8.4).**
+**Última atualização:** 2026-08-27. **Fase atual:** v3.0 em uso real; ciclo **v3.1 — Faixa de normalidade e gráfico interativo** entregue, incluindo dois defeitos de uso real relatados pelo usuário e corrigidos (seção 8.6). Q1 a Q31 fechadas, ADRs `0001` a `0015`, migrações `001` a `009`. A Faixa de normalidade **está implementada e semeada**: 78 faixas, 55 Indicadores, fonte citada em cada linha. **Em aberto: Q32 (seção 3), banda de faixa de um lado só, e a prova de imagem no UNRAID (8.5).**
 
 ---
 
@@ -224,7 +223,7 @@ Cada decisão nova deve, na mesma sessão: atualizar `CONTEXT.md` se criar ou al
 
 ## 8. Como retomar numa sessão nova
 
-**Onde o trabalho está:** branch `main`, working tree limpo, tudo commitado e sincronizado. Três commits cobrem a v3.1: `c6d8bad` (grill Q18–Q31, ADRs `0012`–`0015`, migração `008`, `/config`, Chart.js), `50a02a2` (dois defeitos de `/config` corrigidos, resolução da Faixa de normalidade) e `d784ec8` (migração `009` com as 78 faixas, limites em destaque na tela).
+**Onde o trabalho está:** branch `main`, working tree limpo, tudo commitado e sincronizado. Três commits cobrem a v3.1: `c6d8bad` (grill Q18–Q31, ADRs `0012`–`0015`, migração `008`, `/config`, Chart.js), `50a02a2` (dois defeitos de `/config` corrigidos, resolução da Faixa de normalidade) e `d784ec8` (migração `009` com as 78 faixas, limites em destaque na tela). Sessão de 2026-08-27 acrescenta dois commits de correção de defeito real, ver 8.6: `f9664d6` (chave duplicada no `{#each}` da tela Indicadores) e `eb482e3` (`unmapped:null` na tela de Revisão).
 
 ### 8.1 O que a sessão anterior (2026-08-26, primeira) fez
 
@@ -325,6 +324,20 @@ Como cada ponto ficou na migração `009`:
 
 **Higiene de segurança pendente do lado do usuário:** a `GEMINI_API_KEY` real apareceu na saída de um comando em sessão anterior (`docker compose config`). Nunca entrou no git, mas convém rotacioná-la no Google AI Studio.
 
+### 8.6 Sessão 2026-08-27: dois defeitos de uso real, relatados pelo usuário e corrigidos
+
+O usuário reportou dois problemas na instância real, cada um com print de tela, em mensagens separadas. Nenhum dos dois exigiu nova decisão de produto — os dois são bug fix puro, sem ADR.
+
+**Defeito 1 — `/indicators` preso em "Carregando..." para sempre.** Reproduzido localmente com dado real (série de hemoglobina, perfil sem sexo/nascimento): `HealthSeries.svelte` tinha `{#each normalRange.candidates as c (c.text + c.source)}` na lista de candidatas ambíguas. Duas candidatas do mesmo Indicador citam com frequência o **mesmo texto e a mesma fonte** — todo o hemograma Fleury é assim, M e F só diferem em `min`/`max` — e a chave colidia. Svelte lança `each_key_duplicate`, não tratado, e o erro durante o flush de montagem inicial aborta a renderização inteira: a tela trava no estado anterior (`loading: true`), mesmo com as chamadas de API já concluídas em 200. O mesmo flush também derruba o menu do usuário (engrenagem de Configurações), o que explica por que o usuário não achava onde preencher sexo/nascimento — não é que faltasse o link, é que a tela nunca terminou de montar. Corrigido trocando a chave para `` `${c.sex}|${c.ageMin}|${c.ageMax}` ``, a identidade real da candidata, já garantida única pelo `migrate009_test.go`. Commit `f9664d6`.
+
+**Defeito 2 — "Cannot read properties of null (reading 'forEach')" ao abrir a Revisão de uma extração nova.** `internal/handlers/extractions.go`, handler `Review`: `payload.Unmapped = result.Unmapped` sobrescrevia o valor seguro (`[]gemini.Unmapped{}`) com o slice devolvido por `gemini.ParseRaw`, que é **nil** sempre que o JSON bruto do modelo vem sem a chave `"unmapped"` (acontece quando todo analito mapeia no catálogo). Go serializa slice nil como JSON `null`. `ExtractionReview.svelte`, `resetPromoteForms()`, faz `review.unmapped.forEach(...)` sem guarda de nulo — e a mensagem de erro que aparece na tela é literalmente essa exceção, capturada pelo `catch` de `load()`. Corrigido normalizando com `append([]gemini.Unmapped{}, result.Unmapped...)` antes de servir. Commit `eb482e3`.
+
+**Verificação, não só leitura de código:** os dois foram reproduzidos ao vivo — build local, servidor em `:3399`, banco semeado, `browser` do agente disparando os cliques de verdade — antes de corrigir, e reconfirmados depois. Para o Defeito 2, teste novo `TestReview_UnmappedNeverSerializesAsNull` em `internal/handlers/review_test.go`, com mutação conferida: revertendo a correção, o teste falha exatamente com `unmapped:null` no corpo.
+
+**Diagnóstico em produção (UNRAID, `192.168.1.10`), sem alterar nada:** por pedido do usuário, backup do banco (`sqlite3 .backup`) antes de qualquer leitura, salvo em `/mnt/user/Storage/appsdata/medlog/db/medlog.sqlite.bak-20260827-054843`. Consulta somente leitura confirmou que o Defeito 1 batia em dado real: dos 6 usuários da instância, os 6 estão sem sexo/nascimento no perfil, e o usuário com 563 Observações confirmadas tinha 11 Indicadores (todo o hemograma) com candidatas de mesmo texto/fonte — a colisão disparava de verdade, não só em teoria. Nenhuma alteração foi feita no banco nem no container; o path de produção do usuário é `/mnt/user/Storage/appsdata/medlog/db`, diferente do `/mnt/user/appdata/medlog/db` que este documento e o `UNRAID.md` usam como exemplo genérico — é escolha de instalação, não uma correção a fazer aqui.
+
+**Lição de fundo, vale para qualquer `{#each}` futuro:** a chave de um `{#each}` precisa ser a **identidade do domínio**, não um campo de exibição. Texto e fonte são o que a tela *mostra*; sexo e faixa etária são o que *distingue* duas candidatas. Confundir os dois é fácil porque compila e funciona no caminho feliz — só quebra quando dois registros de exibição igual coexistem, que é exatamente o caso mais comum deste catálogo.
+
 ### Armadilhas que já custaram tempo, para não repetir
 
 - `ALTER TABLE ... DROP COLUMN` falha se a coluna estiver indexada: no `Down` da `007`, o índice é dropado antes. SQLite embutido é 3.49.2, folgado para `DROP COLUMN` (3.35+).
@@ -356,3 +369,5 @@ Como cada ponto ficou na migração `009`:
 - A migração `009` semeia dado, então teste que precisa de faixa própria deve **apagar** as linhas daquele Indicador antes de inserir a sua (`clearRanges`). Mesma armadilha do catálogo semeado pela `007`, e ela reapareceu igual.
 - Faixa de normalidade costuma ser de **um lado só** (17 das 78): "acima de 40", "até 99". Banda de gráfico precisa dos dois lados, então trocar a fonte da banda da Faixa de referência do Laudo para a Faixa de normalidade **apaga** a banda desses indicadores. Não é detalhe de implementação: é decisão de desenho.
 - O `text` da faixa é descrição, não intervalo ("Hemoglobina, população adulta brasileira saudável"). Mostrar só o texto esconde o número, que é o que a pessoa foi procurar na tela. Os limites têm de ser formatados a partir de `min`/`max`.
+- Chave de `{#each}` **tem** de ser a identidade do domínio, nunca um campo de exibição. `(c.text + c.source)` colidia porque duas candidatas de sexo/idade diferentes citam com frequência o mesmo texto e a mesma fonte (todo o hemograma Fleury). `each_key_duplicate` não tratado aborta o flush de montagem inteiro do componente — a tela trava no estado anterior, o que se parece com "travou carregando" e não com "erro de chave", e derruba de brinde qualquer irmão que monte no mesmo flush (o menu do usuário, neste caso).
+- Slice Go que fica **nil** (nunca inicializado, ou reatribuído a partir de um campo ausente no JSON de origem) serializa como `null`, não `[]`. Qualquer `.forEach`/`.map` do frontend sem guarda de nulo quebra. Regra prática: todo campo de resposta que o frontend itera sem checar nulo tem que nascer como slice vazio no Go, nunca como `var x []T` cru reatribuído por um parse que pode faltar a chave.

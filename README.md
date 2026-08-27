@@ -4,7 +4,7 @@
   <p><em>Sistema self-hosted de registro de consultas médicas</em></p>
 </div>
 
-[![Go](https://img.shields.io/badge/go-1.24-00ADD8.svg)](https://go.dev/)
+[![Go](https://img.shields.io/badge/go-1.25-00ADD8.svg)](https://go.dev/)
 [![Svelte](https://img.shields.io/badge/svelte-5-FF3E00.svg)](https://svelte.dev/)
 [![SQLite](https://img.shields.io/badge/sqlite-embedded-003B57.svg)](https://www.sqlite.org/)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
@@ -24,12 +24,13 @@ MedLog centraliza o histórico médico de consultas, exames, laudos e receitas e
 - Upload de arquivos (PDF, PNG, JPG — até 10MB por arquivo)
 - Categorização de arquivos (laudos, receitas, pedidos de exame, etc.)
 
-**Indicadores de Saúde (v3.0)**
+**Indicadores de Saúde (v3.0 – v3.1)**
 - Extração dos valores de um PDF de laudo por IA (Gemini), a partir de documento **já anexado** no sistema
 - Catálogo global de 55 Indicadores semeado na instalação (hemograma, lipidograma, função renal, tireoide, etc.)
 - Revisão obrigatória: o dono do documento confere a lista inteira ao lado do PDF e confirma ou rejeita em bloco — valor não revisado não aparece em lugar nenhum
 - Leitura do laudo evolutivo: as coletas anteriores impressas no próprio documento viram série histórica
-- Série temporal por Indicador, com faixa de referência desenhada e valor fora da faixa destacado
+- Série temporal por Indicador em gráfico interativo (Chart.js, empacotado — nunca por CDN), com tooltip por ponto e clique para abrir o laudo de origem
+- Faixa de normalidade por sexo biológico e idade, pesquisada em fonte citável e distinta da faixa impressa no laudo — banda desenhada no gráfico quando o perfil resolve um candidato único
 - Um documento guarda uma extração: a nova substitui a anterior, e o link **zerar** apaga tudo daquele documento para recomeçar com outro modelo
 - Valor com qualificador (`>90`, `normais`) é guardado fiel e listado, nunca convertido em número
 
@@ -52,6 +53,7 @@ MedLog centraliza o histórico médico de consultas, exames, laudos e receitas e
 **Configurações de Usuário**
 - Tema claro / escuro / sistema (persistido por usuário)
 - Alteração de senha pelo próprio usuário
+- Sexo biológico e data de nascimento, usados só para resolver a Faixa de normalidade dos Indicadores — nunca enviados ao provedor de IA
 
 **Administração**
 - Painel com visão global: usuários, consultas, profissionais, arquivos

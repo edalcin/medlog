@@ -176,6 +176,14 @@ Extração parada em "em andamento" depois de um reinício não é progresso: a 
 
 O documento é servido corretamente; o que costuma acontecer é o navegador estar configurado para **baixar** PDFs em vez de exibi-los, e então o `<iframe>` fica vazio. A própria tela oferece "Abrir o documento em outra aba".
 
+### Indicadores fica preso em "Carregando..."
+
+Corrigido na imagem atual. Acontecia quando o perfil do usuário estava sem sexo biológico/nascimento e duas Faixas de normalidade do mesmo Indicador citavam texto e fonte idênticos (ex.: hemoglobina, hematócrito — todo o hemograma): a tela quebrava silenciosamente ao montar (`each_key_duplicate` do Svelte) e ficava presa em "Carregando...", mesmo com a API respondendo normalmente. Se você ainda vir isso, atualize para a imagem mais recente — `docker pull ghcr.io/edalcin/medlog:latest` e recrie o container.
+
+### "Cannot read properties of null (reading 'forEach')" na tela de Revisão
+
+Corrigido na imagem atual. Acontecia quando o modelo de IA respondia sem nenhum analito fora do catálogo: o campo `unmapped` chegava como `null` em vez de lista vazia, e a tela quebrava ao montar o formulário de promoção de analitos. Mesma solução: atualizar para a imagem mais recente.
+
 ---
 
 ## Links
