@@ -19,7 +19,7 @@
     "@tiptap/core": "^3.27.0",
     "@tiptap/extension-placeholder": "^3.27.0",
     "@tiptap/pm": "^3.27.0",
-    "@tiptap/starter-kit": "^3.27.0",
+    "@tiptap/starter-kit": "^3.27.3",
     "boxicons": "^2.1.4",
     "chart.js": "^4.5.1",
     "marked": "^18.0.3",
