@@ -44,7 +44,7 @@ docker run -d \
   -e SESSION_SECURE="true" \
   -e TRUST_PROXY="false" \
   -e GEMINI_API_KEY="sua_chave_do_google_ai_studio" \
-  git.dalc.in/edalcin/medlog:latest
+  ghcr.io/edalcin/medlog:latest
 ```
 
 > `ADMIN_EMAIL` e `ADMIN_PASSWORD` são usados apenas no **primeiro boot** para criar o administrador. Após a criação do usuário, remova essas variáveis por segurança.
@@ -71,14 +71,14 @@ Aguardar a linha `server listening on :3000` e acessar `http://ip-do-unraid:3000
 2. Clicar **Update** no container `medlog`
 3. Migrações do banco rodam automaticamente na inicialização
 
-Pushar no `main` publica `git.dalc.in/edalcin/medlog:latest` sozinho via Forgejo Actions, mas isso **não** atualiza o container do Unraid: o CI só publica a imagem no registro, quem puxa e recria o container é você, pelos passos acima. Verifique se o fix chegou conferindo os logs (`docker logs medlog | head -5`, o horário de início) ou o hash do bundle JS servido — nunca presuma que um commit no repositório já está no ar.
+Pushar no `main` publica `ghcr.io/edalcin/medlog:latest` sozinho via GitHub Actions, mas isso **não** atualiza o container do Unraid: o CI só publica a imagem no registro, quem puxa e recria o container é você, pelos passos acima. Verifique se o fix chegou conferindo os logs (`docker logs medlog | head -5`, o horário de início) ou o hash do bundle JS servido — nunca presuma que um commit no GitHub já está no ar.
 
 ### Via terminal
 
 ```bash
 docker stop medlog
 docker rm medlog
-docker pull git.dalc.in/edalcin/medlog:latest
+docker pull ghcr.io/edalcin/medlog:latest
 # Re-executar o docker run com as mesmas variáveis
 ```
 
@@ -180,7 +180,7 @@ O documento é servido corretamente; o que costuma acontecer é o navegador esta
 
 ### Indicadores fica preso em "Carregando..."
 
-Corrigido na imagem atual. Acontecia quando o perfil do usuário estava sem sexo biológico/nascimento e duas Faixas de normalidade do mesmo Indicador citavam texto e fonte idênticos (ex.: hemoglobina, hematócrito — todo o hemograma): a tela quebrava silenciosamente ao montar (`each_key_duplicate` do Svelte) e ficava presa em "Carregando...", mesmo com a API respondendo normalmente. Se você ainda vir isso, atualize para a imagem mais recente — `docker pull git.dalc.in/edalcin/medlog:latest` e recrie o container.
+Corrigido na imagem atual. Acontecia quando o perfil do usuário estava sem sexo biológico/nascimento e duas Faixas de normalidade do mesmo Indicador citavam texto e fonte idênticos (ex.: hemoglobina, hematócrito — todo o hemograma): a tela quebrava silenciosamente ao montar (`each_key_duplicate` do Svelte) e ficava presa em "Carregando...", mesmo com a API respondendo normalmente. Se você ainda vir isso, atualize para a imagem mais recente — `docker pull ghcr.io/edalcin/medlog:latest` e recrie o container.
 
 ### "Cannot read properties of null (reading 'forEach')" na tela de Revisão
 
@@ -194,5 +194,5 @@ Corrigido na imagem atual. Mesma causa dos dois casos acima, num `{#each}` difer
 
 ## Links
 
-- [Repositório](https://git.dalc.in/edalcin/medlog)
+- [Repositório GitHub](https://github.com/edalcin/medlog)
 - [Documentação Técnica](./TECHNICAL.md)

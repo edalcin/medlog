@@ -383,7 +383,7 @@ POST   /api/health-indicators    Promove analito pendente ao catálogo (catálog
 
 ```bash
 # Clone
-git clone https://git.dalc.in/edalcin/medlog.git
+git clone https://github.com/edalcin/medlog.git
 cd medlog
 
 # Backend

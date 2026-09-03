@@ -96,7 +96,7 @@ Q1 a Q31 estão fechadas, e a revisão de dado clínico que a seção 3 cobrava 
 
 **Operação e CI**
 - Volume único `./data` com `db/` e `uploads/`. `DATABASE_URL` e `SESSION_SECRET` obrigatórias; `FILES_PATH`, `PORT`, `SESSION_SECURE`, `TRUST_PROXY`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` opcionais.
-- Forgejo Actions publica em `git.dalc.in/edalcin/medlog` (linux/amd64). Roda lint, typecheck e build do frontend.
+- GitHub Actions publica em `ghcr.io/edalcin/medlog` (linux/amd64). Roda lint, typecheck e build do frontend.
 - Existem **17** arquivos `_test.go` (handlers, models e db) que **não rodam no CI**. Os oito da v3.0/v3.1 são `internal/db/migrate_test.go`, `internal/db/migrate009_test.go`, `internal/handlers/extractions_test.go`, `internal/handlers/review_test.go`, `internal/handlers/series_test.go`, `internal/handlers/users_me_test.go`, `internal/models/health_test.go` e `internal/models/normalrange_test.go`.
 - Interface admin: `internal/handlers/admin.go` (11 endpoints) e `frontend/src/routes/Admin.svelte`, agora com **10 abas**, incluindo backup, restore e "Extração por IA".
 - `npm run check` **não existe** e `svelte-check` **não está instalado**. A verificação de frontend disponível é `npm run build`, que roda o compilador Svelte e reprova runa mal usada. Adicionar `svelte-check` é decisão em aberto, nunca proposta ao usuário como necessária.
@@ -316,7 +316,7 @@ Como cada ponto ficou na migração `009`:
 
 ### 8.5 Pendências herdadas, ainda válidas
 
-**Teste da imagem no UNRAID** (`git.dalc.in/edalcin/medlog:latest`), que ainda não aconteceu: extrair, revisar, confirmar, ver a série, zerar e reextrair. Agora com um passo a mais, porque as migrações `008` e `009` entram nessa atualização: conferir que sobem sozinhas sobre um banco com dado real, que `/config` grava sexo e nascimento, e que a tela de Indicadores mostra a Faixa de normalidade com a fonte.
+**Teste da imagem no UNRAID** (`ghcr.io/edalcin/medlog:latest`), que ainda não aconteceu: extrair, revisar, confirmar, ver a série, zerar e reextrair. Agora com um passo a mais, porque as migrações `008` e `009` entram nessa atualização: conferir que sobem sozinhas sobre um banco com dado real, que `/config` grava sexo e nascimento, e que a tela de Indicadores mostra a Faixa de normalidade com a fonte.
 
 **Oferta em aberto, não pedida:** reprocessar a resposta bruta já paga, sem nova chamada à API. `raw_response` e `gemini.ParseRaw` já existem; falta endpoint e botão.
 

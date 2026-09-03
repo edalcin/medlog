@@ -7,7 +7,7 @@
 [![Go](https://img.shields.io/badge/go-1.25-00ADD8.svg)](https://go.dev/)
 [![Svelte](https://img.shields.io/badge/svelte-5-FF3E00.svg)](https://svelte.dev/)
 [![SQLite](https://img.shields.io/badge/sqlite-embedded-003B57.svg)](https://www.sqlite.org/)
-[![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](https://git.dalc.in/edalcin/-/packages/container/medlog)
+[![Docker](https://img.shields.io/badge/docker-ready-2496ED.svg)](https://github.com/edalcin/medlog/pkgs/container/medlog)
 [![Gemini](https://img.shields.io/badge/gemini-opcional-8E75B2.svg)](https://ai.google.dev/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -92,7 +92,7 @@ docker compose up -d
 ```yaml
 services:
   medlog:
-    image: git.dalc.in/edalcin/medlog:latest
+    image: ghcr.io/edalcin/medlog:latest
     ports:
       - "3000:3000"
     volumes:

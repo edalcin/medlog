@@ -12,18 +12,20 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY: git.dalc.in
+  REGISTRY: ghcr.io
   IMAGE_NAME: edalcin/medlog
 
 jobs:
   quality:
-    runs-on: docker
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: 'npm'
@@ -42,11 +44,16 @@ jobs:
         run: echo "(Adicionar testes futuramente)"
         continue-on-error: true
   build-and-push:
-    runs-on: docker
+    runs-on: ubuntu-latest
     needs: quality
     if: always()
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Log in to Container Registry
@@ -70,6 +77,7 @@ jobs:
             type=sha
             type=raw,value=unraid-test,enable=true
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -77,23 +85,29 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Generate artifact attestation
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
       - name: Generate CHANGELOG fragment (tag only)
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           echo "# Release $GITHUB_REF_NAME" > RELEASE_NOTES.md
           echo >> RELEASE_NOTES.md
-          echo "Imagem: git.dalc.in/${{ env.IMAGE_NAME }}:$GITHUB_REF_NAME" >> RELEASE_NOTES.md
+          echo "Imagem: ghcr.io/${{ env.IMAGE_NAME }}:$GITHUB_REF_NAME" >> RELEASE_NOTES.md
           echo >> RELEASE_NOTES.md
           echo "Commit: $GITHUB_SHA" >> RELEASE_NOTES.md
           echo >> RELEASE_NOTES.md
           echo "(Gerar changelog detalhado quando houver conventional commits)" >> RELEASE_NOTES.md
-      - name: Create Forgejo Release
+      - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: akkuman/gitea-release-action@v1
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
-          token: ${{ secrets.GITHUB_TOKEN }}
